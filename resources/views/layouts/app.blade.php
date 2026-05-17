@@ -1,36 +1,45 @@
-<!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="csrf-token" content="{{ csrf_token() }}">
+{{-- resources/views/layouts/app.blade.php --}}
+@extends('adminlte::page')
 
-        <title>{{ config('app.name', 'Laravel') }}</title>
+@section('title', config('adminlte.title'))
 
-        <!-- Fonts -->
-        <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+@section('content_header')
+    <div class="d-flex justify-content-between align-items-center">
+        <h1 class="m-0">@yield('page_title')</h1>
+        <div>@yield('page_actions')</div>
+    </div>
+@stop
 
-        <!-- Scripts -->
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
-    </head>
-    <body class="font-sans antialiased">
-        <div class="min-h-screen bg-gray-100">
-            @include('layouts.navigation')
-
-            <!-- Page Heading -->
-            @isset($header)
-                <header class="bg-white shadow">
-                    <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-                        {{ $header }}
-                    </div>
-                </header>
-            @endisset
-
-            <!-- Page Content -->
-            <main>
-                {{ $slot }}
-            </main>
+@section('content')
+    {{-- Flash Messages --}}
+    @if(session('success'))
+        <div class="alert alert-success alert-dismissible fade show">
+            <i class="fas fa-check-circle mr-1"></i> {{ session('success') }}
+            <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
         </div>
-    </body>
-</html>
+    @endif
+
+    @if(session('error'))
+        <div class="alert alert-danger alert-dismissible fade show">
+            <i class="fas fa-exclamation-circle mr-1"></i> {{ session('error') }}
+            <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
+        </div>
+    @endif
+
+    @yield('page_content')
+@stop
+
+@section('css')
+    <style>
+        .badge-active    { background-color: #28a745; }
+        .badge-inactive  { background-color: #6c757d; }
+        .badge-suspended { background-color: #ffc107; color: #000; }
+        .badge-expired   { background-color: #dc3545; }
+        .card-header { font-weight: 600; }
+    </style>
+    @yield('extra_css')
+@stop
+
+@section('js')
+    @yield('extra_js')
+@stop
