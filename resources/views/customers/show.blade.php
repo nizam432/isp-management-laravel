@@ -70,7 +70,8 @@
             </div>
         </div>
     </div>
-
+{{-- MikroTik Card --}}
+@include('customers.partials.mikrotik-card', ['customer' => $customer])
     {{-- Invoices & Payments --}}
     <div class="col-md-8">
         {{-- Invoice List --}}

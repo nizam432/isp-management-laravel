@@ -6,21 +6,25 @@ use App\Models\Customer;
 use App\Models\Package;
 use App\Models\Agent;
 use App\Models\ActivityLog;
-use App\Models\MikrotikRouter;
-use App\Services\MikrotikService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 
 class CustomerController extends Controller
 {
+    /**
+     * Display a paginated list of customers.
+     * Supports filtering by search keyword, status, and area.
+     */
     public function index(Request $request)
     {
         $customers = Customer::with(['package', 'agent'])
+            // Search by name, phone, or customer code
             ->when($request->search, fn($q) => $q
                 ->where('name', 'like', "%{$request->search}%")
                 ->orWhere('phone', 'like', "%{$request->search}%")
                 ->orWhere('customer_code', 'like', "%{$request->search}%"))
+            // Filter by status: active / inactive / suspended / expired
             ->when($request->status, fn($q) => $q->where('status', $request->status))
+            // Filter by area
             ->when($request->area, fn($q) => $q->where('area', $request->area))
             ->latest()
             ->paginate(20);
@@ -28,15 +32,20 @@ class CustomerController extends Controller
         return view('customers.index', compact('customers'));
     }
 
+    /**
+     * Show the form for creating a new customer.
+     */
     public function create()
     {
+        // Only show active packages and agents
         $packages = Package::active()->get();
         $agents   = Agent::active()->get();
+
         return view('customers.create', compact('packages', 'agents'));
     }
 
     /**
-     * Store করার পর automatically MikroTik এ PPPoE user তৈরি হবে।
+     * Store a newly created customer in the database.
      */
     public function store(Request $request)
     {
@@ -49,35 +58,27 @@ class CustomerController extends Controller
             'billing_date'    => 'required|integer|min:1|max:28',
             'connection_date' => 'nullable|date',
             'status'          => 'required|in:active,inactive,suspended,expired',
-            'pppoe_username'  => 'nullable|string|max:50|unique:customers',
-            'pppoe_password'  => 'nullable|string|max:50',
         ]);
 
         $data = $request->all();
+
+        // Auto-generate unique customer code e.g. ISP-0001
         $data['customer_code'] = Customer::generateCode();
-        $data['created_by']    = auth()->id();
 
-        // PPPoE username না দিলে auto-generate
-        if (empty($data['pppoe_username'])) {
-            $data['pppoe_username'] = 'isp_' . strtolower(preg_replace('/\s+/', '', $request->name)) . '_' . rand(100, 999);
-        }
-        if (empty($data['pppoe_password'])) {
-            $data['pppoe_password'] = 'pass' . rand(10000, 99999);
-        }
+        // Track which user created this record
+        $data['created_by'] = auth()->id();
 
+        // Handle profile photo upload
         if ($request->hasFile('photo')) {
             $data['photo'] = $request->file('photo')->store('customers/photos', 'public');
         }
+
+        // Handle NID photo upload
         if ($request->hasFile('nid_photo')) {
             $data['nid_photo'] = $request->file('nid_photo')->store('customers/nid', 'public');
         }
 
         $customer = Customer::create($data);
-
-        // ── Auto-Provision MikroTik ──────────────────
-        if ($customer->status === 'active') {
-            $this->provisionToMikrotik($customer);
-        }
 
         ActivityLog::log('Customer created', 'Customer', $customer->id, null, $customer->toArray());
 
@@ -85,54 +86,56 @@ class CustomerController extends Controller
                          ->with('success', 'Customer added successfully.');
     }
 
+    /**
+     * Display the specified customer with related data.
+     */
     public function show(Customer $customer)
     {
+        // Eager load all related data
         $customer->load(['package', 'agent', 'invoices', 'payments', 'tickets']);
+
         return view('customers.show', compact('customer'));
     }
 
+    /**
+     * Show the form for editing the specified customer.
+     */
     public function edit(Customer $customer)
     {
         $packages = Package::active()->get();
         $agents   = Agent::active()->get();
+
         return view('customers.edit', compact('customer', 'packages', 'agents'));
     }
 
+    /**
+     * Update the specified customer in the database.
+     */
     public function update(Request $request, Customer $customer)
     {
         $request->validate([
             'name'         => 'required|string|max:100',
+            // Exclude current customer's own phone from unique check
             'phone'        => 'required|string|max:20|unique:customers,phone,' . $customer->id,
             'package_id'   => 'required|exists:packages,id',
             'billing_date' => 'required|integer|min:1|max:28',
             'status'       => 'required|in:active,inactive,suspended,expired',
         ]);
 
-        $old        = $customer->toArray();
-        $oldPackage = $customer->package_id;
-        $data       = $request->all();
+        // Save old values for activity log
+        $old  = $customer->toArray();
+        $data = $request->all();
 
+        // Replace photo if a new one is uploaded
         if ($request->hasFile('photo')) {
             $data['photo'] = $request->file('photo')->store('customers/photos', 'public');
         }
+
         if ($request->hasFile('nid_photo')) {
             $data['nid_photo'] = $request->file('nid_photo')->store('customers/nid', 'public');
         }
 
         $customer->update($data);
-
-        // Package পরিবর্তন হলে MikroTik এ update করো
-        if ($oldPackage !== $customer->package_id && $customer->mikrotik_status === 'active') {
-            try {
-                $router = MikrotikRouter::where('is_active', 1)->first();
-                if ($router) {
-                    $mikrotik = new MikrotikService();
-                    $mikrotik->withRouter($router, fn($m) => $m->changeCustomerPackage($customer));
-                }
-            } catch (\Exception $e) {
-                Log::warning("MikroTik package update failed: " . $e->getMessage());
-            }
-        }
 
         ActivityLog::log('Customer updated', 'Customer', $customer->id, $old, $customer->toArray());
 
@@ -140,26 +143,23 @@ class CustomerController extends Controller
                          ->with('success', 'Customer updated successfully.');
     }
 
+    /**
+     * Soft delete the specified customer.
+     */
     public function destroy(Customer $customer)
     {
-        // MikroTik থেকেও remove করো
-        try {
-            $router = MikrotikRouter::where('is_active', 1)->first();
-            if ($router && $customer->mikrotik_status === 'active') {
-                $mikrotik = new MikrotikService();
-                $mikrotik->withRouter($router, fn($m) => $m->removeCustomer($customer));
-            }
-        } catch (\Exception $e) {
-            Log::warning("MikroTik remove failed: " . $e->getMessage());
-        }
-
         ActivityLog::log('Customer deleted', 'Customer', $customer->id, $customer->toArray(), null);
+
+        // Uses SoftDeletes — record is not permanently removed
         $customer->delete();
 
         return redirect()->route('customers.index')
                          ->with('success', 'Customer deleted successfully.');
     }
 
+    /**
+     * Update the connection status of a customer.
+     */
     public function updateStatus(Request $request, Customer $customer)
     {
         $request->validate([
@@ -169,21 +169,6 @@ class CustomerController extends Controller
         $old = $customer->status;
         $customer->update(['status' => $request->status]);
 
-        // Status পরিবর্তনে MikroTik sync
-        try {
-            $router = MikrotikRouter::where('is_active', 1)->first();
-            if ($router) {
-                $mikrotik = new MikrotikService();
-                match ($request->status) {
-                    'active'    => $mikrotik->withRouter($router, fn($m) => $m->restoreCustomer($customer)),
-                    'suspended' => $mikrotik->withRouter($router, fn($m) => $m->suspendCustomer($customer)),
-                    default     => null,
-                };
-            }
-        } catch (\Exception $e) {
-            Log::warning("MikroTik status sync failed: " . $e->getMessage());
-        }
-
         ActivityLog::log(
             "Customer status changed: {$old} -> {$request->status}",
             'Customer',
@@ -191,27 +176,5 @@ class CustomerController extends Controller
         );
 
         return back()->with('success', 'Status updated successfully.');
-    }
-
-    // ══════════════════════════════════════════════
-    // Private Helper
-    // ══════════════════════════════════════════════
-
-    private function provisionToMikrotik(Customer $customer): void
-    {
-        try {
-            $router = MikrotikRouter::where('is_active', 1)->first();
-            if (!$router) return;
-
-            $mikrotik = new MikrotikService();
-            $mikrotik->withRouter($router, fn($m) => $m->provisionCustomer($customer));
-            $customer->update(['mikrotik_status' => 'active']);
-
-            Log::info("Auto-provisioned customer {$customer->customer_code} on MikroTik.");
-        } catch (\Exception $e) {
-            // MikroTik fail হলেও customer save হবে — শুধু log করো
-            Log::warning("MikroTik auto-provision failed for {$customer->customer_code}: " . $e->getMessage());
-            $customer->update(['mikrotik_status' => 'pending']);
-        }
     }
 }
