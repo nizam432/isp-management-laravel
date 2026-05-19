@@ -11,6 +11,8 @@ use App\Http\Controllers\AgentController;
 use App\Http\Controllers\MikrotikController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ImportController;
+use App\Http\Controllers\SmsController;
 
 // ─────────────────────────────────────────────
 // Public Routes (Login page)
@@ -93,6 +95,16 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/',            [MikrotikController::class, 'removeCustomer'])->name('remove');
     });
 
+
+    Route::prefix('import')->name('import.')->group(function () {
+        Route::get('/',                      [ImportController::class, 'index'])->name('index');
+        Route::post('mikrotik/preview',      [ImportController::class, 'mikrotikPreview'])->name('mikrotik.preview');
+        Route::post('mikrotik/execute',      [ImportController::class, 'mikrotikImport'])->name('mikrotik.execute');
+        Route::post('csv/preview',           [ImportController::class, 'csvPreview'])->name('csv.preview');
+        Route::post('csv/execute',           [ImportController::class, 'csvImport'])->name('csv.execute');
+        Route::get('csv/template',           [ImportController::class, 'downloadTemplate'])->name('csv.template');
+    });
+
     // ── Inventory ──────────────────────────────
     Route::prefix('inventory')->name('inventory.')->group(function () {
         Route::get('/',                              [InventoryController::class, 'index'])->name('index');
@@ -109,6 +121,17 @@ Route::middleware(['auth'])->group(function () {
         Route::get('due',               [ReportController::class, 'due'])->name('due');
         Route::get('customers',         [ReportController::class, 'customers'])->name('customers');
         Route::get('export/{type}/pdf', [ReportController::class, 'exportPdf'])->name('export.pdf');
+    });
+
+
+
+    Route::prefix('sms')->name('sms.')->group(function () {
+        Route::get('/',                                  [SmsController::class, 'index'])->name('index');
+        Route::post('gateway/{gateway}/toggle',          [SmsController::class, 'toggleGateway'])->name('gateway.toggle');
+        Route::post('gateway/{gateway}/config',          [SmsController::class, 'updateConfig'])->name('gateway.config');
+        Route::post('test',                              [SmsController::class, 'sendTest'])->name('test');
+        Route::post('bulk',                              [SmsController::class, 'sendBulk'])->name('bulk');
+        Route::delete('logs',                            [SmsController::class, 'clearLogs'])->name('logs.clear');
     });
 
 });

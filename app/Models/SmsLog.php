@@ -3,36 +3,35 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class SmsLog extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
-        'customer_id', 'phone', 'message', 'type',
-        'status', 'gateway_response', 'sent_at',
+        'gateway', 'mobile', 'message', 'type', 'status', 'response',
     ];
 
-    protected $casts = [
-        'sent_at' => 'datetime',
+    // SMS types
+    const TYPES = [
+        'general'         => 'General',
+        'bill_due'        => 'Bill Due',
+        'payment_confirm' => 'Payment Confirm',
+        'suspend'         => 'Suspend Notice',
+        'restore'         => 'Restore Notice',
+        'welcome'         => 'Welcome',
     ];
 
-    // Relations
-    public function customer()
+    public function scopeSuccess($query)
     {
-        return $this->belongsTo(Customer::class);
-    }
-
-    // Scopes
-    public function scopeSent($query)
-    {
-        return $query->where('status', 'sent');
+        return $query->where('status', 'success');
     }
 
     public function scopeFailed($query)
     {
         return $query->where('status', 'failed');
     }
-}
 
+    public function scopeToday($query)
+    {
+        return $query->whereDate('created_at', today());
+    }
+}

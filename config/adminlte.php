@@ -299,7 +299,12 @@ return [
             'icon_color' => 'teal',
             'label'      => '',
         ],
-
+        [
+            'text'       => 'Import Customers',
+            'url'        => 'import',
+            'icon'       => 'fas fa-fw fa-file-import',
+            'icon_color' => 'teal',
+        ],
         [
             'text'       => 'Packages',
             'url'        => 'packages',
@@ -360,7 +365,12 @@ return [
             'icon'       => 'fas fa-fw fa-warehouse',
             'icon_color' => 'brown',
         ],
-
+        [
+            'text'       => 'SMS Management',
+            'url'        => 'sms',
+            'icon'       => 'fas fa-fw fa-sms',
+            'icon_color' => 'green',
+        ],
         // ── Reports ───────────────────────────────────────
         ['header' => 'REPORTS'],
 

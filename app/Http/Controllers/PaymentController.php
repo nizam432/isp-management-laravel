@@ -8,6 +8,7 @@ use App\Models\AgentCommission;
 use App\Models\ActivityLog;
 use App\Models\MikrotikRouter;
 use App\Services\MikrotikService;
+use App\Services\SmsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -32,7 +33,7 @@ class PaymentController extends Controller
 
     /**
      * Payment record করো।
-     * পুরো বিল দিলে → customer automatically restore হবে MikroTik এ।
+     * পুরো বিল দিলে → MikroTik এ restore + SMS যাবে।
      */
     public function store(Request $request)
     {
@@ -46,6 +47,7 @@ class PaymentController extends Controller
         ]);
 
         $invoice = Invoice::with('customer.agent')->findOrFail($request->invoice_id);
+        $customer = $invoice->customer;
 
         // Payment save করো
         $payment = Payment::create([
@@ -65,13 +67,24 @@ class PaymentController extends Controller
         if ($totalPaid >= $invoice->amount) {
             $invoice->update(['status' => 'paid', 'due_amount' => 0]);
 
-            // ── Auto-Restore MikroTik ──────────────────────────
-            // পুরো বিল দিয়েছে → suspended হলে restore করো
-            $customer = $invoice->customer;
-            if (in_array($customer->mikrotik_status, ['suspended', 'disabled'])) {
-                $this->restoreCustomerOnMikrotik($customer);
+            // ── Payment Confirm SMS ──────────────────────
+            $this->sendSms(fn($sms) => $sms->sendPaymentConfirm(
+                $customer->phone,
+                $customer->name,
+                $payment->amount,
+                strtoupper($payment->method)
+            ), 'payment confirm SMS');
+
+            // ── Auto-Restore MikroTik ────────────────────
+            if (in_array($customer->mikrotik_status ?? '', ['suspended', 'disabled'])) {
+                $this->restoreOnMikrotik($customer);
+
+                // Restore SMS
+                $this->sendSms(fn($sms) => $sms->sendRestoreNotice(
+                    $customer->phone,
+                    $customer->name
+                ), 'restore SMS');
             }
-            // ──────────────────────────────────────────────────
 
         } else {
             $invoice->update([
@@ -80,15 +93,15 @@ class PaymentController extends Controller
             ]);
         }
 
-        // Agent commission calculate
-        if ($invoice->customer->agent && $invoice->customer->agent->commission_rate > 0) {
+        // Agent commission
+        if ($customer->agent && $customer->agent->commission_rate > 0) {
             AgentCommission::create([
-                'agent_id'   => $invoice->customer->agent_id,
+                'agent_id'   => $customer->agent_id,
                 'payment_id' => $payment->id,
                 'amount'     => round(
-                    $payment->amount * $invoice->customer->agent->commission_rate / 100, 2
+                    $payment->amount * $customer->agent->commission_rate / 100, 2
                 ),
-                'status'     => 'pending',
+                'status' => 'pending',
             ]);
         }
 
@@ -122,10 +135,26 @@ class PaymentController extends Controller
     }
 
     // ══════════════════════════════════════════════
-    // Private Helper
+    // Private Helpers
     // ══════════════════════════════════════════════
 
-    private function restoreCustomerOnMikrotik($customer): void
+    /**
+     * SMS পাঠাও — fail হলে শুধু log করো, exception throw করো না
+     */
+    private function sendSms(callable $callback, string $label): void
+    {
+        try {
+            $sms = new SmsService();
+            $callback($sms);
+        } catch (\Exception $e) {
+            Log::warning("SMS failed [{$label}]: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * MikroTik এ customer restore করো
+     */
+    private function restoreOnMikrotik($customer): void
     {
         try {
             $router = MikrotikRouter::where('is_active', 1)->first();
@@ -133,15 +162,11 @@ class PaymentController extends Controller
 
             $mikrotik = new MikrotikService();
             $mikrotik->withRouter($router, fn($m) => $m->restoreCustomer($customer));
-
-            $customer->update([
-                'status'          => 'active',
-                'mikrotik_status' => 'active',
-            ]);
+            $customer->update(['status' => 'active', 'mikrotik_status' => 'active']);
 
             Log::info("Auto-restored customer {$customer->customer_code} after payment.");
         } catch (\Exception $e) {
-            Log::warning("MikroTik auto-restore failed for {$customer->customer_code}: " . $e->getMessage());
+            Log::warning("MikroTik restore failed [{$customer->customer_code}]: " . $e->getMessage());
         }
     }
 }

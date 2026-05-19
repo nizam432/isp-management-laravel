@@ -46,9 +46,7 @@ class MikrotikController extends Controller
         return back()->with('success', 'Router added successfully.');
     }
 
-    /**
-     * Update the specified router's connection details.
-     */
+
     public function update(Request $request, MikrotikRouter $mikrotikRouter)
     {
         $request->validate([
@@ -59,11 +57,17 @@ class MikrotikController extends Controller
             'area'       => 'nullable|string|max:100',
         ]);
 
-        $mikrotikRouter->update($request->all());
+        $data = $request->except('password');
+
+        // Password দিলেই শুধু update হবে
+        if ($request->filled('password')) {
+            $data['password'] = $request->password;
+        }
+
+        $mikrotikRouter->update($data);
 
         return back()->with('success', 'Router updated successfully.');
     }
-
     /**
      * Delete the specified router along with all its IP pools.
      */
