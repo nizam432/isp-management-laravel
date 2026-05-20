@@ -91,11 +91,12 @@ class Customer extends Model
         };
     }
 
-    // Auto generate customer code
-    public static function generateCode()
+    public static function generateCode(): string
     {
-        $last = self::withTrashed()->latest()->first();
-        $number = $last ? (intval(substr($last->customer_code, 4)) + 1) : 1;
-        return 'ISP-' . str_pad($number, 4, '0', STR_PAD_LEFT);
+        do {
+            $code = 'ISP-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+        } while (static::where('customer_code', $code)->exists());
+
+        return $code;
     }
 }
