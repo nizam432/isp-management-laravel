@@ -4,214 +4,251 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Models\Package;
-use App\Models\Agent;
-use App\Models\ActivityLog;
 use App\Models\MikrotikRouter;
 use App\Services\MikrotikService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
-class CustomerController extends Controller
+class ImportController extends Controller
 {
-    public function index(Request $request)
-    {
-        $customers = Customer::with(['package', 'agent'])
-            ->when($request->search, fn($q) => $q
-                ->where('name', 'like', "%{$request->search}%")
-                ->orWhere('phone', 'like', "%{$request->search}%")
-                ->orWhere('customer_code', 'like', "%{$request->search}%"))
-            ->when($request->status, fn($q) => $q->where('status', $request->status))
-            ->when($request->area, fn($q) => $q->where('area', $request->area))
-            ->latest()
-            ->paginate(20);
+    // ══════════════════════════════════════════════
+    // MikroTik Direct Import
+    // ══════════════════════════════════════════════
 
-        return view('customers.index', compact('customers'));
-    }
-
-    public function create()
+    public function index()
     {
+        $routers  = MikrotikRouter::where('is_active', 1)->get();
         $packages = Package::active()->get();
-        $agents   = Agent::active()->get();
-        return view('customers.create', compact('packages', 'agents'));
+
+        return view('import.index', compact('routers', 'packages'));
     }
 
-    /**
-     * Store করার পর automatically MikroTik এ PPPoE user তৈরি হবে।
-     */
-    public function store(Request $request)
+    public function mikrotikPreview(Request $request)
     {
         $request->validate([
-            'name'            => 'required|string|max:100',
-            'phone'           => 'required|string|max:20|unique:customers',
-            'package_id'      => 'required|exists:packages,id',
-            'address'         => 'nullable|string',
-            'area'            => 'nullable|string|max:100',
-            'billing_date'    => 'required|integer|min:1|max:28',
-            'connection_date' => 'nullable|date',
-            'status'          => 'required|in:active,inactive,suspended,expired',
-            'pppoe_username'  => 'nullable|string|max:50|unique:customers',
-            'pppoe_password'  => 'nullable|string|max:50',
+            'router_id' => 'required|exists:mikrotik_routers,id',
         ]);
 
-        $data = $request->all();
-        $data['customer_code'] = Customer::generateCode();
-        $data['created_by']    = auth()->id();
+        $router = MikrotikRouter::findOrFail($request->router_id);
 
-        // PPPoE username না দিলে auto-generate
-        if (empty($data['pppoe_username'])) {
-            $data['pppoe_username'] = 'isp_' . strtolower(preg_replace('/\s+/', '', $request->name)) . '_' . rand(100, 999);
-        }
-        if (empty($data['pppoe_password'])) {
-            $data['pppoe_password'] = 'pass' . rand(10000, 99999);
-        }
-
-        if ($request->hasFile('photo')) {
-            $data['photo'] = $request->file('photo')->store('customers/photos', 'public');
-        }
-        if ($request->hasFile('nid_photo')) {
-            $data['nid_photo'] = $request->file('nid_photo')->store('customers/nid', 'public');
-        }
-
-        $customer = Customer::create($data);
-
-        // ── Auto-Provision MikroTik ──────────────────
-        if ($customer->status === 'active') {
-            $this->provisionToMikrotik($customer);
-        }
-
-        ActivityLog::log('Customer created', 'Customer', $customer->id, null, $customer->toArray());
-
-        return redirect()->route('customers.show', $customer)
-                         ->with('success', 'Customer added successfully.');
-    }
-
-    public function show(Customer $customer)
-    {
-        $customer->load(['package', 'agent', 'invoices', 'payments', 'tickets']);
-        return view('customers.show', compact('customer'));
-    }
-
-    public function edit(Customer $customer)
-    {
-        $packages = Package::active()->get();
-        $agents   = Agent::active()->get();
-        return view('customers.edit', compact('customer', 'packages', 'agents'));
-    }
-
-    public function update(Request $request, Customer $customer)
-    {
-        $request->validate([
-            'name'         => 'required|string|max:100',
-            'phone'        => 'required|string|max:20|unique:customers,phone,' . $customer->id,
-            'package_id'   => 'required|exists:packages,id',
-            'billing_date' => 'required|integer|min:1|max:28',
-            'status'       => 'required|in:active,inactive,suspended,expired',
-        ]);
-
-        $old        = $customer->toArray();
-        $oldPackage = $customer->package_id;
-        $data       = $request->all();
-
-        if ($request->hasFile('photo')) {
-            $data['photo'] = $request->file('photo')->store('customers/photos', 'public');
-        }
-        if ($request->hasFile('nid_photo')) {
-            $data['nid_photo'] = $request->file('nid_photo')->store('customers/nid', 'public');
-        }
-
-        $customer->update($data);
-
-        // Package পরিবর্তন হলে MikroTik এ update করো
-        if ($oldPackage !== $customer->package_id && $customer->mikrotik_status === 'active') {
-            try {
-                $router = MikrotikRouter::where('is_active', 1)->first();
-                if ($router) {
-                    $mikrotik = new MikrotikService();
-                    $mikrotik->withRouter($router, fn($m) => $m->changeCustomerPackage($customer));
-                }
-            } catch (\Exception $e) {
-                Log::warning("MikroTik package update failed: " . $e->getMessage());
-            }
-        }
-
-        ActivityLog::log('Customer updated', 'Customer', $customer->id, $old, $customer->toArray());
-
-        return redirect()->route('customers.show', $customer)
-                         ->with('success', 'Customer updated successfully.');
-    }
-
-    public function destroy(Customer $customer)
-    {
-        // MikroTik থেকেও remove করো
         try {
-            $router = MikrotikRouter::where('is_active', 1)->first();
-            if ($router && $customer->mikrotik_status === 'active') {
-                $mikrotik = new MikrotikService();
-                $mikrotik->withRouter($router, fn($m) => $m->removeCustomer($customer));
-            }
-        } catch (\Exception $e) {
-            Log::warning("MikroTik remove failed: " . $e->getMessage());
-        }
+            $mikrotik = new MikrotikService();
+            $users    = $mikrotik->withRouter($router, fn($m) => $m->getPPPoEUsers());
 
-        ActivityLog::log('Customer deleted', 'Customer', $customer->id, $customer->toArray(), null);
-        $customer->delete();
+            $existingUsernames = Customer::pluck('pppoe_username')->toArray();
+
+            $newUsers = array_filter($users, fn($u) =>
+                !empty($u['name']) && !in_array($u['name'], $existingUsernames)
+            );
+
+            return view('import.mikrotik-preview', [
+                'users'    => array_values($newUsers),
+                'existing' => count($users) - count($newUsers),
+                'router'   => $router,
+                'packages' => Package::active()->get(),
+            ]);
+
+        } catch (\Exception $e) {
+            return back()->with('error', 'MikroTik connect করতে সমস্যা: ' . $e->getMessage());
+        }
+    }
+
+    public function mikrotikImport(Request $request)
+    {
+        $request->validate([
+            'users'      => 'required|array',
+            'package_id' => 'required|exists:packages,id',
+        ]);
+
+        $imported = 0;
+        $skipped  = 0;
+
+        foreach ($request->users as $username) {
+            if (empty($username)) {
+                $skipped++;
+                continue;
+            }
+
+            // Already আছে কিনা check
+            if (Customer::where('pppoe_username', $username)->exists()) {
+                $skipped++;
+                continue;
+            }
+
+            $password = $request->input("password_{$username}", 'pass' . rand(10000, 99999));
+
+            try {
+                // Unique customer code generate
+                $code = $this->generateUniqueCode();
+
+                // Unique phone generate
+                $phone = $this->generateUniquePhone();
+
+                Customer::create([
+                    'customer_code'  => $code,
+                    'name'           => 'Imported - ' . $username,
+                    'phone'          => $phone,
+                    'pppoe_username' => $username,
+                    'pppoe_password' => $password,
+                    'package_id'     => $request->package_id,
+                    'billing_date'   => 1,
+                    'status'         => 'active',
+                    'mikrotik_status'=> 'active',
+                    'created_by'     => auth()->id(),
+                    'remarks'        => 'Imported from MikroTik',
+                ]);
+
+                $imported++;
+
+            } catch (\Exception $e) {
+                Log::warning("MikroTik Import failed for [{$username}]: " . $e->getMessage());
+                $skipped++;
+                continue;
+            }
+        }
 
         return redirect()->route('customers.index')
-                         ->with('success', 'Customer deleted successfully.');
+            ->with('success', "{$imported} জন customer import হয়েছে। {$skipped} টি skip হয়েছে।");
     }
 
-    public function updateStatus(Request $request, Customer $customer)
+    // ══════════════════════════════════════════════
+    // CSV Import
+    // ══════════════════════════════════════════════
+
+    public function csvPreview(Request $request)
     {
         $request->validate([
-            'status' => 'required|in:active,inactive,suspended,expired',
+            'csv_file'   => 'required|file|mimes:csv,txt|max:2048',
+            'package_id' => 'required|exists:packages,id',
         ]);
 
-        $old = $customer->status;
-        $customer->update(['status' => $request->status]);
+        $file = $request->file('csv_file');
+        $rows = [];
 
-        // Status পরিবর্তনে MikroTik sync
-        try {
-            $router = MikrotikRouter::where('is_active', 1)->first();
-            if ($router) {
-                $mikrotik = new MikrotikService();
-                match ($request->status) {
-                    'active'    => $mikrotik->withRouter($router, fn($m) => $m->restoreCustomer($customer)),
-                    'suspended' => $mikrotik->withRouter($router, fn($m) => $m->suspendCustomer($customer)),
-                    default     => null,
-                };
+        if (($handle = fopen($file->getPathname(), 'r')) !== false) {
+            $header = fgetcsv($handle);
+
+            while (($data = fgetcsv($handle)) !== false) {
+                if (count($data) >= 1) {
+                    $row = array_combine(
+                        array_map('strtolower', array_map('trim', $header)),
+                        array_map('trim', $data)
+                    );
+                    $rows[] = $row;
+                }
             }
-        } catch (\Exception $e) {
-            Log::warning("MikroTik status sync failed: " . $e->getMessage());
+            fclose($handle);
         }
 
-        ActivityLog::log(
-            "Customer status changed: {$old} -> {$request->status}",
-            'Customer',
-            $customer->id
-        );
+        $existingUsernames = Customer::pluck('pppoe_username')->toArray();
+        $existingPhones    = Customer::pluck('phone')->toArray();
 
-        return back()->with('success', 'Status updated successfully.');
+        foreach ($rows as &$row) {
+            $row['_exists_username'] = in_array($row['pppoe_username'] ?? '', $existingUsernames);
+            $row['_exists_phone']    = in_array($row['phone'] ?? '', $existingPhones);
+            $row['_will_import']     = !$row['_exists_username'] && !$row['_exists_phone'];
+        }
+
+        return view('import.csv-preview', [
+            'rows'       => $rows,
+            'package_id' => $request->package_id,
+            'packages'   => Package::active()->get(),
+        ]);
+    }
+
+    public function csvImport(Request $request)
+    {
+        $request->validate([
+            'rows'       => 'required|array',
+            'package_id' => 'required|exists:packages,id',
+        ]);
+
+        $imported = 0;
+        $skipped  = 0;
+
+        foreach ($request->rows as $index => $row) {
+            try {
+                if (Customer::where('pppoe_username', $row['pppoe_username'] ?? '')->exists()) {
+                    $skipped++;
+                    continue;
+                }
+                if (!empty($row['phone']) && Customer::where('phone', $row['phone'])->exists()) {
+                    $skipped++;
+                    continue;
+                }
+
+                Customer::create([
+                    'customer_code'  => $this->generateUniqueCode(),
+                    'name'           => $row['name']           ?? ('User-' . ($row['pppoe_username'] ?? $index)),
+                    'phone'          => !empty($row['phone']) ? $row['phone'] : $this->generateUniquePhone(),
+                    'email'          => $row['email']          ?? null,
+                    'address'        => $row['address']        ?? null,
+                    'area'           => $row['area']           ?? null,
+                    'pppoe_username' => $row['pppoe_username'] ?? null,
+                    'pppoe_password' => $row['pppoe_password'] ?? null,
+                    'ip_address'     => $row['ip_address']     ?? null,
+                    'package_id'     => $request->package_id,
+                    'billing_date'   => $row['billing_date']   ?? 1,
+                    'status'         => 'active',
+                    'mikrotik_status'=> 'active',
+                    'created_by'     => auth()->id(),
+                    'remarks'        => 'CSV Import',
+                ]);
+
+                $imported++;
+
+            } catch (\Exception $e) {
+                Log::warning("CSV Import error row {$index}: " . $e->getMessage());
+                $skipped++;
+            }
+        }
+
+        return redirect()->route('customers.index')
+            ->with('success', "{$imported} জন customer import হয়েছে। {$skipped} টি skip।");
+    }
+
+    public function downloadTemplate()
+    {
+        $headers = [
+            'Content-Type'        => 'text/csv',
+            'Content-Disposition' => 'attachment; filename=customer-import-template.csv',
+        ];
+
+        $columns = ['name', 'phone', 'email', 'address', 'area', 'pppoe_username', 'pppoe_password', 'ip_address', 'billing_date'];
+
+        $callback = function () use ($columns) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $columns);
+            fputcsv($file, [
+                'Md Nizam Uddin', '01712345678', 'nizam@gmail.com',
+                'Meraj Nagar, Dhaka', 'Meraj Nagar', 'nizam_isp',
+                'pass12345', '192.168.1.100', '1',
+            ]);
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
     }
 
     // ══════════════════════════════════════════════
-    // Private Helper
+    // Helpers
     // ══════════════════════════════════════════════
 
-    private function provisionToMikrotik(Customer $customer): void
+    private function generateUniqueCode(): string
     {
-        try {
-            $router = MikrotikRouter::where('is_active', 1)->first();
-            if (!$router) return;
+        do {
+            $code = 'ISP-' . str_pad(rand(1, 99999), 4, '0', STR_PAD_LEFT);
+        } while (Customer::where('customer_code', $code)->exists());
 
-            $mikrotik = new MikrotikService();
-            $mikrotik->withRouter($router, fn($m) => $m->provisionCustomer($customer));
-            $customer->update(['mikrotik_status' => 'active']);
+        return $code;
+    }
 
-            Log::info("Auto-provisioned customer {$customer->customer_code} on MikroTik.");
-        } catch (\Exception $e) {
-            // MikroTik fail হলেও customer save হবে — শুধু log করো
-            Log::warning("MikroTik auto-provision failed for {$customer->customer_code}: " . $e->getMessage());
-            $customer->update(['mikrotik_status' => 'pending']);
-        }
+    private function generateUniquePhone(): string
+    {
+        do {
+            $phone = '000' . rand(10000000, 99999999);
+        } while (Customer::where('phone', $phone)->exists());
+
+        return $phone;
     }
 }
