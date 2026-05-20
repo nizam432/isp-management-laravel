@@ -9,23 +9,12 @@ use App\Services\MikrotikService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
-/**
- * ImportController
- * ─────────────────────────────────────────────
- * ২টা import method:
- * ১. MikroTik থেকে direct — PPPoE user list
- * ২. CSV দিয়ে — নাম, phone, username সহ
- */
 class ImportController extends Controller
 {
     // ══════════════════════════════════════════════
     // MikroTik Direct Import
     // ══════════════════════════════════════════════
 
-    /**
-     * GET /import
-     * Import page দেখাও
-     */
     public function index()
     {
         $routers  = MikrotikRouter::where('is_active', 1)->get();
@@ -34,10 +23,6 @@ class ImportController extends Controller
         return view('import.index', compact('routers', 'packages'));
     }
 
-    /**
-     * POST /import/mikrotik/preview
-     * MikroTik থেকে PPPoE user list আনো — preview দেখাও
-     */
     public function mikrotikPreview(Request $request)
     {
         $request->validate([
@@ -50,12 +35,10 @@ class ImportController extends Controller
             $mikrotik = new MikrotikService();
             $users    = $mikrotik->withRouter($router, fn($m) => $m->getPPPoEUsers());
 
-            // Already imported username গুলো বের করো
             $existingUsernames = Customer::pluck('pppoe_username')->toArray();
 
-            // নতুন user গুলো filter করো
             $newUsers = array_filter($users, fn($u) =>
-                !in_array($u['name'] ?? '', $existingUsernames)
+                !empty($u['name']) && !in_array($u['name'], $existingUsernames)
             );
 
             return view('import.mikrotik-preview', [
@@ -70,10 +53,6 @@ class ImportController extends Controller
         }
     }
 
-    /**
-     * POST /import/mikrotik/execute
-     * Selected users import করো
-     */
     public function mikrotikImport(Request $request)
     {
         $request->validate([
@@ -85,44 +64,57 @@ class ImportController extends Controller
         $skipped  = 0;
 
         foreach ($request->users as $username) {
+            if (empty($username)) {
+                $skipped++;
+                continue;
+            }
+
             // Already আছে কিনা check
             if (Customer::where('pppoe_username', $username)->exists()) {
                 $skipped++;
                 continue;
             }
 
-            // Password আলাদাভাবে আনো
-            $password = $request->input("password_{$username}", 'imported_' . rand(1000, 9999));
+            $password = $request->input("password_{$username}", 'pass' . rand(10000, 99999));
 
-            Customer::create([
-                'customer_code'  => Customer::generateCode(),
-                'name'           => 'Imported - ' . $username,
-                'phone'          => '000' . rand(10000000, 99999999), // placeholder
-                'pppoe_username' => $username,
-                'pppoe_password' => $password,
-                'package_id'     => $request->package_id,
-                'billing_date'   => 1,
-                'status'         => 'active',
-                'mikrotik_status'=> 'active',
-                'created_by'     => auth()->id(),
-                'remarks'        => 'Imported from MikroTik',
-            ]);
+            try {
+                // Unique customer code generate
+                $code = $this->generateUniqueCode();
 
-            $imported++;
+                // Unique phone generate
+                $phone = $this->generateUniquePhone();
+
+                Customer::create([
+                    'customer_code'  => $code,
+                    'name'           => 'Imported - ' . $username,
+                    'phone'          => $phone,
+                    'pppoe_username' => $username,
+                    'pppoe_password' => $password,
+                    'package_id'     => $request->package_id,
+                    'billing_date'   => 1,
+                    'status'         => 'active',
+                    'mikrotik_status'=> 'active',
+                    'created_by'     => auth()->id(),
+                    'remarks'        => 'Imported from MikroTik',
+                ]);
+
+                $imported++;
+
+            } catch (\Exception $e) {
+                Log::warning("MikroTik Import failed for [{$username}]: " . $e->getMessage());
+                $skipped++;
+                continue;
+            }
         }
 
         return redirect()->route('customers.index')
-            ->with('success', "{$imported} জন customer import হয়েছে। {$skipped} টি skip হয়েছে (already ছিল)।");
+            ->with('success', "{$imported} জন customer import হয়েছে। {$skipped} টি skip হয়েছে।");
     }
 
     // ══════════════════════════════════════════════
     // CSV Import
     // ══════════════════════════════════════════════
 
-    /**
-     * POST /import/csv/preview
-     * CSV file upload করো — preview দেখাও
-     */
     public function csvPreview(Request $request)
     {
         $request->validate([
@@ -134,7 +126,7 @@ class ImportController extends Controller
         $rows = [];
 
         if (($handle = fopen($file->getPathname(), 'r')) !== false) {
-            $header = fgetcsv($handle); // প্রথম row = header
+            $header = fgetcsv($handle);
 
             while (($data = fgetcsv($handle)) !== false) {
                 if (count($data) >= 1) {
@@ -148,7 +140,6 @@ class ImportController extends Controller
             fclose($handle);
         }
 
-        // Already imported check
         $existingUsernames = Customer::pluck('pppoe_username')->toArray();
         $existingPhones    = Customer::pluck('phone')->toArray();
 
@@ -165,10 +156,6 @@ class ImportController extends Controller
         ]);
     }
 
-    /**
-     * POST /import/csv/execute
-     * CSV data import করো
-     */
     public function csvImport(Request $request)
     {
         $request->validate([
@@ -178,11 +165,9 @@ class ImportController extends Controller
 
         $imported = 0;
         $skipped  = 0;
-        $errors   = [];
 
         foreach ($request->rows as $index => $row) {
             try {
-                // Duplicate check
                 if (Customer::where('pppoe_username', $row['pppoe_username'] ?? '')->exists()) {
                     $skipped++;
                     continue;
@@ -193,9 +178,9 @@ class ImportController extends Controller
                 }
 
                 Customer::create([
-                    'customer_code'  => Customer::generateCode(),
+                    'customer_code'  => $this->generateUniqueCode(),
                     'name'           => $row['name']           ?? ('User-' . ($row['pppoe_username'] ?? $index)),
-                    'phone'          => $row['phone']          ?? ('000' . rand(10000000, 99999999)),
+                    'phone'          => !empty($row['phone']) ? $row['phone'] : $this->generateUniquePhone(),
                     'email'          => $row['email']          ?? null,
                     'address'        => $row['address']        ?? null,
                     'area'           => $row['area']           ?? null,
@@ -213,22 +198,15 @@ class ImportController extends Controller
                 $imported++;
 
             } catch (\Exception $e) {
-                $errors[] = "Row " . ($index + 1) . ": " . $e->getMessage();
                 Log::warning("CSV Import error row {$index}: " . $e->getMessage());
+                $skipped++;
             }
         }
 
-        $message = "{$imported} জন customer import হয়েছে।";
-        if ($skipped > 0) $message .= " {$skipped} টি skip।";
-        if (!empty($errors)) $message .= " " . count($errors) . " টি error।";
-
-        return redirect()->route('customers.index')->with('success', $message);
+        return redirect()->route('customers.index')
+            ->with('success', "{$imported} জন customer import হয়েছে। {$skipped} টি skip।");
     }
 
-    /**
-     * GET /import/csv/template
-     * CSV template download করো
-     */
     public function downloadTemplate()
     {
         $headers = [
@@ -240,26 +218,37 @@ class ImportController extends Controller
 
         $callback = function () use ($columns) {
             $file = fopen('php://output', 'w');
-
-            // Header row
             fputcsv($file, $columns);
-
-            // Example row
             fputcsv($file, [
-                'Md Nizam Uddin',
-                '01712345678',
-                'nizam@gmail.com',
-                'Meraj Nagar, Dhaka',
-                'Meraj Nagar',
-                'nizam_isp',
-                'pass12345',
-                '192.168.1.100',
-                '1',
+                'Md Nizam Uddin', '01712345678', 'nizam@gmail.com',
+                'Meraj Nagar, Dhaka', 'Meraj Nagar', 'nizam_isp',
+                'pass12345', '192.168.1.100', '1',
             ]);
-
             fclose($file);
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    // ══════════════════════════════════════════════
+    // Helpers
+    // ══════════════════════════════════════════════
+
+    private function generateUniqueCode(): string
+    {
+        do {
+            $code = 'ISP-' . str_pad(rand(1, 99999), 4, '0', STR_PAD_LEFT);
+        } while (Customer::where('customer_code', $code)->exists());
+
+        return $code;
+    }
+
+    private function generateUniquePhone(): string
+    {
+        do {
+            $phone = '000' . rand(10000000, 99999999);
+        } while (Customer::where('phone', $phone)->exists());
+
+        return $phone;
     }
 }
