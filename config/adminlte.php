@@ -288,7 +288,16 @@ return [
             'icon'        => 'fas fa-fw fa-tachometer-alt',
             'icon_color'  => 'blue',
         ],
-
+        [
+            'text'        => 'Super Admin',
+            'icon'        => 'fas fa-fw fa-crown',
+            'can'         => 'super-admin', // শুধু super-admin role দেখবে
+            'submenu'     => [
+                ['text' => 'Dashboard', 'url' => 'super-admin'],
+                ['text' => 'ISP List',  'url' => 'super-admin/tenants'],
+                ['text' => 'Plans',     'url' => 'super-admin/plans'],
+            ],
+        ],
         // ── Customer Management ───────────────────────────
         ['header' => 'CUSTOMER MANAGEMENT'],
 

@@ -13,6 +13,8 @@ use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\SmsController;
+use App\Http\Controllers\SuperAdmin\TenantController as SuperAdminTenantController;
+use App\Http\Controllers\SuperAdmin\PlanController as SuperAdminPlanController;
 
 // ─────────────────────────────────────────────
 // Public Routes (Login page)
@@ -64,19 +66,13 @@ Route::middleware(['auth'])->group(function () {
 
     // ── MikroTik ───────────────────────────────
     Route::prefix('mikrotik')->name('mikrotik.')->group(function () {
-
-        // CRUD (পুরনো — blade এ ব্যবহার হচ্ছে)
-        Route::get('/',                     [MikrotikController::class, 'index'])->name('index');
-        Route::post('/',                    [MikrotikController::class, 'store'])->name('store');
-        Route::put('{mikrotikRouter}',      [MikrotikController::class, 'update'])->name('update');
-        Route::delete('{mikrotikRouter}',   [MikrotikController::class, 'destroy'])->name('destroy');
-        Route::post('{mikrotikRouter}/pool',[MikrotikController::class, 'addPool'])->name('pool.store');
-
-        // Bulk operations
-        Route::post('bulk-suspend',         [MikrotikController::class, 'bulkSuspend'])->name('bulk.suspend');
-        Route::post('sync-all',             [MikrotikController::class, 'syncAll'])->name('sync.all');
-
-        // Router-level AJAX endpoints
+        Route::get('/',                        [MikrotikController::class, 'index'])->name('index');
+        Route::post('/',                       [MikrotikController::class, 'store'])->name('store');
+        Route::put('{mikrotikRouter}',         [MikrotikController::class, 'update'])->name('update');
+        Route::delete('{mikrotikRouter}',      [MikrotikController::class, 'destroy'])->name('destroy');
+        Route::post('{mikrotikRouter}/pool',   [MikrotikController::class, 'addPool'])->name('pool.store');
+        Route::post('bulk-suspend',            [MikrotikController::class, 'bulkSuspend'])->name('bulk.suspend');
+        Route::post('sync-all',                [MikrotikController::class, 'syncAll'])->name('sync.all');
         Route::get('{router}/status',          [MikrotikController::class, 'routerStatus'])->name('router.status');
         Route::get('{router}/pppoe-users',     [MikrotikController::class, 'pppoeUsers'])->name('pppoe.users');
         Route::get('{router}/active-sessions', [MikrotikController::class, 'activeSessions'])->name('active.sessions');
@@ -84,7 +80,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('{router}/profiles',        [MikrotikController::class, 'profiles'])->name('profiles');
     });
 
-    // Customer-level MikroTik operations
+    // ── Customer MikroTik ──────────────────────
     Route::prefix('customers/{customer}/mikrotik')->name('customers.mikrotik.')->group(function () {
         Route::get('session',         [MikrotikController::class, 'customerSession'])->name('session');
         Route::post('provision',      [MikrotikController::class, 'provisionCustomer'])->name('provision');
@@ -95,24 +91,24 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/',            [MikrotikController::class, 'removeCustomer'])->name('remove');
     });
 
-
+    // ── Import ─────────────────────────────────
     Route::prefix('import')->name('import.')->group(function () {
-        Route::get('/',                      [ImportController::class, 'index'])->name('index');
-        Route::post('mikrotik/preview',      [ImportController::class, 'mikrotikPreview'])->name('mikrotik.preview');
-        Route::post('mikrotik/execute',      [ImportController::class, 'mikrotikImport'])->name('mikrotik.execute');
-        Route::post('csv/preview',           [ImportController::class, 'csvPreview'])->name('csv.preview');
-        Route::post('csv/execute',           [ImportController::class, 'csvImport'])->name('csv.execute');
-        Route::get('csv/template',           [ImportController::class, 'downloadTemplate'])->name('csv.template');
+        Route::get('/',                 [ImportController::class, 'index'])->name('index');
+        Route::post('mikrotik/preview', [ImportController::class, 'mikrotikPreview'])->name('mikrotik.preview');
+        Route::post('mikrotik/execute', [ImportController::class, 'mikrotikImport'])->name('mikrotik.execute');
+        Route::post('csv/preview',      [ImportController::class, 'csvPreview'])->name('csv.preview');
+        Route::post('csv/execute',      [ImportController::class, 'csvImport'])->name('csv.execute');
+        Route::get('csv/template',      [ImportController::class, 'downloadTemplate'])->name('csv.template');
     });
 
     // ── Inventory ──────────────────────────────
     Route::prefix('inventory')->name('inventory.')->group(function () {
-        Route::get('/',                              [InventoryController::class, 'index'])->name('index');
-        Route::post('/',                             [InventoryController::class, 'store'])->name('store');
-        Route::put('{inventoryItem}',                [InventoryController::class, 'update'])->name('update');
-        Route::delete('{inventoryItem}',             [InventoryController::class, 'destroy'])->name('destroy');
-        Route::post('{inventoryItem}/stock-in',      [InventoryController::class, 'stockIn'])->name('stock-in');
-        Route::post('{inventoryItem}/stock-out',     [InventoryController::class, 'stockOut'])->name('stock-out');
+        Route::get('/',                         [InventoryController::class, 'index'])->name('index');
+        Route::post('/',                        [InventoryController::class, 'store'])->name('store');
+        Route::put('{inventoryItem}',           [InventoryController::class, 'update'])->name('update');
+        Route::delete('{inventoryItem}',        [InventoryController::class, 'destroy'])->name('destroy');
+        Route::post('{inventoryItem}/stock-in', [InventoryController::class, 'stockIn'])->name('stock-in');
+        Route::post('{inventoryItem}/stock-out',[InventoryController::class, 'stockOut'])->name('stock-out');
     });
 
     // ── Reports ────────────────────────────────
@@ -123,15 +119,41 @@ Route::middleware(['auth'])->group(function () {
         Route::get('export/{type}/pdf', [ReportController::class, 'exportPdf'])->name('export.pdf');
     });
 
-
-
+    // ── SMS ────────────────────────────────────
     Route::prefix('sms')->name('sms.')->group(function () {
-        Route::get('/',                                  [SmsController::class, 'index'])->name('index');
-        Route::post('gateway/{gateway}/toggle',          [SmsController::class, 'toggleGateway'])->name('gateway.toggle');
-        Route::post('gateway/{gateway}/config',          [SmsController::class, 'updateConfig'])->name('gateway.config');
-        Route::post('test',                              [SmsController::class, 'sendTest'])->name('test');
-        Route::post('bulk',                              [SmsController::class, 'sendBulk'])->name('bulk');
-        Route::delete('logs',                            [SmsController::class, 'clearLogs'])->name('logs.clear');
+        Route::get('/',                         [SmsController::class, 'index'])->name('index');
+        Route::post('gateway/{gateway}/toggle', [SmsController::class, 'toggleGateway'])->name('gateway.toggle');
+        Route::post('gateway/{gateway}/config', [SmsController::class, 'updateConfig'])->name('gateway.config');
+        Route::post('test',                     [SmsController::class, 'sendTest'])->name('test');
+        Route::post('bulk',                     [SmsController::class, 'sendBulk'])->name('bulk');
+        Route::delete('logs',                   [SmsController::class, 'clearLogs'])->name('logs.clear');
+    });
+
+    // ── Super Admin ────────────────────────────
+    Route::prefix('super-admin')
+        ->name('super-admin.')
+        ->middleware(['superadmin'])
+        ->group(function () {
+
+        Route::get('/', [SuperAdminTenantController::class, 'dashboard'])->name('dashboard');
+
+        Route::prefix('tenants')->name('tenants.')->group(function () {
+            Route::get('/',              [SuperAdminTenantController::class, 'index'])->name('index');
+            Route::get('/create',        [SuperAdminTenantController::class, 'create'])->name('create');
+            Route::post('/',             [SuperAdminTenantController::class, 'store'])->name('store');
+            Route::get('/{id}',          [SuperAdminTenantController::class, 'show'])->name('show');
+            Route::get('/{id}/edit',     [SuperAdminTenantController::class, 'edit'])->name('edit');
+            Route::put('/{id}',          [SuperAdminTenantController::class, 'update'])->name('update');
+            Route::post('/{id}/toggle',  [SuperAdminTenantController::class, 'toggle'])->name('toggle');
+            Route::post('/{id}/plan',    [SuperAdminTenantController::class, 'changePlan'])->name('change-plan');
+        });
+
+        Route::prefix('plans')->name('plans.')->group(function () {
+            Route::get('/',               [SuperAdminPlanController::class, 'index'])->name('index');
+            Route::post('/',              [SuperAdminPlanController::class, 'store'])->name('store');
+            Route::put('/{plan}',         [SuperAdminPlanController::class, 'update'])->name('update');
+            Route::post('/{plan}/toggle', [SuperAdminPlanController::class, 'toggle'])->name('toggle');
+        });
     });
 
 });
