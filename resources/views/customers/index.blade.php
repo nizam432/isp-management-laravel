@@ -23,7 +23,12 @@
                 <option value="suspended" {{ request('status') == 'suspended' ? 'selected' : '' }}>Suspended</option>
                 <option value="expired"   {{ request('status') == 'expired'   ? 'selected' : '' }}>Expired</option>
             </select>
-            <button type="submit" class="btn btn-sm btn-default mr-1"><i class="fas fa-search"></i> Filter</button>
+            <select name="area" class="form-control form-control-sm mr-2">
+                <option value="">All Areas</option>
+            </select>
+            <button type="submit" class="btn btn-sm btn-default mr-1">
+                <i class="fas fa-search"></i> Filter
+            </button>
             <a href="{{ route('customers.index') }}" class="btn btn-sm btn-secondary">Reset</a>
         </form>
     </div>
@@ -43,32 +48,58 @@
             </thead>
             <tbody>
                 @forelse($customers as $customer)
+
+                {{-- Null check — broken import থেকে রক্ষা --}}
+                @if(!$customer || !$customer->id)
+                    @continue
+                @endif
+
                 <tr>
                     <td><code>{{ $customer->customer_code }}</code></td>
                     <td>
-                        <a href="{{ route('customers.show', $customer) }}">{{ $customer->name }}</a>
+                        <a href="{{ route('customers.show', $customer) }}">
+                            {{ $customer->name }}
+                        </a>
                     </td>
                     <td>{{ $customer->phone }}</td>
                     <td>{{ $customer->package->name ?? 'N/A' }}</td>
                     <td>{{ $customer->area ?? '-' }}</td>
                     <td>
-                        <span class="badge badge-{{ $customer->status === 'active' ? 'success' : ($customer->status === 'suspended' ? 'warning' : ($customer->status === 'expired' ? 'danger' : 'secondary')) }}">
+                        <span class="badge badge-{{
+                            $customer->status === 'active'    ? 'success'   :
+                            ($customer->status === 'suspended' ? 'warning'   :
+                            ($customer->status === 'expired'   ? 'danger'    : 'secondary'))
+                        }}">
                             {{ ucfirst($customer->status) }}
                         </span>
                     </td>
                     <td>{{ $customer->billing_date }}</td>
                     <td>
-                        <a href="{{ route('customers.show', $customer) }}" class="btn btn-xs btn-info"><i class="fas fa-eye"></i></a>
-                        <a href="{{ route('customers.edit', $customer) }}" class="btn btn-xs btn-warning"><i class="fas fa-edit"></i></a>
-                        <form action="{{ route('customers.destroy', $customer) }}" method="POST" class="d-inline"
+                        <a href="{{ route('customers.show', $customer) }}"
+                           class="btn btn-xs btn-info" title="View">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                        <a href="{{ route('customers.edit', $customer) }}"
+                           class="btn btn-xs btn-warning" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                        <form action="{{ route('customers.destroy', $customer) }}"
+                              method="POST" class="d-inline"
                               onsubmit="return confirm('Delete this customer?')">
                             @csrf @method('DELETE')
-                            <button class="btn btn-xs btn-danger"><i class="fas fa-trash"></i></button>
+                            <button class="btn btn-xs btn-danger" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
                         </form>
                     </td>
                 </tr>
+
                 @empty
-                <tr><td colspan="8" class="text-center text-muted py-4">No customers found.</td></tr>
+                <tr>
+                    <td colspan="8" class="text-center text-muted py-4">
+                        No customers found.
+                    </td>
+                </tr>
                 @endforelse
             </tbody>
         </table>
