@@ -280,131 +280,80 @@ return [
     */
 
     'menu' => [
-
-        // ── Dashboard ─────────────────────────────────────
-        [
-            'text'        => 'Dashboard',
-            'url'         => 'dashboard',
-            'icon'        => 'fas fa-fw fa-tachometer-alt',
-            'icon_color'  => 'blue',
-        ],
-        [
-            'text'        => 'Super Admin',
-            'icon'        => 'fas fa-fw fa-crown',
-            'can'         => 'super-admin', // শুধু super-admin role দেখবে
-            'submenu'     => [
-                ['text' => 'Dashboard', 'url' => 'super-admin'],
-                ['text' => 'ISP List',  'url' => 'super-admin/tenants'],
-                ['text' => 'Plans',     'url' => 'super-admin/plans'],
-            ],
-        ],
-        // ── Customer Management ───────────────────────────
-        ['header' => 'CUSTOMER MANAGEMENT'],
+        // ── Super Admin Only ──────────────────────
+        ['header' => 'SUPER ADMIN', 'can' => 'super-admin'],
 
         [
-            'text'       => 'Customers',
-            'url'        => 'customers',
-            'icon'       => 'fas fa-fw fa-users',
-            'icon_color' => 'teal',
-            'label'      => '',
-        ],
-        [
-            'text'       => 'Import Customers',
-            'url'        => 'import',
-            'icon'       => 'fas fa-fw fa-file-import',
-            'icon_color' => 'teal',
-        ],
-        [
-            'text'       => 'Packages',
-            'url'        => 'packages',
-            'icon'       => 'fas fa-fw fa-box',
-            'icon_color' => 'purple',
-        ],
-
-        // ── Billing ───────────────────────────────────────
-        ['header' => 'BILLING'],
-
-        [
-            'text'       => 'Invoices',
-            'url'        => 'invoices',
-            'icon'       => 'fas fa-fw fa-file-invoice',
-            'icon_color' => 'orange',
-        ],
-
-        [
-            'text'       => 'Payments',
-            'url'        => 'payments',
-            'icon'       => 'fas fa-fw fa-money-bill-wave',
-            'icon_color' => 'green',
-        ],
-
-        // ── Support ───────────────────────────────────────
-        ['header' => 'SUPPORT'],
-
-        [
-            'text'       => 'Tickets',
-            'url'        => 'tickets',
-            'icon'       => 'fas fa-fw fa-ticket-alt',
-            'icon_color' => 'red',
-        ],
-
-        // ── Network ───────────────────────────────────────
-        ['header' => 'NETWORK'],
-
-        [
-            'text'       => 'MikroTik Routers',
-            'url'        => 'mikrotik',
-            'icon'       => 'fas fa-fw fa-network-wired',
+            'text'       => 'SA Dashboard',
+            'url'        => 'super-admin',
+            'icon'       => 'fas fa-fw fa-tachometer-alt',
             'icon_color' => 'blue',
-        ],
-
-        // ── Management ────────────────────────────────────
-        ['header' => 'MANAGEMENT'],
-
-        [
-            'text'       => 'Agents',
-            'url'        => 'agents',
-            'icon'       => 'fas fa-fw fa-user-tie',
-            'icon_color' => 'indigo',
-        ],
-
-        [
-            'text'       => 'Inventory',
-            'url'        => 'inventory',
-            'icon'       => 'fas fa-fw fa-warehouse',
-            'icon_color' => 'brown',
+            'can'        => 'super-admin',
         ],
         [
-            'text'       => 'SMS Management',
-            'url'        => 'sms',
-            'icon'       => 'fas fa-fw fa-sms',
+            'text'       => 'ISP List',
+            'url'        => 'super-admin/tenants',
+            'icon'       => 'fas fa-fw fa-building',
             'icon_color' => 'green',
+            'can'        => 'super-admin',
         ],
-        // ── Reports ───────────────────────────────────────
-        ['header' => 'REPORTS'],
-
         [
-            'text'    => 'Reports',
-            'icon'    => 'fas fa-fw fa-chart-bar',
-            'submenu' => [
-                [
-                    'text' => 'Revenue Report',
-                    'url'  => 'reports/revenue',
-                    'icon' => 'fas fa-fw fa-coins',
-                ],
-                [
-                    'text' => 'Outstanding Dues',
-                    'url'  => 'reports/due',
-                    'icon' => 'fas fa-fw fa-exclamation-circle',
-                ],
-                [
-                    'text' => 'Customer Report',
-                    'url'  => 'reports/customers',
-                    'icon' => 'fas fa-fw fa-users',
-                ],
+            'text'       => 'Plans',
+            'url'        => 'super-admin/plans',
+            'icon'       => 'fas fa-fw fa-tags',
+            'icon_color' => 'yellow',
+            'can'        => 'super-admin',
+        ],
+        ['header' => 'RESELLER', 'can' => 'create-reseller'],
+        [
+            'text'       => 'My Resellers',
+            'url'        => 'my-resellers',
+            'icon'       => 'fas fa-fw fa-sitemap',
+            'icon_color' => 'orange',
+            'can'        => 'create-reseller',
+        ],
+        // ── ISP Admin Only ────────────────────────
+        ['header' => 'CUSTOMER MANAGEMENT', 'can' => 'isp-admin'],
+        ['text' => 'Dashboard',        'url' => 'dashboard',  'icon' => 'fas fa-fw fa-tachometer-alt', 'icon_color' => 'blue',   'can' => 'isp-admin'],
+        ['header' => 'RESELLER', 'can' => 'create-reseller'],
+        [
+            'text'       => 'My Resellers',
+            'url'        => 'my-resellers',
+            'icon'       => 'fas fa-fw fa-sitemap',
+            'icon_color' => 'orange',
+            'can'        => 'create-reseller',
+        ],        
+        ['text' => 'Customers',        'url' => 'customers',  'icon' => 'fas fa-fw fa-users',          'icon_color' => 'green',  'can' => 'isp-admin'],
+        ['text' => 'Import Customers', 'url' => 'import',     'icon' => 'fas fa-fw fa-file-import',    'icon_color' => 'teal',   'can' => 'isp-admin'],
+        ['text' => 'Packages',         'url' => 'packages',   'icon' => 'fas fa-fw fa-box',            'icon_color' => 'purple', 'can' => 'isp-admin'],
+
+        ['header' => 'BILLING', 'can' => 'isp-admin'],
+        ['text' => 'Invoices', 'url' => 'invoices', 'icon' => 'fas fa-fw fa-file-invoice', 'icon_color' => 'orange', 'can' => 'isp-admin'],
+        ['text' => 'Payments', 'url' => 'payments', 'icon' => 'fas fa-fw fa-money-bill',   'icon_color' => 'green',  'can' => 'isp-admin'],
+
+        ['header' => 'SUPPORT', 'can' => 'isp-admin'],
+        ['text' => 'Tickets', 'url' => 'tickets', 'icon' => 'fas fa-fw fa-ticket-alt', 'icon_color' => 'red', 'can' => 'isp-admin'],
+
+        ['header' => 'NETWORK', 'can' => 'isp-admin'],
+        ['text' => 'MikroTik Routers', 'url' => 'mikrotik', 'icon' => 'fas fa-fw fa-network-wired', 'icon_color' => 'cyan', 'can' => 'isp-admin'],
+
+        ['header' => 'MANAGEMENT', 'can' => 'isp-admin'],
+        ['text' => 'Agents',    'url' => 'agents',    'icon' => 'fas fa-fw fa-user-tie', 'icon_color' => 'yellow', 'can' => 'isp-admin'],
+        ['text' => 'Inventory', 'url' => 'inventory', 'icon' => 'fas fa-fw fa-boxes',    'icon_color' => 'brown',  'can' => 'isp-admin'],
+        ['text' => 'SMS',       'url' => 'sms',       'icon' => 'fas fa-fw fa-sms',      'icon_color' => 'green',  'can' => 'isp-admin'],
+
+        ['header' => 'REPORTS', 'can' => 'isp-admin'],
+        [
+            'text'       => 'Reports',
+            'icon'       => 'fas fa-fw fa-chart-bar',
+            'icon_color' => 'blue',
+            'can'        => 'isp-admin',
+            'submenu'    => [
+                ['text' => 'Revenue',   'url' => 'reports/revenue',   'icon' => 'fas fa-fw fa-dollar-sign', 'icon_color' => 'green'],
+                ['text' => 'Due',       'url' => 'reports/due',       'icon' => 'fas fa-fw fa-exclamation', 'icon_color' => 'red'],
+                ['text' => 'Customers', 'url' => 'reports/customers', 'icon' => 'fas fa-fw fa-users',       'icon_color' => 'blue'],
             ],
         ],
-
     ],
 
 ];
