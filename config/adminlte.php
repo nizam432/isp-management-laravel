@@ -304,6 +304,20 @@ return [
             'icon_color' => 'yellow',
             'can'        => 'super-admin',
         ],
+         // Super Admin menu তে
+        ['text' => 'SMS Gateways', 'url' => 'super-admin/sms', 'icon' => 'fas fa-fw fa-sms', 'icon_color' => 'green', 'can' => 'super-admin'],
+
+        // ISP Admin menu তে (SMS section এ)
+        ['text' => 'SMS Settings', 'url' => 'sms/settings', 'icon' => 'fas fa-fw fa-cog', 'icon_color' => 'yellow', 'can' => 'isp-admin'],
+
+        // ── ISP Admin Only ────────────────────────
+        ['header' => 'CUSTOMER MANAGEMENT', 'can' => 'isp-admin'],
+        ['text' => 'Dashboard',        'url' => 'dashboard',  'icon' => 'fas fa-fw fa-tachometer-alt', 'icon_color' => 'blue',   'can' => 'isp-admin'],
+        
+        ['text' => 'Customers',        'url' => 'customers',  'icon' => 'fas fa-fw fa-users',          'icon_color' => 'green',  'can' => 'isp-admin'],
+        ['text' => 'Import Customers', 'url' => 'import',     'icon' => 'fas fa-fw fa-file-import',    'icon_color' => 'teal',   'can' => 'isp-admin'],
+        ['text' => 'Packages',         'url' => 'packages',   'icon' => 'fas fa-fw fa-box',            'icon_color' => 'purple', 'can' => 'isp-admin'],
+        
         ['header' => 'RESELLER', 'can' => 'create-reseller'],
         [
             'text'       => 'My Resellers',
@@ -312,21 +326,6 @@ return [
             'icon_color' => 'orange',
             'can'        => 'create-reseller',
         ],
-        // ── ISP Admin Only ────────────────────────
-        ['header' => 'CUSTOMER MANAGEMENT', 'can' => 'isp-admin'],
-        ['text' => 'Dashboard',        'url' => 'dashboard',  'icon' => 'fas fa-fw fa-tachometer-alt', 'icon_color' => 'blue',   'can' => 'isp-admin'],
-        ['header' => 'RESELLER', 'can' => 'create-reseller'],
-        [
-            'text'       => 'My Resellers',
-            'url'        => 'my-resellers',
-            'icon'       => 'fas fa-fw fa-sitemap',
-            'icon_color' => 'orange',
-            'can'        => 'create-reseller',
-        ],        
-        ['text' => 'Customers',        'url' => 'customers',  'icon' => 'fas fa-fw fa-users',          'icon_color' => 'green',  'can' => 'isp-admin'],
-        ['text' => 'Import Customers', 'url' => 'import',     'icon' => 'fas fa-fw fa-file-import',    'icon_color' => 'teal',   'can' => 'isp-admin'],
-        ['text' => 'Packages',         'url' => 'packages',   'icon' => 'fas fa-fw fa-box',            'icon_color' => 'purple', 'can' => 'isp-admin'],
-
         ['header' => 'BILLING', 'can' => 'isp-admin'],
         ['text' => 'Invoices', 'url' => 'invoices', 'icon' => 'fas fa-fw fa-file-invoice', 'icon_color' => 'orange', 'can' => 'isp-admin'],
         ['text' => 'Payments', 'url' => 'payments', 'icon' => 'fas fa-fw fa-money-bill',   'icon_color' => 'green',  'can' => 'isp-admin'],

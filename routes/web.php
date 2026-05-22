@@ -155,5 +155,26 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/{plan}/toggle', [SuperAdminPlanController::class, 'toggle'])->name('toggle');
         });
     });
+    // ── My Resellers (Master Reseller) ────────────
+    Route::prefix('my-resellers')->name('my-resellers.')->middleware(['can:create-reseller'])->group(function () {
+        Route::get('/',              [App\Http\Controllers\MyResellerController::class, 'index'])->name('index');
+        Route::get('/create',        [App\Http\Controllers\MyResellerController::class, 'create'])->name('create');
+        Route::post('/',             [App\Http\Controllers\MyResellerController::class, 'store'])->name('store');
+        Route::post('/{id}/toggle',  [App\Http\Controllers\MyResellerController::class, 'toggle'])->name('toggle');
+        Route::get('/{id}/edit',  [App\Http\Controllers\MyResellerController::class, 'edit'])->name('edit');
+        Route::put('/{id}',       [App\Http\Controllers\MyResellerController::class, 'update'])->name('update');    
+    });
+     // ISP SMS Settings
+    Route::prefix('sms/settings')->name('sms.tenant.')->group(function () {
+        Route::get('/',                [App\Http\Controllers\TenantSmsController::class, 'index'])->name('index');
+        Route::post('/{slug}/save',    [App\Http\Controllers\TenantSmsController::class, 'save'])->name('save');
+        Route::post('/{slug}/toggle',  [App\Http\Controllers\TenantSmsController::class, 'toggle'])->name('toggle');
+    });
 
+    // Super Admin SMS Gateway switch
+    Route::prefix('super-admin/sms')->name('super-admin.sms.')->middleware(['superadmin'])->group(function () {
+        Route::get('/',                [App\Http\Controllers\SuperAdmin\SmsGatewayController::class, 'index'])->name('index');
+        Route::post('/{gateway}/toggle',[App\Http\Controllers\SuperAdmin\SmsGatewayController::class, 'toggle'])->name('toggle');
+    });   
+    
 });
