@@ -44,7 +44,6 @@
     <div class="card-body">
         <form method="GET">
             <div class="row">
-                {{-- Search --}}
                 <div class="col-md-3">
                     <div class="form-group mb-0">
                         <label class="small font-weight-bold">Search</label>
@@ -58,7 +57,6 @@
                         </div>
                     </div>
                 </div>
-                {{-- Status --}}
                 <div class="col-md-2">
                     <div class="form-group mb-0">
                         <label class="small font-weight-bold">Status</label>
@@ -71,7 +69,18 @@
                         </select>
                     </div>
                 </div>
-                {{-- Package --}}
+                <div class="col-md-2">
+                    <div class="form-group mb-0">
+                        <label class="small font-weight-bold">MikroTik</label>
+                        <select name="mikrotik_status" class="form-control form-control-sm">
+                            <option value="">All MikroTik</option>
+                            <option value="active"    {{ request('mikrotik_status') == 'active'    ? 'selected' : '' }}>Active</option>
+                            <option value="pending"   {{ request('mikrotik_status') == 'pending'   ? 'selected' : '' }}>Pending</option>
+                            <option value="suspended" {{ request('mikrotik_status') == 'suspended' ? 'selected' : '' }}>Suspended</option>
+                            <option value="removed"   {{ request('mikrotik_status') == 'removed'   ? 'selected' : '' }}>Removed</option>
+                        </select>
+                    </div>
+                </div>
                 <div class="col-md-2">
                     <div class="form-group mb-0">
                         <label class="small font-weight-bold">Package</label>
@@ -85,12 +94,11 @@
                         </select>
                     </div>
                 </div>
-                {{-- Area --}}
-                <div class="col-md-2">
+                <div class="col-md-1">
                     <div class="form-group mb-0">
                         <label class="small font-weight-bold">Area</label>
                         <select name="area" class="form-control form-control-sm">
-                            <option value="">All Areas</option>
+                            <option value="">All</option>
                             @foreach($areas as $area)
                                 <option value="{{ $area }}" {{ request('area') == $area ? 'selected' : '' }}>
                                     {{ $area }}
@@ -99,7 +107,6 @@
                         </select>
                     </div>
                 </div>
-                {{-- Billing Date --}}
                 <div class="col-md-2">
                     <div class="form-group mb-0">
                         <label class="small font-weight-bold">Billing Date</label>
@@ -121,7 +128,7 @@
                 <a href="{{ route('customers.index') }}" class="btn btn-sm btn-secondary ml-1">
                     <i class="fas fa-redo mr-1"></i> Reset
                 </a>
-                @if(request()->hasAny(['search','status','package_id','area','billing_date']))
+                @if(request()->hasAny(['search','status','mikrotik_status','package_id','area','billing_date']))
                     <span class="badge badge-warning ml-2">
                         Filtered: {{ $customers->total() }} results
                     </span>
@@ -134,9 +141,7 @@
 {{-- Customer Table --}}
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <h3 class="card-title">
-            <i class="fas fa-users mr-1"></i> Customer List
-        </h3>
+        <h3 class="card-title"><i class="fas fa-users mr-1"></i> Customer List</h3>
         <div>
             <a href="{{ route('import.index') }}" class="btn btn-xs btn-success mr-1">
                 <i class="fas fa-file-import mr-1"></i> Import
@@ -156,13 +161,14 @@
                     <th>Area</th>
                     <th>Billing</th>
                     <th>Status</th>
-                    <th style="width:100px">Action</th>
+                    <th>MikroTik</th>
+                    <th style="width:90px">Action</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($customers as $i => $customer)
                 @if(!$customer || !$customer->id) @continue @endif
-                <tr>
+                <tr id="row-{{ $customer->id }}">
                     <td class="text-muted small">{{ $customers->firstItem() + $i }}</td>
                     <td><code class="small">{{ $customer->customer_code }}</code></td>
                     <td>
@@ -173,9 +179,7 @@
                             <br><small class="text-muted">{{ $customer->email }}</small>
                         @endif
                     </td>
-                    <td>
-                        <a href="tel:{{ $customer->phone }}">{{ $customer->phone }}</a>
-                    </td>
+                    <td><a href="tel:{{ $customer->phone }}">{{ $customer->phone }}</a></td>
                     <td>
                         @if($customer->package)
                             <span class="badge badge-light border">{{ $customer->package->name }}</span>
@@ -189,11 +193,33 @@
                     </td>
                     <td>
                         <span class="badge badge-{{
-                            $customer->status === 'active'    ? 'success'   :
-                            ($customer->status === 'suspended' ? 'warning'  :
-                            ($customer->status === 'expired'   ? 'danger'   : 'secondary'))
-                        }}">
-                            {{ ucfirst($customer->status) }}
+                            $customer->status === 'active'    ? 'success'  :
+                            ($customer->status === 'suspended' ? 'warning' :
+                            ($customer->status === 'expired'   ? 'danger'  : 'secondary'))
+                        }}">{{ ucfirst($customer->status) }}</span>
+                    </td>
+                    {{-- MikroTik Badge — Click করলে Modal আসবে --}}
+                    <td>
+                        @php $mk = $customer->mikrotik_status ?? 'pending' @endphp
+                        <span class="badge badge-{{
+                                $mk === 'active'    ? 'success'  :
+                                ($mk === 'suspended' ? 'warning' :
+                                ($mk === 'removed'   ? 'danger'  : 'secondary'))
+                            }} mk-badge"
+                            style="cursor:pointer"
+                            data-toggle="modal"
+                            data-target="#mkModal"
+                            data-id="{{ $customer->id }}"
+                            data-name="{{ $customer->name }}"
+                            data-pppoe="{{ $customer->pppoe_username }}"
+                            data-status="{{ $mk }}"
+                            title="Click to manage MikroTik">
+                            <i class="fas fa-{{
+                                $mk === 'active'    ? 'check' :
+                                ($mk === 'suspended' ? 'ban'  :
+                                ($mk === 'removed'   ? 'times': 'clock'))
+                            }} mr-1"></i>
+                            {{ ucfirst($mk) }}
                         </span>
                     </td>
                     <td>
@@ -217,7 +243,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="9" class="text-center text-muted py-4">
+                    <td colspan="10" class="text-center text-muted py-4">
                         <i class="fas fa-users fa-2x d-block mb-2"></i>
                         কোনো customer পাওয়া যায়নি।
                     </td>
@@ -234,4 +260,132 @@
     </div>
 </div>
 
+{{-- MikroTik Modal --}}
+<div class="modal fade" id="mkModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title">
+                    <i class="fas fa-router mr-1"></i> MikroTik Control
+                </h6>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body py-2">
+                <p class="mb-1 small">
+                    <strong id="mk-name"></strong><br>
+                    <code id="mk-pppoe" class="text-muted"></code>
+                </p>
+                <div class="mb-2">
+                    <span class="small text-muted">Current: </span>
+                    <span id="mk-current-badge"></span>
+                </div>
+                <div id="mk-spinner" class="text-center py-2 d-none">
+                    <i class="fas fa-spinner fa-spin"></i> Processing...
+                </div>
+                <div id="mk-result" class="d-none"></div>
+                <div id="mk-actions" class="d-grid gap-1">
+                    {{-- Buttons will be injected by JS --}}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 @endsection
+
+@push('js')
+<script>
+var currentCustomerId = null;
+var csrfToken = '{{ csrf_token() }}';
+
+$('#mkModal').on('show.bs.modal', function(e) {
+    var btn     = $(e.relatedTarget);
+    currentCustomerId = btn.data('id');
+    var name    = btn.data('name');
+    var pppoe   = btn.data('pppoe');
+    var status  = btn.data('status');
+
+    $('#mk-name').text(name);
+    $('#mk-pppoe').text(pppoe || '—');
+    $('#mk-result').addClass('d-none').html('');
+    $('#mk-spinner').addClass('d-none');
+
+    // Current status badge
+    var badgeClass = {active:'success', suspended:'warning', removed:'danger', pending:'secondary'};
+    $('#mk-current-badge').html(
+        '<span class="badge badge-' + (badgeClass[status] || 'secondary') + '">' + status + '</span>'
+    );
+
+    // Action buttons based on current status
+    var actions = '';
+    if (status === 'pending' || status === 'removed') {
+        actions += '<button class="btn btn-success btn-block btn-sm mb-1" onclick="mkAction(\'provision\')"><i class="fas fa-plus-circle mr-1"></i> Provision</button>';
+    }
+    if (status === 'active') {
+        actions += '<button class="btn btn-warning btn-block btn-sm mb-1" onclick="mkAction(\'suspend\')"><i class="fas fa-ban mr-1"></i> Suspend</button>';
+    }
+    if (status === 'suspended') {
+        actions += '<button class="btn btn-primary btn-block btn-sm mb-1" onclick="mkAction(\'restore\')"><i class="fas fa-check-circle mr-1"></i> Restore</button>';
+    }
+    if (status === 'active' || status === 'suspended') {
+        actions += '<button class="btn btn-danger btn-block btn-sm" onclick="mkAction(\'remove\')"><i class="fas fa-trash mr-1"></i> Remove</button>';
+    }
+
+    $('#mk-actions').html(actions);
+});
+
+function mkAction(action) {
+    if (!currentCustomerId) return;
+
+    var urls = {
+        provision: '/customers/' + currentCustomerId + '/mikrotik/provision',
+        suspend:   '/customers/' + currentCustomerId + '/mikrotik/suspend',
+        restore:   '/customers/' + currentCustomerId + '/mikrotik/restore',
+        remove:    '/customers/' + currentCustomerId + '/mikrotik/',
+    };
+
+    var methods = { provision: 'POST', suspend: 'POST', restore: 'POST', remove: 'DELETE' };
+
+    $('#mk-actions').addClass('d-none');
+    $('#mk-spinner').removeClass('d-none');
+
+    $.ajax({
+        url:    urls[action],
+        method: methods[action],
+        data:   { _token: csrfToken },
+        success: function(res) {
+            $('#mk-spinner').addClass('d-none');
+            $('#mk-result').removeClass('d-none')
+                .html('<div class="alert alert-success py-1 small mb-1"><i class="fas fa-check mr-1"></i>' + (res.message || 'সফল!') + '</div>');
+
+            // Badge update in table
+            var newStatus = res.mikrotik_status || '';
+            if (newStatus) {
+                var badgeMap = {
+                    active:    'badge-success',
+                    suspended: 'badge-warning',
+                    removed:   'badge-danger',
+                    pending:   'badge-secondary',
+                };
+                var iconMap = {
+                    active: 'check', suspended: 'ban', removed: 'times', pending: 'clock'
+                };
+                var $badge = $('[data-id="' + currentCustomerId + '"].mk-badge');
+                $badge.attr('class', 'badge ' + (badgeMap[newStatus] || 'badge-secondary') + ' mk-badge')
+                      .attr('data-status', newStatus)
+                      .html('<i class="fas fa-' + (iconMap[newStatus] || 'clock') + ' mr-1"></i>' + newStatus.charAt(0).toUpperCase() + newStatus.slice(1));
+            }
+
+            setTimeout(function() { $('#mkModal').modal('hide'); }, 1200);
+        },
+        error: function(xhr) {
+            $('#mk-spinner').addClass('d-none');
+            $('#mk-actions').removeClass('d-none');
+            var msg = xhr.responseJSON ? xhr.responseJSON.message : 'সমস্যা হয়েছে।';
+            $('#mk-result').removeClass('d-none')
+                .html('<div class="alert alert-danger py-1 small mb-1"><i class="fas fa-times mr-1"></i>' + msg + '</div>');
+        }
+    });
+}
+</script>
+@endpush
