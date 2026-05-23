@@ -17,16 +17,31 @@ class CustomerController extends Controller
     {
         $customers = Customer::with(['package', 'agent'])
             ->when($request->search, fn($q) => $q
-                ->where('name', 'like', "%{$request->search}%")
-                ->orWhere('phone', 'like', "%{$request->search}%")
-                ->orWhere('customer_code', 'like', "%{$request->search}%"))
-            ->when($request->status, fn($q) => $q->where('status', $request->status))
-            ->when($request->area, fn($q) => $q->where('area', $request->area))
+                ->where('name',          'like', "%{$request->search}%")
+                ->orWhere('phone',        'like', "%{$request->search}%")
+                ->orWhere('customer_code','like', "%{$request->search}%"))
+            ->when($request->status,       fn($q) => $q->where('status',       $request->status))
+            ->when($request->area,         fn($q) => $q->where('area',         $request->area))
+            ->when($request->package_id,   fn($q) => $q->where('package_id',   $request->package_id))
+            ->when($request->billing_date, fn($q) => $q->where('billing_date', $request->billing_date))
             ->latest()
             ->paginate(20);
-
-        return view('customers.index', compact('customers'));
+    
+        $totalCustomers     = Customer::count();
+        $activeCustomers    = Customer::where('status', 'active')->count();
+        $suspendedCustomers = Customer::where('status', 'suspended')->count();
+        $expiredCustomers   = Customer::where('status', 'expired')->count();
+    
+        $packages = Package::active()->get();
+        $areas    = Customer::select('area')->distinct()->whereNotNull('area')->pluck('area')->sort()->values();
+    
+        return view('customers.index', compact(
+            'customers',
+            'totalCustomers', 'activeCustomers', 'suspendedCustomers', 'expiredCustomers',
+            'packages', 'areas'
+        ));
     }
+    
 
     public function create()
     {
