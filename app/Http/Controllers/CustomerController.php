@@ -175,38 +175,51 @@ class CustomerController extends Controller
                          ->with('success', 'Customer deleted successfully.');
     }
 
-    public function updateStatus(Request $request, Customer $customer)
-    {
-        $request->validate([
-            'status' => 'required|in:active,inactive,suspended,expired',
-        ]);
+        public function updateStatus(Request $request, Customer $customer)
+        {
+            $request->validate([
+                'status' => 'required|in:active,inactive,suspended,expired',
+            ]);
 
-        $old = $customer->status;
-        $customer->update(['status' => $request->status]);
+            $old = $customer->status;
+            $customer->update(['status' => $request->status]);
 
-        // Status পরিবর্তনে MikroTik sync
-        try {
-            $router = MikrotikRouter::where('is_active', 1)->first();
-            if ($router) {
-                $mikrotik = new MikrotikService();
-                match ($request->status) {
-                    'active'    => $mikrotik->withRouter($router, fn($m) => $m->restoreCustomer($customer)),
-                    'suspended' => $mikrotik->withRouter($router, fn($m) => $m->suspendCustomer($customer)),
-                    default     => null,
-                };
+            // Status পরিবর্তনে MikroTik sync
+            try {
+                $router = MikrotikRouter::where('is_active', 1)->first();
+                if ($router) {
+                    $mikrotik = new MikrotikService();
+
+                    match ($request->status) {
+                        'active' => $customer->mikrotik_status === 'pending'
+                                        ? $mikrotik->withRouter($router, fn($m) => $m->provisionCustomer($customer))
+                                        : $mikrotik->withRouter($router, fn($m) => $m->restoreCustomer($customer)),
+                        'suspended',
+                        'expired',
+                        'inactive' => $mikrotik->withRouter($router, fn($m) => $m->suspendCustomer($customer)),
+                        default    => null,
+                    };
+
+                    // mikrotik_status DB update
+                    $mkStatus = match($request->status) {
+                        'active'                        => 'active',
+                        'suspended','expired','inactive' => 'suspended',
+                        default                         => $customer->mikrotik_status,
+                    };
+                    $customer->update(['mikrotik_status' => $mkStatus]);
+                }
+            } catch (\Exception $e) {
+                Log::warning("MikroTik status sync failed: " . $e->getMessage());
             }
-        } catch (\Exception $e) {
-            Log::warning("MikroTik status sync failed: " . $e->getMessage());
+
+            ActivityLog::log(
+                "Customer status changed: {$old} -> {$request->status}",
+                'Customer',
+                $customer->id
+            );
+
+            return back()->with('success', 'Status updated successfully.');
         }
-
-        ActivityLog::log(
-            "Customer status changed: {$old} -> {$request->status}",
-            'Customer',
-            $customer->id
-        );
-
-        return back()->with('success', 'Status updated successfully.');
-    }
 
     // ══════════════════════════════════════════════
     // Private Helper
@@ -214,19 +227,20 @@ class CustomerController extends Controller
 
     private function provisionToMikrotik(Customer $customer): void
     {
-        try {
-            $router = MikrotikRouter::where('is_active', 1)->first();
-            if (!$router) return;
+        $router = MikrotikRouter::where('is_active', 1)->first();
+        if (!$router) {
+            $customer->update(['mikrotik_status' => 'pending']);
+            return;
+        }
 
+        try {
             $mikrotik = new MikrotikService();
             $mikrotik->withRouter($router, fn($m) => $m->provisionCustomer($customer));
-            $customer->update(['mikrotik_status' => 'active']);
-
-            Log::info("Auto-provisioned customer {$customer->customer_code} on MikroTik.");
+            $customer->update(['mikrotik_status' => 'active']); // ✅ success = active
+            Log::info("Provisioned: {$customer->customer_code}");
         } catch (\Exception $e) {
-            // MikroTik fail হলেও customer save হবে — শুধু log করো
-            Log::warning("MikroTik auto-provision failed for {$customer->customer_code}: " . $e->getMessage());
-            $customer->update(['mikrotik_status' => 'pending']);
+            Log::warning("Provision failed [{$customer->customer_code}]: " . $e->getMessage());
+            $customer->update(['mikrotik_status' => 'pending']); // ❌ fail = pending
         }
     }
 }
