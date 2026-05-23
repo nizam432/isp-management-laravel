@@ -113,47 +113,73 @@ class CustomerController extends Controller
         return view('customers.edit', compact('customer', 'packages', 'agents'));
     }
 
-    public function update(Request $request, Customer $customer)
-    {
-        $request->validate([
-            'name'         => 'required|string|max:100',
-            'phone'        => 'required|string|max:20|unique:customers,phone,' . $customer->id,
-            'package_id'   => 'required|exists:packages,id',
-            'billing_date' => 'required|integer|min:1|max:28',
-            'status'       => 'required|in:active,inactive,suspended,expired',
-        ]);
+   public function update(Request $request, Customer $customer)
+{
+    $request->validate([
+        'name'         => 'required|string|max:100',
+        'phone'        => 'required|string|max:20|unique:customers,phone,' . $customer->id,
+        'package_id'   => 'required|exists:packages,id',
+        'billing_date' => 'required|integer|min:1|max:28',
+        'status'       => 'required|in:active,inactive,suspended,expired',
+    ]);
 
-        $old        = $customer->toArray();
-        $oldPackage = $customer->package_id;
-        $data       = $request->all();
+    $old        = $customer->toArray();
+    $oldPackage = $customer->package_id;
+    $oldStatus  = $customer->status;
+    $data       = $request->all();
 
-        if ($request->hasFile('photo')) {
-            $data['photo'] = $request->file('photo')->store('customers/photos', 'public');
-        }
-        if ($request->hasFile('nid_photo')) {
-            $data['nid_photo'] = $request->file('nid_photo')->store('customers/nid', 'public');
-        }
+    if ($request->hasFile('photo')) {
+        $data['photo'] = $request->file('photo')->store('customers/photos', 'public');
+    }
+    if ($request->hasFile('nid_photo')) {
+        $data['nid_photo'] = $request->file('nid_photo')->store('customers/nid', 'public');
+    }
 
-        $customer->update($data);
+    $customer->update($data);
 
-        // Package পরিবর্তন হলে MikroTik এ update করো
-        if ($oldPackage !== $customer->package_id && $customer->mikrotik_status === 'active') {
-            try {
-                $router = MikrotikRouter::where('is_active', 1)->first();
-                if ($router) {
-                    $mikrotik = new MikrotikService();
-                    $mikrotik->withRouter($router, fn($m) => $m->changeCustomerPackage($customer));
-                }
-            } catch (\Exception $e) {
-                Log::warning("MikroTik package update failed: " . $e->getMessage());
+    try {
+        $router = MikrotikRouter::where('is_active', 1)->first();
+        if ($router) {
+            $mikrotik = new MikrotikService();
+
+            // ── Status পরিবর্তন হলে MikroTik sync ──
+            if ($oldStatus !== $request->status) {
+                match ($request->status) {
+                    'active' => $customer->mikrotik_status === 'pending'
+                                    ? $mikrotik->withRouter($router, fn($m) => $m->provisionCustomer($customer))
+                                    : $mikrotik->withRouter($router, fn($m) => $m->restoreCustomer($customer)),
+                    'suspended',
+                    'expired',
+                    'inactive' => $customer->mikrotik_status === 'active'
+                                    ? $mikrotik->withRouter($router, fn($m) => $m->suspendCustomer($customer))
+                                    : null,
+                    default => null,
+                };
+
+                $mkStatus = match($request->status) {
+                    'active'                         => 'active',
+                    'suspended','expired','inactive'  => $customer->mikrotik_status === 'active'
+                                                            ? 'suspended'
+                                                            : $customer->mikrotik_status,
+                    default                          => $customer->mikrotik_status,
+                };
+                $customer->update(['mikrotik_status' => $mkStatus]);
+            }
+
+            // ── Package পরিবর্তন হলে MikroTik sync ──
+            if ($oldPackage !== $customer->package_id && $customer->mikrotik_status === 'active') {
+                $mikrotik->withRouter($router, fn($m) => $m->changeCustomerPackage($customer));
             }
         }
-
-        ActivityLog::log('Customer updated', 'Customer', $customer->id, $old, $customer->toArray());
-
-        return redirect()->route('customers.show', $customer)
-                         ->with('success', 'Customer updated successfully.');
+    } catch (\Exception $e) {
+        Log::warning("MikroTik update sync failed: " . $e->getMessage());
     }
+
+    ActivityLog::log('Customer updated', 'Customer', $customer->id, $old, $customer->toArray());
+
+    return redirect()->route('customers.show', $customer)
+                     ->with('success', 'Customer updated successfully.');
+}
 
     public function destroy(Customer $customer)
     {

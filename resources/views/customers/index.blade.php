@@ -198,27 +198,26 @@
                             ($customer->status === 'expired'   ? 'danger'  : 'secondary'))
                         }}">{{ ucfirst($customer->status) }}</span>
                     </td>
-                    {{-- MikroTik Badge — Click করলে Modal আসবে --}}
                     <td>
-                        @php $mk = $customer->mikrotik_status ?? 'pending' @endphp
-                        <span class="badge badge-{{
-                                $mk === 'active'    ? 'success'  :
-                                ($mk === 'suspended' ? 'warning' :
-                                ($mk === 'removed'   ? 'danger'  : 'secondary'))
-                            }} mk-badge"
-                            style="cursor:pointer"
-                            data-toggle="modal"
-                            data-target="#mkModal"
-                            data-id="{{ $customer->id }}"
-                            data-name="{{ $customer->name }}"
-                            data-pppoe="{{ $customer->pppoe_username }}"
-                            data-status="{{ $mk }}"
-                            title="Click to manage MikroTik">
-                            <i class="fas fa-{{
-                                $mk === 'active'    ? 'check' :
-                                ($mk === 'suspended' ? 'ban'  :
-                                ($mk === 'removed'   ? 'times': 'clock'))
-                            }} mr-1"></i>
+                        @php
+                            $mk = $customer->mikrotik_status ?? 'pending';
+                            $mkBadge = match($mk) {
+                                'active'    => ['badge' => 'success', 'icon' => 'check'],
+                                'suspended' => ['badge' => 'warning', 'icon' => 'ban'],
+                                'removed'   => ['badge' => 'danger',  'icon' => 'times'],
+                                default     => ['badge' => 'secondary','icon' => 'clock'],
+                            };
+                        @endphp
+                        <span class="badge badge-{{ $mkBadge['badge'] }} mk-badge"
+                              style="cursor:pointer"
+                              data-toggle="modal"
+                              data-target="#mkModal"
+                              data-id="{{ $customer->id }}"
+                              data-name="{{ $customer->name }}"
+                              data-pppoe="{{ $customer->pppoe_username }}"
+                              data-status="{{ $mk }}"
+                              title="Click to manage MikroTik">
+                            <i class="fas fa-{{ $mkBadge['icon'] }} mr-1"></i>
                             {{ ucfirst($mk) }}
                         </span>
                     </td>
