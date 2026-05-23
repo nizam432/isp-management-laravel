@@ -175,51 +175,55 @@ class CustomerController extends Controller
                          ->with('success', 'Customer deleted successfully.');
     }
 
-        public function updateStatus(Request $request, Customer $customer)
-        {
-            $request->validate([
-                'status' => 'required|in:active,inactive,suspended,expired',
-            ]);
+  public function updateStatus(Request $request, Customer $customer)
+{
+    $request->validate([
+        'status' => 'required|in:active,inactive,suspended,expired',
+    ]);
 
-            $old = $customer->status;
-            $customer->update(['status' => $request->status]);
+    $old = $customer->status;
+    $customer->update(['status' => $request->status]);
 
-            // Status পরিবর্তনে MikroTik sync
-            try {
-                $router = MikrotikRouter::where('is_active', 1)->first();
-                if ($router) {
-                    $mikrotik = new MikrotikService();
+    // Status পরিবর্তনে MikroTik sync
+    try {
+        $router = MikrotikRouter::where('is_active', 1)->first();
+        if ($router) {
+            $mikrotik = new MikrotikService();
 
-                    match ($request->status) {
-                        'active' => $customer->mikrotik_status === 'pending'
-                                        ? $mikrotik->withRouter($router, fn($m) => $m->provisionCustomer($customer))
-                                        : $mikrotik->withRouter($router, fn($m) => $m->restoreCustomer($customer)),
-                        'suspended',
-                        'expired',
-                        'inactive' => $mikrotik->withRouter($router, fn($m) => $m->suspendCustomer($customer)),
-                        default    => null,
-                    };
+            match ($request->status) {
+                'active' => $customer->mikrotik_status === 'pending'
+                                ? $mikrotik->withRouter($router, fn($m) => $m->provisionCustomer($customer))
+                                : $mikrotik->withRouter($router, fn($m) => $m->restoreCustomer($customer)),
+                'suspended',
+                'expired',
+                'inactive' => $customer->mikrotik_status === 'active'
+                                ? $mikrotik->withRouter($router, fn($m) => $m->suspendCustomer($customer))
+                                : null,
+                default => null,
+            };
 
-                    // mikrotik_status DB update
-                    $mkStatus = match($request->status) {
-                        'active'                        => 'active',
-                        'suspended','expired','inactive' => 'suspended',
-                        default                         => $customer->mikrotik_status,
-                    };
-                    $customer->update(['mikrotik_status' => $mkStatus]);
-                }
-            } catch (\Exception $e) {
-                Log::warning("MikroTik status sync failed: " . $e->getMessage());
-            }
-
-            ActivityLog::log(
-                "Customer status changed: {$old} -> {$request->status}",
-                'Customer',
-                $customer->id
-            );
-
-            return back()->with('success', 'Status updated successfully.');
+            // mikrotik_status DB update
+            $mkStatus = match($request->status) {
+                'active'                         => 'active',
+                'suspended','expired','inactive'  => $customer->mikrotik_status === 'active'
+                                                        ? 'suspended'
+                                                        : $customer->mikrotik_status,
+                default                          => $customer->mikrotik_status,
+            };
+            $customer->update(['mikrotik_status' => $mkStatus]);
         }
+    } catch (\Exception $e) {
+        Log::warning("MikroTik status sync failed: " . $e->getMessage());
+    }
+
+    ActivityLog::log(
+        "Customer status changed: {$old} -> {$request->status}",
+        'Customer',
+        $customer->id
+    );
+
+    return back()->with('success', 'Status updated successfully.');
+}
 
     // ══════════════════════════════════════════════
     // Private Helper
