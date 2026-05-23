@@ -153,7 +153,7 @@ class SmsService
             ],
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_TIMEOUT        => 30,
+            CURLOPT_TIMEOUT        => 60,
         ]);
         $response = curl_exec($ch);
         curl_close($ch);

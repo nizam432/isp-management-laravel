@@ -20,12 +20,13 @@ class SmsController extends Controller
      */
     public function index()
     {
-        $gateways = SmsGateway::all();
-        $logs     = SmsLog::latest()->paginate(20);
-        $todaySent = SmsLog::today()->success()->count();
+        $gateways    = SmsGateway::all();
+        $logs        = SmsLog::latest()->paginate(20);
+        $todaySent   = SmsLog::today()->success()->count();
         $todayFailed = SmsLog::today()->failed()->count();
+        $templates   = \App\Models\SmsTemplate::active()->get(); // এই line যোগ করো
 
-        return view('sms.index', compact('gateways', 'logs', 'todaySent', 'todayFailed'));
+        return view('sms.index', compact('gateways', 'logs', 'todaySent', 'todayFailed', 'templates'));
     }
 
     /**

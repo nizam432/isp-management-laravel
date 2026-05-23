@@ -1,0 +1,27 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('tenant_sms_settings', function (Blueprint $table) {
+            $table->id();
+            $table->string('tenant_id', 100)->index();
+            $table->string('gateway_slug', 50);
+            $table->json('config')->nullable();
+            $table->boolean('is_active')->default(false);
+            $table->timestamps();
+
+            $table->unique(['tenant_id', 'gateway_slug']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('tenant_sms_settings');
+    }
+};

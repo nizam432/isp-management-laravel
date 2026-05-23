@@ -339,8 +339,35 @@ return [
         ['header' => 'MANAGEMENT', 'can' => 'isp-admin'],
         ['text' => 'Agents',    'url' => 'agents',    'icon' => 'fas fa-fw fa-user-tie', 'icon_color' => 'yellow', 'can' => 'isp-admin'],
         ['text' => 'Inventory', 'url' => 'inventory', 'icon' => 'fas fa-fw fa-boxes',    'icon_color' => 'brown',  'can' => 'isp-admin'],
-        ['text' => 'SMS',       'url' => 'sms',       'icon' => 'fas fa-fw fa-sms',      'icon_color' => 'green',  'can' => 'isp-admin'],
-
+      //  ['text' => 'SMS',       'url' => 'sms',       'icon' => 'fas fa-fw fa-sms',      'icon_color' => 'green',  'can' => 'isp-admin'],
+        [
+            'text'       => 'SMS',
+            'icon'       => 'fas fa-fw fa-sms',
+            'icon_color' => 'green',
+            'can'        => 'isp-admin',
+            'submenu'    => [
+                [
+                    'text' => 'Gateway Settings',
+                    'url'  => 'sms/settings',
+                    'icon' => 'fas fa-fw fa-server',
+                ],
+                [
+                    'text' => 'Templates',
+                    'url'  => 'sms/templates',
+                    'icon' => 'fas fa-fw fa-file-alt',
+                ],                
+                [
+                    'text' => 'Send SMS',
+                    'url'  => 'sms',
+                    'icon' => 'fas fa-fw fa-paper-plane',
+                ],
+                [
+                    'text' => 'SMS Reports',
+                    'url'  => 'sms/reports',
+                    'icon' => 'fas fa-fw fa-chart-bar',
+                ],
+            ],
+        ],
         ['header' => 'REPORTS', 'can' => 'isp-admin'],
         [
             'text'       => 'Reports',

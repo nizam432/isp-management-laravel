@@ -1,7 +1,20 @@
 {{-- resources/views/sms/index.blade.php --}}
 @extends('layouts.app')
-@section('page_title', 'SMS Management')
+@section('page_title', 'Send SMS')
 @section('page_content')
+
+@if(session('success'))
+    <div class="alert alert-success alert-dismissible">
+        <button type="button" class="close" data-dismiss="alert">&times;</button>
+        <i class="fas fa-check-circle mr-1"></i> {{ session('success') }}
+    </div>
+@endif
+@if(session('error'))
+    <div class="alert alert-danger alert-dismissible">
+        <button type="button" class="close" data-dismiss="alert">&times;</button>
+        <i class="fas fa-times-circle mr-1"></i> {{ session('error') }}
+    </div>
+@endif
 
 {{-- Stats --}}
 <div class="row mb-3">
@@ -34,187 +47,242 @@
     </div>
 </div>
 
-<div class="row">
+{{-- Tabs --}}
+<div class="card card-primary card-outline">
+    <div class="card-header p-0 border-bottom-0">
+        <ul class="nav nav-tabs" id="smsTabs" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" data-toggle="tab" href="#quick" role="tab">
+                    <i class="fas fa-paper-plane mr-1"></i> Quick SMS
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-toggle="tab" href="#bulk" role="tab">
+                    <i class="fas fa-broadcast-tower mr-1"></i> Bulk SMS
+                </a>
+            </li>
+        </ul>
+    </div>
 
-    {{-- Left Column: Gateways + Test + Bulk --}}
-    <div class="col-md-5">
+    <div class="card-body">
+        <div class="tab-content">
 
-        {{-- Gateway List --}}
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title"><i class="fas fa-server mr-1"></i> SMS Gateways</h3>
-            </div>
-            <div class="card-body p-0">
-                @foreach($gateways as $gw)
-                <div class="p-3 border-bottom">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div>
-                            <strong>{{ $gw->name }}</strong>
-                            @if($gw->is_active)
-                                <span class="badge badge-success ml-1">Active</span>
-                            @else
-                                <span class="badge badge-secondary ml-1">Inactive</span>
-                            @endif
-                            <br>
-                            <small class="text-muted">{{ $gw->description }}</small>
-                        </div>
-                        <form action="{{ route('sms.gateway.toggle', $gw) }}" method="POST">
+            {{-- ── Tab 1: Quick SMS ───────────────────── --}}
+            <div class="tab-pane fade show active" id="quick" role="tabpanel">
+                <div class="row">
+
+                    {{-- Form --}}
+                    <div class="col-md-6">
+                        <form action="{{ route('sms.test') }}" method="POST">
                             @csrf
-                            <button type="submit" class="btn btn-sm btn-{{ $gw->is_active ? 'danger' : 'success' }}">
-                                <i class="fas fa-{{ $gw->is_active ? 'ban' : 'check' }} mr-1"></i>
-                                {{ $gw->is_active ? 'বন্ধ করুন' : 'চালু করুন' }}
+                            <div class="form-group">
+                                <label class="font-weight-bold">
+                                    <i class="fas fa-mobile-alt mr-1"></i> Mobile Number
+                                </label>
+                                <input type="text" name="mobile" class="form-control"
+                                       placeholder="01XXXXXXXXX" required
+                                       value="{{ old('mobile') }}">
+                            </div>
+                            <div class="form-group">
+                                <label class="font-weight-bold">
+                                    <i class="fas fa-comment mr-1"></i> Message
+                                </label>
+                                <textarea name="message" id="quickMessage" class="form-control" rows="5"
+                                          required maxlength="500"
+                                          placeholder="আপনার message লিখুন...">{{ old('message') }}</textarea>
+                                <small class="text-muted float-right">
+                                    <span id="quickCount">0</span>/500
+                                </small>
+                            </div>
+                            <button type="submit" class="btn btn-info btn-block">
+                                <i class="fas fa-paper-plane mr-1"></i> SMS পাঠাও
                             </button>
                         </form>
                     </div>
 
-                    {{-- Config Form --}}
-                    <form action="{{ route('sms.gateway.config', $gw) }}" method="POST">
-                        @csrf
-                        @foreach($gw->config ?? [] as $key => $value)
-                        <div class="form-group mb-1">
-                            <label class="small text-muted mb-0">
-                                {{ strtoupper(str_replace('_', ' ', $key)) }}
-                            </label>
-                            <input type="{{ in_array($key, ['api_key', 'auth_token', 'password']) ? 'password' : 'text' }}"
-                                   name="config[{{ $key }}]"
-                                   class="form-control form-control-sm"
-                                   value="{{ $value }}"
-                                   placeholder="{{ strtoupper($key) }}">
+                    {{-- Templates Panel --}}
+                    <div class="col-md-6">
+                        <label class="font-weight-bold">
+                            <i class="fas fa-file-alt mr-1"></i> Templates
+                            <a href="{{ route('sms.templates.index') }}" class="btn btn-xs btn-outline-secondary ml-2">
+                                <i class="fas fa-cog"></i> Manage
+                            </a>
+                        </label>
+
+                        {{-- Saved Templates --}}
+                        @if($templates->count())
+                        <div class="list-group mb-2" style="max-height:200px; overflow-y:auto;">
+                            @foreach($templates as $tpl)
+                            <button type="button"
+                                    class="list-group-item list-group-item-action py-2 quick-tpl-btn"
+                                    data-msg="{{ $tpl->body }}">
+                                <strong class="d-block">{{ $tpl->title }}</strong>
+                                <small class="text-muted">{{ Str::limit($tpl->body, 60) }}</small>
+                            </button>
+                            @endforeach
                         </div>
-                        @endforeach
-                        <button type="submit" class="btn btn-xs btn-primary mt-1">
-                            <i class="fas fa-save mr-1"></i> Save Config
-                        </button>
-                    </form>
+                        @else
+                        <div class="alert alert-light border mb-2 py-2">
+                            <small class="text-muted">
+                                কোনো template নেই।
+                                <a href="{{ route('sms.templates.index') }}">এখানে তৈরি করুন</a>।
+                            </small>
+                        </div>
+                        @endif
+
+                        {{-- Default Quick Buttons --}}
+                        <label class="small text-muted">Default Templates</label>
+                        <div class="d-flex flex-wrap">
+                            <button type="button" class="btn btn-xs btn-outline-secondary mr-1 mb-1 quick-tpl-btn"
+                                    data-msg="প্রিয় গ্রাহক, আপনার বিল বাকি আছে। দ্রুত পরিশোধ করুন।">
+                                Bill Due
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-secondary mr-1 mb-1 quick-tpl-btn"
+                                    data-msg="প্রিয় গ্রাহক, আপনার পেমেন্ট সফলভাবে গ্রহণ করা হয়েছে। ধন্যবাদ।">
+                                Payment OK
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-secondary mr-1 mb-1 quick-tpl-btn"
+                                    data-msg="প্রিয় গ্রাহক, বিল বাকি থাকায় আপনার সংযোগ সাময়িকভাবে বন্ধ করা হয়েছে।">
+                                Suspended
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-secondary mr-1 mb-1 quick-tpl-btn"
+                                    data-msg="প্রিয় গ্রাহক, আপনার ইন্টারনেট সংযোগ পুনরায় চালু করা হয়েছে। ধন্যবাদ।">
+                                Restored
+                            </button>
+                        </div>
+                    </div>
+
                 </div>
-                @endforeach
             </div>
-        </div>
 
-        {{-- Test SMS --}}
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title"><i class="fas fa-vial mr-1"></i> Test SMS</h3>
-            </div>
-            <div class="card-body">
-                <form action="{{ route('sms.test') }}" method="POST">
-                    @csrf
-                    <div class="form-group">
-                        <label>Mobile Number</label>
-                        <input type="text" name="mobile" class="form-control"
-                               placeholder="01XXXXXXXXX" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Message</label>
-                        <textarea name="message" class="form-control" rows="3" required>এটি একটি test SMS। - ISP Management</textarea>
-                    </div>
-                    <button type="submit" class="btn btn-info btn-block">
-                        <i class="fas fa-paper-plane mr-1"></i> Test SMS পাঠাও
-                    </button>
-                </form>
-            </div>
-        </div>
+            {{-- ── Tab 2: Bulk SMS ─────────────────────── --}}
+            <div class="tab-pane fade" id="bulk" role="tabpanel">
+                <div class="row">
 
-        {{-- Bulk SMS --}}
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title"><i class="fas fa-broadcast-tower mr-1"></i> Bulk SMS</h3>
-            </div>
-            <div class="card-body">
-                <form action="{{ route('sms.bulk') }}" method="POST">
-                    @csrf
-                    <div class="form-group">
-                        <label>Customer Filter</label>
-                        <select name="status" class="form-control">
-                            <option value="all">সব Customer</option>
-                            <option value="active">Active</option>
-                            <option value="suspended">Suspended</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Message</label>
-                        <textarea name="message" class="form-control" rows="3"
-                                  maxlength="500" required
-                                  placeholder="আপনার message লিখুন..."></textarea>
-                        <small class="text-muted">সর্বোচ্চ ৫০০ অক্ষর</small>
-                    </div>
-                    <button type="submit" class="btn btn-warning btn-block"
-                            onclick="return confirm('সব customer কে SMS পাঠাবেন?')">
-                        <i class="fas fa-broadcast-tower mr-1"></i> Bulk SMS পাঠাও
-                    </button>
-                </form>
-            </div>
-        </div>
-
-    </div>
-
-    {{-- Right Column: SMS Logs --}}
-    <div class="col-md-7">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h3 class="card-title"><i class="fas fa-list mr-1"></i> SMS Logs</h3>
-                <form action="{{ route('sms.logs.clear') }}" method="POST" class="d-inline">
-                    @csrf @method('DELETE')
-                    <button type="submit" class="btn btn-xs btn-danger"
-                            onclick="return confirm('৩০ দিনের পুরনো log মুছবেন?')">
-                        <i class="fas fa-trash mr-1"></i> Clear Old
-                    </button>
-                </form>
-            </div>
-            <div class="card-body p-0">
-                <table class="table table-sm table-striped mb-0">
-                    <thead class="thead-dark">
-                        <tr>
-                            <th>Mobile</th>
-                            <th>Type</th>
-                            <th>Gateway</th>
-                            <th>Status</th>
-                            <th>Time</th>
-                            <th>Message</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($logs as $log)
-                        <tr>
-                            <td><code>{{ $log->mobile }}</code></td>
-                            <td>
-                                <small>{{ \App\Models\SmsLog::TYPES[$log->type] ?? $log->type }}</small>
-                            </td>
-                            <td>
-                                <span class="badge badge-info">{{ $log->gateway }}</span>
-                            </td>
-                            <td>
-                                <span class="badge badge-{{ $log->status === 'success' ? 'success' : 'danger' }}">
-                                    {{ $log->status === 'success' ? '✓ Sent' : '✗ Failed' }}
-                                </span>
-                            </td>
-                            <td>
-                                <small title="{{ $log->created_at }}">
-                                    {{ $log->created_at->diffForHumans() }}
+                    {{-- Form --}}
+                    <div class="col-md-6">
+                        <form action="{{ route('sms.bulk') }}" method="POST"
+                              onsubmit="return confirm('নিশ্চিত — সব selected customer কে SMS পাঠাবেন?')">
+                            @csrf
+                            <div class="form-group">
+                                <label class="font-weight-bold">
+                                    <i class="fas fa-users mr-1"></i> Customer Filter
+                                </label>
+                                <select name="status" class="form-control">
+                                    <option value="all">সব Customer</option>
+                                    <option value="active">Active Customer</option>
+                                    <option value="suspended">Suspended Customer</option>
+                                    <option value="expired">Expired Customer</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="font-weight-bold">
+                                    <i class="fas fa-comment mr-1"></i> Message
+                                </label>
+                                <textarea name="message" id="bulkMessage" class="form-control" rows="5"
+                                          maxlength="500" required
+                                          placeholder="আপনার message লিখুন..."></textarea>
+                                <small class="text-muted float-right">
+                                    <span id="bulkCount">0</span>/500
                                 </small>
-                            </td>
-                            <td>
-                                <small title="{{ $log->message }}">
-                                    {{ Str::limit($log->message, 40) }}
-                                </small>
-                            </td>
-                        </tr>
-                        @empty
-                        <tr>
-                            <td colspan="6" class="text-center text-muted py-3">
-                                কোনো SMS log নেই।
-                            </td>
-                        </tr>
-                        @endforelse
-                    </tbody>
-                </table>
+                            </div>
+                            <div class="alert alert-warning py-2 mb-2">
+                                <i class="fas fa-exclamation-triangle mr-1"></i>
+                                <small>Bulk SMS পাঠালে সব selected customer এর কাছে একসাথে SMS যাবে।</small>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-block">
+                                <i class="fas fa-broadcast-tower mr-1"></i> Bulk SMS পাঠাও
+                            </button>
+                        </form>
+                    </div>
+
+                    {{-- Templates Panel --}}
+                    <div class="col-md-6">
+                        <label class="font-weight-bold">
+                            <i class="fas fa-file-alt mr-1"></i> Templates
+                            <a href="{{ route('sms.templates.index') }}" class="btn btn-xs btn-outline-secondary ml-2">
+                                <i class="fas fa-cog"></i> Manage
+                            </a>
+                        </label>
+
+                        {{-- Saved Templates --}}
+                        @if($templates->count())
+                        <div class="list-group mb-2" style="max-height:200px; overflow-y:auto;">
+                            @foreach($templates as $tpl)
+                            <button type="button"
+                                    class="list-group-item list-group-item-action py-2 bulk-tpl-btn"
+                                    data-msg="{{ $tpl->body }}">
+                                <strong class="d-block">{{ $tpl->title }}</strong>
+                                <small class="text-muted">{{ Str::limit($tpl->body, 60) }}</small>
+                            </button>
+                            @endforeach
+                        </div>
+                        @else
+                        <div class="alert alert-light border mb-2 py-2">
+                            <small class="text-muted">
+                                কোনো template নেই।
+                                <a href="{{ route('sms.templates.index') }}">এখানে তৈরি করুন</a>।
+                            </small>
+                        </div>
+                        @endif
+
+                        {{-- Default Quick Buttons --}}
+                        <label class="small text-muted">Default Templates</label>
+                        <div class="d-flex flex-wrap">
+                            <button type="button" class="btn btn-xs btn-outline-secondary mr-1 mb-1 bulk-tpl-btn"
+                                    data-msg="প্রিয় গ্রাহক, আপনার এই মাসের ইন্টারনেট বিল বাকি আছে। দ্রুত পরিশোধ করুন।">
+                                Bill Due
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-secondary mr-1 mb-1 bulk-tpl-btn"
+                                    data-msg="প্রিয় গ্রাহক, বিল বাকি থাকায় আপনার সংযোগ বন্ধ করা হয়েছে। বিল পরিশোধ করুন।">
+                                Suspend Notice
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-secondary mr-1 mb-1 bulk-tpl-btn"
+                                    data-msg="প্রিয় গ্রাহক, আপনার প্যাকেজের মেয়াদ শেষ হতে চলেছে। রিনিউ করুন।">
+                                Expiry Notice
+                            </button>
+                            <button type="button" class="btn btn-xs btn-outline-secondary mr-1 mb-1 bulk-tpl-btn"
+                                    data-msg="প্রিয় গ্রাহক, আমাদের সেবা ব্যবহার করার জন্য ধন্যবাদ। যেকোনো সমস্যায় যোগাযোগ করুন।">
+                                General
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
             </div>
-            <div class="card-footer">
-                {{ $logs->links() }}
-            </div>
+
         </div>
     </div>
-
 </div>
 
 @endsection
+
+@push('js')
+<script>
+// Character counters
+document.getElementById('quickMessage').addEventListener('input', function() {
+    document.getElementById('quickCount').textContent = this.value.length;
+});
+document.getElementById('bulkMessage').addEventListener('input', function() {
+    document.getElementById('bulkCount').textContent = this.value.length;
+});
+
+// Quick SMS template click
+document.querySelectorAll('.quick-tpl-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        var msg = this.getAttribute('data-msg');
+        document.getElementById('quickMessage').value = msg;
+        document.getElementById('quickCount').textContent = msg.length;
+    });
+});
+
+// Bulk SMS template click
+document.querySelectorAll('.bulk-tpl-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        var msg = this.getAttribute('data-msg');
+        document.getElementById('bulkMessage').value = msg;
+        document.getElementById('bulkCount').textContent = msg.length;
+    });
+});
+</script>
+@endpush

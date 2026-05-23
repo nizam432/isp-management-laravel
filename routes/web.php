@@ -13,15 +13,17 @@ use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ImportController;
 use App\Http\Controllers\SmsController;
+use App\Http\Controllers\TenantSmsController;
+use App\Http\Controllers\MyResellerController;
 use App\Http\Controllers\SuperAdmin\TenantController as SuperAdminTenantController;
 use App\Http\Controllers\SuperAdmin\PlanController as SuperAdminPlanController;
+use App\Http\Controllers\SuperAdmin\SmsGatewayController as SuperAdminSmsGatewayController;
 
 // ─────────────────────────────────────────────
-// Public Routes (Login page)
+// Public Routes
 // ─────────────────────────────────────────────
 Route::get('/', fn() => redirect()->route('login'));
 
-// Auth Routes (Laravel Breeze)
 require __DIR__ . '/auth.php';
 
 // ─────────────────────────────────────────────
@@ -29,7 +31,7 @@ require __DIR__ . '/auth.php';
 // ─────────────────────────────────────────────
 Route::middleware(['auth'])->group(function () {
 
-    // Dashboard
+    // ── Dashboard ──────────────────────────────
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // ── Customers ──────────────────────────────
@@ -50,8 +52,8 @@ Route::middleware(['auth'])->group(function () {
          ->name('invoices.bulk-generate');
 
     // ── Payments ───────────────────────────────
-    Route::get('payments', [PaymentController::class, 'index'])->name('payments.index');
-    Route::post('payments', [PaymentController::class, 'store'])->name('payments.store');
+    Route::get('payments',              [PaymentController::class, 'index'])->name('payments.index');
+    Route::post('payments',             [PaymentController::class, 'store'])->name('payments.store');
     Route::delete('payments/{payment}', [PaymentController::class, 'destroy'])->name('payments.destroy');
 
     // ── Tickets ────────────────────────────────
@@ -103,12 +105,12 @@ Route::middleware(['auth'])->group(function () {
 
     // ── Inventory ──────────────────────────────
     Route::prefix('inventory')->name('inventory.')->group(function () {
-        Route::get('/',                         [InventoryController::class, 'index'])->name('index');
-        Route::post('/',                        [InventoryController::class, 'store'])->name('store');
-        Route::put('{inventoryItem}',           [InventoryController::class, 'update'])->name('update');
-        Route::delete('{inventoryItem}',        [InventoryController::class, 'destroy'])->name('destroy');
-        Route::post('{inventoryItem}/stock-in', [InventoryController::class, 'stockIn'])->name('stock-in');
-        Route::post('{inventoryItem}/stock-out',[InventoryController::class, 'stockOut'])->name('stock-out');
+        Route::get('/',                          [InventoryController::class, 'index'])->name('index');
+        Route::post('/',                         [InventoryController::class, 'store'])->name('store');
+        Route::put('{inventoryItem}',            [InventoryController::class, 'update'])->name('update');
+        Route::delete('{inventoryItem}',         [InventoryController::class, 'destroy'])->name('destroy');
+        Route::post('{inventoryItem}/stock-in',  [InventoryController::class, 'stockIn'])->name('stock-in');
+        Route::post('{inventoryItem}/stock-out', [InventoryController::class, 'stockOut'])->name('stock-out');
     });
 
     // ── Reports ────────────────────────────────
@@ -119,7 +121,6 @@ Route::middleware(['auth'])->group(function () {
         Route::get('export/{type}/pdf', [ReportController::class, 'exportPdf'])->name('export.pdf');
     });
 
-    // ── SMS ────────────────────────────────────
     Route::prefix('sms')->name('sms.')->group(function () {
         Route::get('/',                         [SmsController::class, 'index'])->name('index');
         Route::post('gateway/{gateway}/toggle', [SmsController::class, 'toggleGateway'])->name('gateway.toggle');
@@ -127,54 +128,67 @@ Route::middleware(['auth'])->group(function () {
         Route::post('test',                     [SmsController::class, 'sendTest'])->name('test');
         Route::post('bulk',                     [SmsController::class, 'sendBulk'])->name('bulk');
         Route::delete('logs',                   [SmsController::class, 'clearLogs'])->name('logs.clear');
+        Route::get('reports',                   [App\Http\Controllers\SmsReportController::class, 'index'])->name('reports');
+        Route::get('reports/details',           [App\Http\Controllers\SmsReportController::class, 'details'])->name('reports.details');
+        Route::get('templates',              [App\Http\Controllers\SmsTemplateController::class, 'index'])->name('templates.index');
+        Route::post('templates',             [App\Http\Controllers\SmsTemplateController::class, 'store'])->name('templates.store');
+        Route::put('templates/{smsTemplate}',[App\Http\Controllers\SmsTemplateController::class, 'update'])->name('templates.update');
+        Route::delete('templates/{smsTemplate}',[App\Http\Controllers\SmsTemplateController::class, 'destroy'])->name('templates.destroy');
+        Route::post('templates/{smsTemplate}/toggle',[App\Http\Controllers\SmsTemplateController::class, 'toggle'])->name('templates.toggle');
+        
+    });
+
+    // ── SMS Settings (ISP Admin — tenant gateway config) ──
+    Route::prefix('sms/settings')->name('sms.tenant.')->group(function () {
+        Route::get('/',               [TenantSmsController::class, 'index'])->name('index');
+        Route::post('/{slug}/save',   [TenantSmsController::class, 'save'])->name('save');
+        Route::post('/{slug}/toggle', [TenantSmsController::class, 'toggle'])->name('toggle');
+    });
+
+    // ── My Resellers (Master Reseller only) ───
+    Route::prefix('my-resellers')->name('my-resellers.')->middleware(['can:create-reseller'])->group(function () {
+        Route::get('/',             [MyResellerController::class, 'index'])->name('index');
+        Route::get('/create',       [MyResellerController::class, 'create'])->name('create');
+        Route::post('/',            [MyResellerController::class, 'store'])->name('store');
+        Route::get('/{id}/edit',    [MyResellerController::class, 'edit'])->name('edit');
+        Route::put('/{id}',         [MyResellerController::class, 'update'])->name('update');
+        Route::post('/{id}/toggle', [MyResellerController::class, 'toggle'])->name('toggle');
     });
 
     // ── Super Admin ────────────────────────────
-    Route::prefix('super-admin')
-        ->name('super-admin.')
-        ->middleware(['superadmin'])
-        ->group(function () {
+    Route::prefix('super-admin')->name('super-admin.')->middleware(['superadmin'])->group(function () {
 
+        // Dashboard
         Route::get('/', [SuperAdminTenantController::class, 'dashboard'])->name('dashboard');
 
+        // Tenants (ISP Management)
         Route::prefix('tenants')->name('tenants.')->group(function () {
-            Route::get('/',              [SuperAdminTenantController::class, 'index'])->name('index');
-            Route::get('/create',        [SuperAdminTenantController::class, 'create'])->name('create');
-            Route::post('/',             [SuperAdminTenantController::class, 'store'])->name('store');
-            Route::get('/{id}',          [SuperAdminTenantController::class, 'show'])->name('show');
-            Route::get('/{id}/edit',     [SuperAdminTenantController::class, 'edit'])->name('edit');
-            Route::put('/{id}',          [SuperAdminTenantController::class, 'update'])->name('update');
-            Route::post('/{id}/toggle',  [SuperAdminTenantController::class, 'toggle'])->name('toggle');
-            Route::post('/{id}/plan',    [SuperAdminTenantController::class, 'changePlan'])->name('change-plan');
+            Route::get('/',             [SuperAdminTenantController::class, 'index'])->name('index');
+            Route::get('/create',       [SuperAdminTenantController::class, 'create'])->name('create');
+            Route::post('/',            [SuperAdminTenantController::class, 'store'])->name('store');
+            Route::get('/{id}',         [SuperAdminTenantController::class, 'show'])->name('show');
+            Route::get('/{id}/edit',    [SuperAdminTenantController::class, 'edit'])->name('edit');
+            Route::put('/{id}',         [SuperAdminTenantController::class, 'update'])->name('update');
+            Route::post('/{id}/toggle', [SuperAdminTenantController::class, 'toggle'])->name('toggle');
+            Route::post('/{id}/plan',   [SuperAdminTenantController::class, 'changePlan'])->name('change-plan');
         });
 
+        // Plans
         Route::prefix('plans')->name('plans.')->group(function () {
             Route::get('/',               [SuperAdminPlanController::class, 'index'])->name('index');
             Route::post('/',              [SuperAdminPlanController::class, 'store'])->name('store');
             Route::put('/{plan}',         [SuperAdminPlanController::class, 'update'])->name('update');
             Route::post('/{plan}/toggle', [SuperAdminPlanController::class, 'toggle'])->name('toggle');
         });
-    });
-    // ── My Resellers (Master Reseller) ────────────
-    Route::prefix('my-resellers')->name('my-resellers.')->middleware(['can:create-reseller'])->group(function () {
-        Route::get('/',              [App\Http\Controllers\MyResellerController::class, 'index'])->name('index');
-        Route::get('/create',        [App\Http\Controllers\MyResellerController::class, 'create'])->name('create');
-        Route::post('/',             [App\Http\Controllers\MyResellerController::class, 'store'])->name('store');
-        Route::post('/{id}/toggle',  [App\Http\Controllers\MyResellerController::class, 'toggle'])->name('toggle');
-        Route::get('/{id}/edit',  [App\Http\Controllers\MyResellerController::class, 'edit'])->name('edit');
-        Route::put('/{id}',       [App\Http\Controllers\MyResellerController::class, 'update'])->name('update');    
-    });
-     // ISP SMS Settings
-    Route::prefix('sms/settings')->name('sms.tenant.')->group(function () {
-        Route::get('/',                [App\Http\Controllers\TenantSmsController::class, 'index'])->name('index');
-        Route::post('/{slug}/save',    [App\Http\Controllers\TenantSmsController::class, 'save'])->name('save');
-        Route::post('/{slug}/toggle',  [App\Http\Controllers\TenantSmsController::class, 'toggle'])->name('toggle');
-    });
 
-    // Super Admin SMS Gateway switch
-    Route::prefix('super-admin/sms')->name('super-admin.sms.')->middleware(['superadmin'])->group(function () {
-        Route::get('/',                [App\Http\Controllers\SuperAdmin\SmsGatewayController::class, 'index'])->name('index');
-        Route::post('/{gateway}/toggle',[App\Http\Controllers\SuperAdmin\SmsGatewayController::class, 'toggle'])->name('toggle');
-    });   
+        // SMS Gateways (enable/disable for ISPs)
+        Route::prefix('sms')->name('sms.')->group(function () {
+            Route::get('/',                 [SuperAdminSmsGatewayController::class, 'index'])->name('index');
+            Route::post('/{gateway}/toggle',[SuperAdminSmsGatewayController::class, 'toggle'])->name('toggle');
+        });
+        
+            
+            }); // end super-admin
     
-});
+
+}); // end auth
