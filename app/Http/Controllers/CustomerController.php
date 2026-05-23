@@ -112,8 +112,7 @@ class CustomerController extends Controller
         $agents   = Agent::active()->get();
         return view('customers.edit', compact('customer', 'packages', 'agents'));
     }
-
-   public function update(Request $request, Customer $customer)
+public function update(Request $request, Customer $customer)
 {
     $request->validate([
         'name'         => 'required|string|max:100',
@@ -126,6 +125,7 @@ class CustomerController extends Controller
     $old        = $customer->toArray();
     $oldPackage = $customer->package_id;
     $oldStatus  = $customer->status;
+    $oldMkStatus = $customer->mikrotik_status;
     $data       = $request->all();
 
     if ($request->hasFile('photo')) {
@@ -136,6 +136,7 @@ class CustomerController extends Controller
     }
 
     $customer->update($data);
+    $customer->refresh(); // ← DB থেকে fresh data
 
     try {
         $router = MikrotikRouter::where('is_active', 1)->first();
@@ -145,12 +146,12 @@ class CustomerController extends Controller
             // ── Status পরিবর্তন হলে MikroTik sync ──
             if ($oldStatus !== $request->status) {
                 match ($request->status) {
-                    'active' => $customer->mikrotik_status === 'pending'
+                    'active' => $oldMkStatus === 'pending'
                                     ? $mikrotik->withRouter($router, fn($m) => $m->provisionCustomer($customer))
                                     : $mikrotik->withRouter($router, fn($m) => $m->restoreCustomer($customer)),
                     'suspended',
                     'expired',
-                    'inactive' => $customer->mikrotik_status === 'active'
+                    'inactive' => $oldMkStatus === 'active'
                                     ? $mikrotik->withRouter($router, fn($m) => $m->suspendCustomer($customer))
                                     : null,
                     default => null,
@@ -158,16 +159,16 @@ class CustomerController extends Controller
 
                 $mkStatus = match($request->status) {
                     'active'                         => 'active',
-                    'suspended','expired','inactive'  => $customer->mikrotik_status === 'active'
+                    'suspended','expired','inactive'  => $oldMkStatus === 'active'
                                                             ? 'suspended'
-                                                            : $customer->mikrotik_status,
-                    default                          => $customer->mikrotik_status,
+                                                            : $oldMkStatus,
+                    default                          => $oldMkStatus,
                 };
                 $customer->update(['mikrotik_status' => $mkStatus]);
             }
 
             // ── Package পরিবর্তন হলে MikroTik sync ──
-            if ($oldPackage !== $customer->package_id && $customer->mikrotik_status === 'active') {
+            if ($oldPackage !== $customer->package_id && $oldMkStatus === 'active') {
                 $mikrotik->withRouter($router, fn($m) => $m->changeCustomerPackage($customer));
             }
         }
