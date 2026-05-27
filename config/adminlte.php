@@ -337,22 +337,27 @@ return [
             ],
         ],        
        // ['header' => 'SETTINGS', 'can' => 'isp-admin'],
-        [
-            'text' => 'System Settings',
-            'icon' => 'fas fa-fw fa-cog',
-            'can'  => 'isp-admin',
-            'submenu' => [
-                ['text' => 'Zone',     'url' => 'settings/zones',     'icon' => 'fas fa-fw fa-map-marked-alt'],
-                ['text' => 'Sub Zone', 'url' => 'settings/sub-zones', 'icon' => 'fas fa-fw fa-map-pin'],
-                ['text' => 'Connection Type', 'url' => 'settings/connection-types', 'icon' => 'fas fa-fw fa-plug'],
-                ['text' => 'Client Type',     'url' => 'settings/client-types',     'icon' => 'fas fa-fw fa-user-tag'],           
-                ['text' => 'Protocol Type', 'url' => 'settings/protocol-types', 'icon' => 'fas fa-fw fa-network-wired'],
-                ['text' => 'Packages',         'url' => 'packages',   'icon' => 'fas fa-fw fa-box'],
-          ],
-        ],
+
         // ── ISP Admin Only ────────────────────────
        // ['header' => 'CUSTOMER MANAGEMENT', 'can' => 'isp-admin'],
-        
+    [
+    'text'       => 'Packages',
+    'icon'       => 'fas fa-fw fa-box',
+    'icon_color' => 'purple',
+    'can'        => 'isp-admin',
+    'submenu'    => [
+        [
+            'text' => 'All Packages',
+            'url'  => 'packages',
+            'icon' => 'fas fa-fw fa-list',
+        ],
+        [
+            'text' => 'Add Package',
+            'url'  => 'packages/create',
+            'icon' => 'fas fa-fw fa-plus',
+        ],
+    ],
+],        
        
     [
         'text'       => 'Customers',
@@ -453,19 +458,51 @@ return [
         ],
     ],    
     
-        ['header' => 'RESELLER', 'can' => 'create-reseller'],
+
+        [
+            'text'       => 'Support Tickets',
+            'icon'       => 'fas fa-fw fa-headset',
+            'icon_color' => 'red',
+            'can'        => 'isp-admin',
+            'submenu'    => [
+                [
+                    'text' => 'All Tickets',
+                    'url'  => 'tickets',
+                    'icon' => 'fas fa-fw fa-list',
+                ],
+                [
+                    'text' => 'Open Tickets',
+                    'url'  => 'tickets?status=open',
+                    'icon' => 'fas fa-fw fa-envelope-open',
+                ],
+                [
+                    'text' => 'Urgent Tickets',
+                    'url'  => 'tickets?priority=urgent',
+                    'icon' => 'fas fa-fw fa-exclamation-triangle',
+                ],
+            ],
+        ],        
+        ['text' => 'Tickets', 'url' => 'tickets', 'icon' => 'fas fa-fw fa-ticket-alt', 'icon_color' => 'red', 'can' => 'isp-admin'],
+        [
+            'text' => 'System Settings',
+            'icon' => 'fas fa-fw fa-cog',
+            'can'  => 'isp-admin',
+            'submenu' => [
+                ['text' => 'Zone',     'url' => 'settings/zones',     'icon' => 'fas fa-fw fa-map-marked-alt'],
+                ['text' => 'Sub Zone', 'url' => 'settings/sub-zones', 'icon' => 'fas fa-fw fa-map-pin'],
+                ['text' => 'Connection Type', 'url' => 'settings/connection-types', 'icon' => 'fas fa-fw fa-plug'],
+                ['text' => 'Client Type',     'url' => 'settings/client-types',     'icon' => 'fas fa-fw fa-user-tag'],           
+                ['text' => 'Protocol Type', 'url' => 'settings/protocol-types', 'icon' => 'fas fa-fw fa-network-wired'],
+          ],
+        ],
+         ['header' => 'RESELLER', 'can' => 'create-reseller'],
         [
             'text'       => 'My Resellers',
             'url'        => 'my-resellers',
             'icon'       => 'fas fa-fw fa-sitemap',
             'icon_color' => 'orange',
             'can'        => 'create-reseller',
-        ],
-       
-        ['header' => 'SUPPORT', 'can' => 'isp-admin'],
-        ['text' => 'Tickets', 'url' => 'tickets', 'icon' => 'fas fa-fw fa-ticket-alt', 'icon_color' => 'red', 'can' => 'isp-admin'],
-
-        
+        ],       
         ['header' => 'MANAGEMENT', 'can' => 'isp-admin'],
         ['text' => 'Agents',    'url' => 'agents',    'icon' => 'fas fa-fw fa-user-tie', 'icon_color' => 'yellow', 'can' => 'isp-admin'],
         ['text' => 'Inventory', 'url' => 'inventory', 'icon' => 'fas fa-fw fa-boxes',    'icon_color' => 'brown',  'can' => 'isp-admin'],
