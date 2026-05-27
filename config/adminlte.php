@@ -235,7 +235,21 @@ return [
                 ['type' => 'js', 'asset' => false, 'location' => 'https://cdn.jsdelivr.net/npm/chart.js'],
             ],
         ],
-
+        'Toastr' => [
+            'active' => true,
+            'files'  => [
+                [
+                    'type'     => 'css',
+                    'asset'    => false,
+                    'location' => 'https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css',
+                ],
+                [
+                    'type'     => 'js',
+                    'asset'    => false,
+                    'location' => 'https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js',
+                ],
+            ],
+        ],
         'Sweetalert2' => [
             'active' => false,
             'files'  => [
@@ -280,6 +294,7 @@ return [
     */
 
     'menu' => [
+    
         // ── Super Admin Only ──────────────────────
         ['header' => 'SUPER ADMIN', 'can' => 'super-admin'],
 
@@ -304,20 +319,140 @@ return [
             'icon_color' => 'yellow',
             'can'        => 'super-admin',
         ],
-         // Super Admin menu তে
         ['text' => 'SMS Gateways', 'url' => 'super-admin/sms', 'icon' => 'fas fa-fw fa-sms', 'icon_color' => 'green', 'can' => 'super-admin'],
-
-        // ISP Admin menu তে (SMS section এ)
-        ['text' => 'SMS Settings', 'url' => 'sms/settings', 'icon' => 'fas fa-fw fa-cog', 'icon_color' => 'yellow', 'can' => 'isp-admin'],
-
-        // ── ISP Admin Only ────────────────────────
-        ['header' => 'CUSTOMER MANAGEMENT', 'can' => 'isp-admin'],
+        
+        
+         // ISP Admin menu তে
         ['text' => 'Dashboard',        'url' => 'dashboard',  'icon' => 'fas fa-fw fa-tachometer-alt', 'icon_color' => 'blue',   'can' => 'isp-admin'],
+       
+       [
+            'text'       => 'MikroTik',
+            'icon'       => 'fas fa-fw fa-server',
+            'icon_color' => 'red',
+            'can'        => 'isp-admin',
+            'submenu'    => [
+                ['text' => 'Routers',        'url' => 'mikrotik',              'icon' => 'fas fa-fw fa-network-wired'],
+                ['text' => 'Active Sessions','url' => 'mikrotik/active',       'icon' => 'fas fa-fw fa-circle text-success'],
+                ['text' => 'Import',         'url' => 'import',                'icon' => 'fas fa-fw fa-file-import'],
+            ],
+        ],        
+       // ['header' => 'SETTINGS', 'can' => 'isp-admin'],
+        [
+            'text' => 'System Settings',
+            'icon' => 'fas fa-fw fa-cog',
+            'can'  => 'isp-admin',
+            'submenu' => [
+                ['text' => 'Zone',     'url' => 'settings/zones',     'icon' => 'fas fa-fw fa-map-marked-alt'],
+                ['text' => 'Sub Zone', 'url' => 'settings/sub-zones', 'icon' => 'fas fa-fw fa-map-pin'],
+                ['text' => 'Connection Type', 'url' => 'settings/connection-types', 'icon' => 'fas fa-fw fa-plug'],
+                ['text' => 'Client Type',     'url' => 'settings/client-types',     'icon' => 'fas fa-fw fa-user-tag'],           
+                ['text' => 'Protocol Type', 'url' => 'settings/protocol-types', 'icon' => 'fas fa-fw fa-network-wired'],
+                ['text' => 'Packages',         'url' => 'packages',   'icon' => 'fas fa-fw fa-box'],
+          ],
+        ],
+        // ── ISP Admin Only ────────────────────────
+       // ['header' => 'CUSTOMER MANAGEMENT', 'can' => 'isp-admin'],
         
-        ['text' => 'Customers',        'url' => 'customers',  'icon' => 'fas fa-fw fa-users',          'icon_color' => 'green',  'can' => 'isp-admin'],
-        ['text' => 'Import Customers', 'url' => 'import',     'icon' => 'fas fa-fw fa-file-import',    'icon_color' => 'teal',   'can' => 'isp-admin'],
-        ['text' => 'Packages',         'url' => 'packages',   'icon' => 'fas fa-fw fa-box',            'icon_color' => 'purple', 'can' => 'isp-admin'],
-        
+       
+    [
+        'text'       => 'Customers',
+        'url'        => 'customers',
+        'icon'       => 'fas fa-fw fa-users',
+        'icon_color' => 'green',
+        'can'        => 'isp-admin',
+        'submenu'    => [
+            [
+                'text' => 'All Customers',
+                'url'  => 'customers',
+                'icon' => 'fas fa-fw fa-list',
+            ],
+            [
+                'text' => 'Add Customer',
+                'url'  => 'customers/create',
+                'icon' => 'fas fa-fw fa-user-plus',
+            ],
+            [
+                'text' => 'Import Customer',
+                'url'  => 'import',
+                'icon' => 'fas fa-fw fa-file-import',
+            ],
+        ],
+    ],       
+    [
+        'text'       => 'Billing',
+        'icon'       => 'fas fa-fw fa-file-invoice-dollar',
+        'icon_color' => 'orange',
+        'can'        => 'isp-admin',
+        'submenu'    => [
+            [
+                'text' => 'Invoices',
+                'url'  => 'invoices',
+                'icon' => 'fas fa-fw fa-file-invoice',
+            ],
+            [
+                'text' => 'Payments',
+                'url'  => 'payments',
+                'icon' => 'fas fa-fw fa-money-bill-wave',
+            ],
+            [
+                'text' => 'Due List',
+                'url'  => 'reports/due',
+                'icon' => 'fas fa-fw fa-exclamation-circle',
+            ],
+        ],
+    ],     
+    [
+        'text'       => 'Reports',
+        'icon'       => 'fas fa-fw fa-chart-bar',
+        'icon_color' => 'blue',
+        'can'        => 'isp-admin',
+        'submenu'    => [
+            [
+                'text' => 'Revenue',
+                'url'  => 'reports/revenue',
+                'icon' => 'fas fa-fw fa-chart-line',
+            ],
+            [
+                'text' => 'Collection',
+                'url'  => 'reports/customers',
+                'icon' => 'fas fa-fw fa-users',
+            ],
+            [
+                'text' => 'SMS Reports',
+                'url'  => 'sms/reports',
+                'icon' => 'fas fa-fw fa-sms',
+            ],
+        ],
+    ],
+    [
+        'text'       => 'SMS',
+        'icon'       => 'fas fa-fw fa-sms',
+        'icon_color' => 'green',
+        'can'        => 'isp-admin',
+        'submenu'    => [
+            [
+                'text' => 'Gateway Settings',
+                'url'  => 'sms/settings',
+                'icon' => 'fas fa-fw fa-server',
+            ],
+            [
+                'text' => 'Templates',
+                'url'  => 'sms/templates',
+                'icon' => 'fas fa-fw fa-file-alt',
+            ],                
+            [
+                'text' => 'Send SMS',
+                'url'  => 'sms',
+                'icon' => 'fas fa-fw fa-paper-plane',
+            ],
+            [
+                'text' => 'SMS Reports',
+                'url'  => 'sms/reports',
+                'icon' => 'fas fa-fw fa-chart-bar',
+            ],
+        ],
+    ],    
+    
         ['header' => 'RESELLER', 'can' => 'create-reseller'],
         [
             'text'       => 'My Resellers',
@@ -326,16 +461,11 @@ return [
             'icon_color' => 'orange',
             'can'        => 'create-reseller',
         ],
-        ['header' => 'BILLING', 'can' => 'isp-admin'],
-        ['text' => 'Invoices', 'url' => 'invoices', 'icon' => 'fas fa-fw fa-file-invoice', 'icon_color' => 'orange', 'can' => 'isp-admin'],
-        ['text' => 'Payments', 'url' => 'payments', 'icon' => 'fas fa-fw fa-money-bill',   'icon_color' => 'green',  'can' => 'isp-admin'],
-
+       
         ['header' => 'SUPPORT', 'can' => 'isp-admin'],
         ['text' => 'Tickets', 'url' => 'tickets', 'icon' => 'fas fa-fw fa-ticket-alt', 'icon_color' => 'red', 'can' => 'isp-admin'],
 
-        ['header' => 'NETWORK', 'can' => 'isp-admin'],
-        ['text' => 'MikroTik Routers', 'url' => 'mikrotik', 'icon' => 'fas fa-fw fa-network-wired', 'icon_color' => 'cyan', 'can' => 'isp-admin'],
-
+        
         ['header' => 'MANAGEMENT', 'can' => 'isp-admin'],
         ['text' => 'Agents',    'url' => 'agents',    'icon' => 'fas fa-fw fa-user-tie', 'icon_color' => 'yellow', 'can' => 'isp-admin'],
         ['text' => 'Inventory', 'url' => 'inventory', 'icon' => 'fas fa-fw fa-boxes',    'icon_color' => 'brown',  'can' => 'isp-admin'],

@@ -18,7 +18,11 @@ use App\Http\Controllers\MyResellerController;
 use App\Http\Controllers\SuperAdmin\TenantController as SuperAdminTenantController;
 use App\Http\Controllers\SuperAdmin\PlanController as SuperAdminPlanController;
 use App\Http\Controllers\SuperAdmin\SmsGatewayController as SuperAdminSmsGatewayController;
-
+use App\Http\Controllers\Settings\ZoneController;
+use App\Http\Controllers\Settings\SubZoneController;
+use App\Http\Controllers\Settings\ConnectionTypeController;
+use App\Http\Controllers\Settings\ClientTypeController;
+use App\Http\Controllers\Settings\ProtocolTypeController;
 // ─────────────────────────────────────────────
 // Public Routes
 // ─────────────────────────────────────────────
@@ -80,6 +84,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('{router}/active-sessions', [MikrotikController::class, 'activeSessions'])->name('active.sessions');
         Route::get('{router}/queues',          [MikrotikController::class, 'queues'])->name('queues');
         Route::get('{router}/profiles',        [MikrotikController::class, 'profiles'])->name('profiles');
+    
     });
 
     // ── Customer MikroTik ──────────────────────
@@ -96,12 +101,13 @@ Route::middleware(['auth'])->group(function () {
     // ── Import ─────────────────────────────────
     Route::prefix('import')->name('import.')->group(function () {
         Route::get('/',                 [ImportController::class, 'index'])->name('index');
-        Route::post('mikrotik/preview', [ImportController::class, 'mikrotikPreview'])->name('mikrotik.preview');
+        Route::any('mikrotik/preview', [ImportController::class, 'mikrotikPreview'])->name('mikrotik.preview');
         Route::post('mikrotik/execute', [ImportController::class, 'mikrotikImport'])->name('mikrotik.execute');
         Route::post('csv/preview',      [ImportController::class, 'csvPreview'])->name('csv.preview');
         Route::post('csv/execute',      [ImportController::class, 'csvImport'])->name('csv.execute');
         Route::get('csv/template',      [ImportController::class, 'downloadTemplate'])->name('csv.template');
-    });
+        Route::post('mikrotik/single', [ImportController::class, 'mikrotikSingleImport'])->name('mikrotik.single');   
+   });
 
     // ── Inventory ──────────────────────────────
     Route::prefix('inventory')->name('inventory.')->group(function () {
@@ -189,6 +195,48 @@ Route::middleware(['auth'])->group(function () {
         
             
             }); // end super-admin
+            
+    Route::middleware(['auth', 'can:isp-admin'])->prefix('settings')->name('settings.')->group(function () {
+
+        // ── Zones ──────────────────────────────────────────────
+        Route::get   ('zones',         [ZoneController::class, 'index'])   ->name('zones.index');
+        Route::get   ('zones/data',    [ZoneController::class, 'data'])    ->name('zones.data');
+        Route::post  ('zones',         [ZoneController::class, 'store'])   ->name('zones.store');
+        Route::put   ('zones/{zone}',  [ZoneController::class, 'update'])  ->name('zones.update');
+        Route::delete('zones/{zone}',  [ZoneController::class, 'destroy']) ->name('zones.destroy');
+
+        // ── Sub Zones ───────────────────────────────────────────
+        Route::get   ('sub-zones',           [SubZoneController::class, 'index'])   ->name('sub-zones.index');
+        Route::get   ('sub-zones/data',      [SubZoneController::class, 'data'])    ->name('sub-zones.data');
+        Route::post  ('sub-zones',           [SubZoneController::class, 'store'])   ->name('sub-zones.store');
+        Route::put   ('sub-zones/{subZone}', [SubZoneController::class, 'update'])  ->name('sub-zones.update');
+        Route::delete('sub-zones/{subZone}', [SubZoneController::class, 'destroy']) ->name('sub-zones.destroy');
+
+        // ── Connection Types ──────────────────────────────────── ← এগুলো যোগ করুন
+        Route::get   ('connection-types',                        [ConnectionTypeController::class, 'index'])   ->name('connection-types.index');
+        Route::get   ('connection-types/data',                   [ConnectionTypeController::class, 'data'])    ->name('connection-types.data');
+        Route::post  ('connection-types',                        [ConnectionTypeController::class, 'store'])   ->name('connection-types.store');
+        Route::put   ('connection-types/{connectionType}',       [ConnectionTypeController::class, 'update'])  ->name('connection-types.update');
+        Route::post  ('connection-types/{connectionType}/toggle',[ConnectionTypeController::class, 'toggle'])  ->name('connection-types.toggle');
+        Route::delete('connection-types/{connectionType}',       [ConnectionTypeController::class, 'destroy']) ->name('connection-types.destroy');
+
+        // ── Client Types ──────────────────────────────────────── ← এগুলো যোগ করুন
+        Route::get   ('client-types',               [ClientTypeController::class, 'index'])   ->name('client-types.index');
+        Route::get   ('client-types/data',          [ClientTypeController::class, 'data'])    ->name('client-types.data');
+        Route::post  ('client-types',               [ClientTypeController::class, 'store'])   ->name('client-types.store');
+        Route::put   ('client-types/{clientType}',  [ClientTypeController::class, 'update'])  ->name('client-types.update');
+        Route::post  ('client-types/{clientType}/toggle', [ClientTypeController::class, 'toggle'])  ->name('client-types.toggle');
+        Route::delete('client-types/{clientType}',  [ClientTypeController::class, 'destroy']) ->name('client-types.destroy');
+        
+        // ── protocol Types ──────────────────────────────────────── ← এগুলো যোগ করুন
+        Route::get   ('protocol-types',                        [ProtocolTypeController::class, 'index'])   ->name('protocol-types.index');
+        Route::get   ('protocol-types/data',                   [ProtocolTypeController::class, 'data'])    ->name('protocol-types.data');
+        Route::post  ('protocol-types',                        [ProtocolTypeController::class, 'store'])   ->name('protocol-types.store');
+        Route::put   ('protocol-types/{protocolType}',         [ProtocolTypeController::class, 'update'])  ->name('protocol-types.update');
+        Route::post  ('protocol-types/{protocolType}/toggle',  [ProtocolTypeController::class, 'toggle'])  ->name('protocol-types.toggle');
+        Route::delete('protocol-types/{protocolType}',         [ProtocolTypeController::class, 'destroy']) ->name('protocol-types.destroy');
+    });
+
     
 
 }); // end auth

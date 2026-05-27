@@ -52,16 +52,52 @@ class ImportController extends Controller
             return back()->with('error', 'MikroTik connect করতে সমস্যা: ' . $e->getMessage());
         }
     }
-
-    public function mikrotikImport(Request $request)
+    public function mikrotikSingleImport(Request $request)
     {
         $request->validate([
-            'users'      => 'required|array',
-            'package_id' => 'required|exists:packages,id',
+            'username'  => 'required|string|unique:customers,pppoe_username',
+            'router_id' => 'required|integer',
+        ]);
+
+        $profile  = $request->profile;
+        $disabled = $request->disabled === 'true';
+
+        $package = $profile
+            ? Package::where('mikrotik_profile', $profile)->first()
+            : Package::active()->first();
+
+        $customer = Customer::create([
+            'customer_code'   => $this->generateUniqueCode(),
+            'name'            => 'Imported - ' . $request->username,
+            'phone'           => $this->generateUniquePhone(),
+           // 'phone'           => '00000000000',
+            'pppoe_username'  => $request->username,
+            'pppoe_password'  => $request->password,
+            'package_id'      => $package?->id,
+            'router_id'       => $request->router_id,
+            'billing_date'    => 1,
+            'status'          => $disabled ? 'suspended' : 'active',
+            'mikrotik_status' => $disabled ? 'suspended' : 'active',
+            'created_by'      => auth()->id(),
+            'remarks'         => 'Imported from MikroTik',
+        ]);
+
+        return redirect()->route('customers.edit', $customer)
+            ->with('success', "'{$request->username}' import হয়েছে। এখন বাকি তথ্য দিন।");
+    }
+    public function mikrotikImport(Request $request)
+    {
+
+        $request->validate([
+            'users' => 'required|array',
+            'router_id' => 'required|integer',
         ]);
 
         $imported = 0;
         $skipped  = 0;
+
+        // Default package — profile match না হলে ব্যবহার হবে
+        $defaultPackage = Package::active()->first();
 
         foreach ($request->users as $username) {
             if (empty($username)) {
@@ -75,43 +111,50 @@ class ImportController extends Controller
                 continue;
             }
 
-            $password = $request->input("password_{$username}", 'pass' . rand(10000, 99999));
+            $password   = $request->input("password_{$username}", 'pass' . rand(10000, 99999));
+            $profile    = $request->input("profile_{$username}");
+            $disabled   = $request->input("disabled_{$username}", 'false');
 
-            try {
-                // Unique customer code generate
-                $code = $this->generateUniqueCode();
+            // Profile দিয়ে package match করো
+            $package = $profile
+                ? Package::where('mikrotik_profile', $profile)->first()
+                : null;
 
-                // Unique phone generate
-                $phone = $this->generateUniquePhone();
+            // Match না হলে default package
+            $package = $package ?? $defaultPackage;
 
+            // MikroTik disabled status অনুযায়ী customer status
+            $status         = ($disabled === 'true') ? 'suspended' : 'active';
+            $mikrotikStatus = ($disabled === 'true') ? 'suspended' : 'active';
+
+           
                 Customer::create([
-                    'customer_code'  => $code,
-                    'name'           => 'Imported - ' . $username,
-                    'phone'          => $phone,
-                    'pppoe_username' => $username,
-                    'pppoe_password' => $password,
-                    'package_id'     => $request->package_id,
-                    'billing_date'   => 1,
-                    'status'         => 'active',
-                    'mikrotik_status'=> 'active',
-                    'created_by'     => auth()->id(),
-                    'remarks'        => 'Imported from MikroTik',
+                    'customer_code'   => $this->generateUniqueCode(),
+                    'name'            => 'Imported - ' . $username,
+                    'phone'           => $this->generateUniquePhone(),
+                    //'phone'           => '00000000000',
+                    'pppoe_username'  => $username,
+                    'pppoe_password'  => $password,
+                    'package_id'      => $package?->id,
+                    'billing_date'    => 1,
+                    'router_id'       => $request->router_id,
+                    'status'          => $status,
+                    'mikrotik_status' => $mikrotikStatus,
+                    'created_by'      => auth()->id(),
+                    'remarks'         => 'Imported from MikroTik',
                 ]);
 
                 $imported++;
 
-            } catch (\Exception $e) {
+            try { } catch (\Exception $e) {
                 Log::warning("MikroTik Import failed for [{$username}]: " . $e->getMessage());
                 $skipped++;
-                continue;
             }
         }
 
         return redirect()->route('customers.index')
             ->with('success', "{$imported} জন customer import হয়েছে। {$skipped} টি skip হয়েছে।");
-    }
-
-    // ══════════════════════════════════════════════
+    }    // ══════════════════════════════════════════════
     // CSV Import
     // ══════════════════════════════════════════════
 
@@ -181,7 +224,8 @@ class ImportController extends Controller
                     'customer_code'  => $this->generateUniqueCode(),
                     'name'           => $row['name']           ?? ('User-' . ($row['pppoe_username'] ?? $index)),
                     'phone'          => !empty($row['phone']) ? $row['phone'] : $this->generateUniquePhone(),
-                    'email'          => $row['email']          ?? null,
+                   
+                   'email'          => $row['email']          ?? null,
                     'address'        => $row['address']        ?? null,
                     'area'           => $row['area']           ?? null,
                     'pppoe_username' => $row['pppoe_username'] ?? null,

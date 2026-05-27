@@ -135,35 +135,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // ─────────────────────────────────────────────
-        // 7. customers
-        // ─────────────────────────────────────────────
-        Schema::create('customers', function (Blueprint $table) {
-            $table->id();
-            $table->string('customer_code', 20)->unique()->comment('e.g. ISP-0001');
-            $table->string('name', 100);
-            $table->string('phone', 20)->index();
-            $table->string('email', 150)->nullable();
-            $table->string('nid_number', 30)->nullable();
-            $table->string('nid_photo', 255)->nullable();
-            $table->string('photo', 255)->nullable();
-            $table->text('address')->nullable();
-            $table->string('area', 100)->nullable();
-            $table->foreignId('package_id')->nullable()->constrained('packages')->onDelete('set null');
-            $table->foreignId('agent_id')->nullable()->constrained('agents')->onDelete('set null');
-            $table->date('connection_date')->nullable();
-            $table->tinyInteger('billing_date')->default(1)->comment('day of month 1-28');
-            $table->enum('status', ['active', 'inactive', 'suspended', 'expired'])->default('active');
-            $table->string('ip_address', 20)->nullable();
-            $table->string('mac_address', 20)->nullable();
-            $table->string('pppoe_username', 50)->nullable();
-            $table->string('pppoe_password', 100)->nullable();
-            $table->text('remarks')->nullable();
-            $table->foreignId('created_by')->nullable()->constrained('users')->onDelete('set null');
-            $table->timestamps();
-            $table->softDeletes();
-        });
-
+   
         // ─────────────────────────────────────────────
         // 8. invoices
         // ─────────────────────────────────────────────

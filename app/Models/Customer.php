@@ -10,7 +10,9 @@ class Customer extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $fillable = [
+    protected $fillable = ['occupation', 'gender','zone_id', 'sub_zone_id',
+        'connection_type_id', 'client_type_id', 'protocol_type_id','router_id', 
+        'billing_status', 'monthly_bill_amount', 'portal_password',
         'customer_code', 'name', 'phone', 'email', 'nid_number',
         'nid_photo', 'photo', 'address', 'area', 'package_id',
         'agent_id', 'connection_date', 'billing_date', 'status',
@@ -78,7 +80,35 @@ class Customer extends Model
     {
         return $query->where('area', $area);
     }
+    public function zone()
+    {
+        return $this->belongsTo(\App\Models\Zone::class);
+    }
 
+    public function subZone()
+    {
+        return $this->belongsTo(\App\Models\SubZone::class);
+    }
+
+    public function connectionType()
+    {
+        return $this->belongsTo(\App\Models\ConnectionType::class);
+    }
+
+    public function clientType()
+    {
+        return $this->belongsTo(\App\Models\ClientType::class);
+    }
+
+    public function protocolType()
+    {
+        return $this->belongsTo(\App\Models\ProtocolType::class);
+    }
+
+    public function router()
+    {
+        return $this->belongsTo(\App\Models\MikrotikRouter::class, 'router_id');
+    }
     // Accessors
     public function getStatusBadgeAttribute()
     {

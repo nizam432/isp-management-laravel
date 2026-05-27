@@ -39,27 +39,45 @@
                         </th>
                         <th>#</th>
                         <th>PPPoE Username</th>
-                        <th>Profile</th>
+                        <th>Profile → Package</th>
                         <th>Status</th>
                         <th>Password (editable)</th>
+                        <th> Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($users as $i => $user)
+                    @php
+                        $profile    = $user['profile'] ?? 'default';
+                        $disabled   = ($user['disabled'] ?? 'false') === 'true';
+                        $pkgMatch   = $packages->firstWhere('mikrotik_profile', $profile);
+                    @endphp
                     <tr>
                         <td>
                             <input type="checkbox" name="users[]"
                                    value="{{ $user['name'] }}"
                                    class="user-check" checked>
+                            {{-- Hidden fields for profile and disabled status --}}
+                            <input type="hidden" name="profile_{{ $user['name'] }}" value="{{ $profile }}">
+                            <input type="hidden" name="disabled_{{ $user['name'] }}" value="{{ $disabled ? 'true' : 'false' }}">
                         </td>
                         <td>{{ $i + 1 }}</td>
                         <td><code>{{ $user['name'] }}</code></td>
                         <td>
-                            <span class="badge badge-info">{{ $user['profile'] ?? 'default' }}</span>
+                            <span class="badge badge-info">{{ $profile }}</span>
+                            @if($pkgMatch)
+                                <i class="fas fa-arrow-right text-muted mx-1" style="font-size:10px"></i>
+                                <span class="badge badge-success">{{ $pkgMatch->name }}</span>
+                            @else
+                                <i class="fas fa-arrow-right text-muted mx-1" style="font-size:10px"></i>
+                                <span class="badge badge-warning" title="Package match নেই — default package ব্যবহার হবে">
+                                    No Match
+                                </span>
+                            @endif
                         </td>
                         <td>
-                            @if(($user['disabled'] ?? 'false') === 'true')
-                                <span class="badge badge-danger">Disabled</span>
+                            @if($disabled)
+                                <span class="badge badge-danger">Disabled → Suspended</span>
                             @else
                                 <span class="badge badge-success">Active</span>
                             @endif
@@ -71,6 +89,20 @@
                                    value="{{ $user['password'] ?? '' }}"
                                    placeholder="password">
                         </td>
+                        <td>
+                            {{-- Single Import --}}
+                            <form action="{{ route('import.mikrotik.single') }}" method="POST" class="d-inline">
+                                @csrf
+                                <input type="hidden" name="username"   value="{{ $user['name'] }}">
+                                <input type="hidden" name="password"   value="{{ $user['password'] ?? '' }}">
+                                <input type="hidden" name="profile"    value="{{ $profile }}">
+                                <input type="hidden" name="disabled"   value="{{ $disabled ? 'true' : 'false' }}">
+                                <input type="hidden" name="router_id"  value="{{ $router->id }}">
+                                <button type="submit" class="btn btn-xs btn-success">
+                                    <i class="fas fa-plus mr-1"></i> Add
+                                </button>
+                            </form>
+                        </td>                        
                     </tr>
                     @empty
                     <tr>
@@ -84,26 +116,26 @@
         </div>
         <div class="card-footer">
             <div class="row align-items-center">
-                <div class="col-md-4">
-                    <label>Default Package <span class="text-danger">*</span></label>
-                    <select name="package_id" class="form-control" required>
-                        @foreach($packages as $pkg)
-                        <option value="{{ $pkg->id }}">{{ $pkg->name }} ({{ $pkg->price }} BDT)</option>
-                        @endforeach
-                    </select>
+                <div class="col-md-8">
+                    <div class="alert alert-warning py-2 mb-0">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        <small>
+                            Profile → Package auto match হবে। <strong>No Match</strong> হলে default package ব্যবহার হবে।
+                            Import এর পর customer এর নাম ও phone manually দিতে হবে।
+                        </small>
+                    </div>
                 </div>
-                <div class="col-md-4 mt-3">
+                <input type="hidden" name="router_id" value="{{ $router->id }}">
+                <div class="col-md-4 text-right">
                     <button type="submit" class="btn btn-primary btn-lg"
                             onclick="return confirm('Selected users import করবেন?')">
-                        <i class="fas fa-file-import mr-1"></i> Import করুন
+                        <i class="fas fa-file-import mr-1"></i> Bulk Import করুন
                     </button>
-                </div>
-                <div class="col-md-4 mt-3 text-muted">
-                    <small>⚠️ Import এর পর customer এর নাম ও phone manually দিতে হবে।</small>
                 </div>
             </div>
         </div>
     </div>
+    
 </form>
 
 <script>

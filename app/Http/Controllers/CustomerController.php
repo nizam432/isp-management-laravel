@@ -5,76 +5,122 @@ namespace App\Http\Controllers;
 use App\Models\Customer;
 use App\Models\Package;
 use App\Models\Agent;
-use App\Models\ActivityLog;
+use App\Models\Zone;
+use App\Models\SubZone;
+use App\Models\ConnectionType;
+use App\Models\ClientType;
+use App\Models\ProtocolType;
 use App\Models\MikrotikRouter;
+use App\Models\ActivityLog;
 use App\Services\MikrotikService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 
 class CustomerController extends Controller
 {
+    // =========================================================================
+    // Customer List
+    // =========================================================================
+
     public function index(Request $request)
     {
         $customers = Customer::with(['package', 'agent'])
             ->when($request->search, fn($q) => $q
-                ->where('name',          'like', "%{$request->search}%")
-                ->orWhere('phone',        'like', "%{$request->search}%")
-                ->orWhere('customer_code','like', "%{$request->search}%"))
+                ->where('name',           'like', "%{$request->search}%")
+                ->orWhere('phone',         'like', "%{$request->search}%")
+                ->orWhere('customer_code', 'like', "%{$request->search}%"))
             ->when($request->status,       fn($q) => $q->where('status',       $request->status))
             ->when($request->area,         fn($q) => $q->where('area',         $request->area))
             ->when($request->package_id,   fn($q) => $q->where('package_id',   $request->package_id))
             ->when($request->billing_date, fn($q) => $q->where('billing_date', $request->billing_date))
             ->latest()
             ->paginate(20);
-    
+
         $totalCustomers     = Customer::count();
         $activeCustomers    = Customer::where('status', 'active')->count();
         $suspendedCustomers = Customer::where('status', 'suspended')->count();
         $expiredCustomers   = Customer::where('status', 'expired')->count();
-    
+
         $packages = Package::active()->get();
         $areas    = Customer::select('area')->distinct()->whereNotNull('area')->pluck('area')->sort()->values();
-    
+
         return view('customers.index', compact(
             'customers',
             'totalCustomers', 'activeCustomers', 'suspendedCustomers', 'expiredCustomers',
             'packages', 'areas'
         ));
     }
-    
+
+    // =========================================================================
+    // Create Customer
+    // =========================================================================
 
     public function create()
     {
-        $packages = Package::active()->get();
-        $agents   = Agent::active()->get();
-        return view('customers.create', compact('packages', 'agents'));
+        $packages        = Package::active()->get();
+        $agents          = Agent::active()->get();
+        $zones           = Zone::active()->get();
+        $connectionTypes = ConnectionType::active()->get();
+        $clientTypes     = ClientType::active()->get();
+        $protocolTypes   = ProtocolType::active()->get();
+        $routers         = MikrotikRouter::active()->get();
+
+        return view('customers.create', compact(
+            'packages', 'agents', 'zones',
+            'connectionTypes', 'clientTypes', 'protocolTypes', 'routers'
+        ));
     }
 
-    /**
-     * Store করার পর automatically MikroTik এ PPPoE user তৈরি হবে।
-     */
     public function store(Request $request)
     {
         $request->validate([
-            'name'            => 'required|string|max:100',
-            'phone'           => 'required|string|max:20|unique:customers',
-            'package_id'      => 'required|exists:packages,id',
-            'address'         => 'nullable|string',
-            'area'            => 'nullable|string|max:100',
-            'billing_date'    => 'required|integer|min:1|max:28',
-            'connection_date' => 'nullable|date',
-            'status'          => 'required|in:active,inactive,suspended,expired',
-            'pppoe_username'  => 'nullable|string|max:50|unique:customers',
-            'pppoe_password'  => 'nullable|string|max:50',
+            // Personal
+            'name'               => 'required|string|max:100',
+            'phone'              => 'required|string|max:20|unique:customers',
+            'email'              => 'nullable|email|max:150',
+            'address'            => 'nullable|string',
+            'occupation'         => 'nullable|string|max:100',
+            'gender'             => 'nullable|in:male,female,other',
+            'nid_number'         => 'nullable|string|max:30',
+            'photo'              => 'nullable|image|max:2048',
+            'nid_photo'          => 'nullable|image|max:2048',
+            // Service
+            'package_id'         => 'required|exists:packages,id',
+            'client_type_id'     => 'required|exists:client_types,id',
+            'zone_id'            => 'nullable|exists:zones,id',
+            'sub_zone_id'        => 'nullable|exists:sub_zones,id',
+            'connection_type_id' => 'nullable|exists:connection_types,id',
+            'billing_status'     => 'required|in:active,inactive,left,free',
+            'billing_date'       => 'required|integer|min:1|max:28',
+            'connection_date'    => 'required|date',
+            'monthly_bill_amount'=> 'nullable|numeric|min:0',
+            // Network
+            'router_id'          => 'nullable|exists:mikrotik_routers,id',
+            'protocol_type_id'   => 'nullable|exists:protocol_types,id',
+            'pppoe_username'     => 'nullable|string|max:50|unique:customers',
+            'pppoe_password'     => 'nullable|string|max:100',
+            'ip_address'         => 'nullable|string|max:20',
+            'mac_address'        => 'nullable|string|max:20',
+            'status'             => 'required|in:active,inactive,suspended,expired',
         ]);
 
-        $data = $request->all();
+        $data                  = $request->except(['photo', 'nid_photo', '_token']);
         $data['customer_code'] = Customer::generateCode();
         $data['created_by']    = auth()->id();
+        $data['portal_password'] = Hash::make($request->phone);
 
-        // PPPoE username না দিলে auto-generate
+        // Monthly bill — default to package price
+        if (empty($data['monthly_bill_amount'])) {
+            $package = Package::find($request->package_id);
+            $data['monthly_bill_amount'] = $package?->price ?? 0;
+        }
+
+        // Auto PPPoE if not provided
         if (empty($data['pppoe_username'])) {
-            $data['pppoe_username'] = 'isp_' . strtolower(preg_replace('/\s+/', '', $request->name)) . '_' . rand(100, 999);
+            $data['pppoe_username'] = 'isp_'
+                . strtolower(preg_replace('/\s+/', '', $request->name))
+                . '_' . rand(100, 999);
         }
         if (empty($data['pppoe_password'])) {
             $data['pppoe_password'] = 'pass' . rand(10000, 99999);
@@ -89,7 +135,6 @@ class CustomerController extends Controller
 
         $customer = Customer::create($data);
 
-        // ── Auto-Provision MikroTik ──────────────────
         if ($customer->status === 'active') {
             $this->provisionToMikrotik($customer);
         }
@@ -100,178 +145,221 @@ class CustomerController extends Controller
                          ->with('success', 'Customer added successfully.');
     }
 
+    // =========================================================================
+    // Show Customer
+    // =========================================================================
+
     public function show(Customer $customer)
     {
-        $customer->load(['package', 'agent', 'invoices', 'payments', 'tickets']);
+        $customer->load([
+            'package', 'agent', 'zone', 'subZone',
+            'connectionType', 'clientType', 'protocolType',
+            'router', 'invoices', 'payments', 'tickets',
+        ]);
         return view('customers.show', compact('customer'));
     }
 
+    // =========================================================================
+    // Edit Customer
+    // =========================================================================
+
     public function edit(Customer $customer)
     {
-        $packages = Package::active()->get();
-        $agents   = Agent::active()->get();
-        return view('customers.edit', compact('customer', 'packages', 'agents'));
-    }
-public function update(Request $request, Customer $customer)
-{
-    $request->validate([
-        'name'         => 'required|string|max:100',
-        'phone'        => 'required|string|max:20|unique:customers,phone,' . $customer->id,
-        'package_id'   => 'required|exists:packages,id',
-        'billing_date' => 'required|integer|min:1|max:28',
-        'status'       => 'required|in:active,inactive,suspended,expired',
-    ]);
+        $packages        = Package::active()->get();
+        $agents          = Agent::active()->get();
+        $zones           = Zone::active()->get();
+        $subZones        = SubZone::where('zone_id', $customer->zone_id)->active()->get();
+        $connectionTypes = ConnectionType::active()->get();
+        $clientTypes     = ClientType::active()->get();
+        $protocolTypes   = ProtocolType::active()->get();
+        $routers         = MikrotikRouter::active()->get();
 
-    $old        = $customer->toArray();
-    $oldPackage = $customer->package_id;
-    $oldStatus  = $customer->status;
-    $oldMkStatus = $customer->mikrotik_status;
-    $data       = $request->all();
-
-    if ($request->hasFile('photo')) {
-        $data['photo'] = $request->file('photo')->store('customers/photos', 'public');
-    }
-    if ($request->hasFile('nid_photo')) {
-        $data['nid_photo'] = $request->file('nid_photo')->store('customers/nid', 'public');
+        return view('customers.edit', compact(
+            'customer', 'packages', 'agents', 'zones', 'subZones',
+            'connectionTypes', 'clientTypes', 'protocolTypes', 'routers'
+        ));
     }
 
-    $customer->update($data);
-    $customer->refresh(); // ← DB থেকে fresh data
+    public function update(Request $request, Customer $customer)
+    {
+        $request->validate([
+            'name'               => 'required|string|max:100',
+            'phone'              => 'required|string|max:20|unique:customers,phone,' . $customer->id,
+            'email'              => 'nullable|email|max:150',
+            'address'            => 'nullable|string',
+            'occupation'         => 'nullable|string|max:100',
+            'gender'             => 'nullable|in:male,female,other',
+            'nid_number'         => 'nullable|string|max:30',
+            'package_id'         => 'required|exists:packages,id',
+            'client_type_id'     => 'required|exists:client_types,id',
+            'zone_id'            => 'nullable|exists:zones,id',
+            'sub_zone_id'        => 'nullable|exists:sub_zones,id',
+            'connection_type_id' => 'nullable|exists:connection_types,id',
+            'billing_status'     => 'required|in:active,inactive,left,free',
+            'billing_date'       => 'required|integer|min:1|max:28',
+            'connection_date'    => 'required|date',
+            'monthly_bill_amount'=> 'nullable|numeric|min:0',
+            'router_id'          => 'nullable|exists:mikrotik_routers,id',
+            'protocol_type_id'   => 'nullable|exists:protocol_types,id',
+            'status'             => 'required|in:active,inactive,suspended,expired',
+        ]);
 
-    try {
-        $router = MikrotikRouter::where('is_active', 1)->first();
-        if ($router) {
-            $mikrotik = new MikrotikService();
+        $old         = $customer->toArray();
+        $oldPackage  = $customer->package_id;
+        $oldMkStatus = $customer->mikrotik_status;
+        $newStatus   = $request->input('status', $customer->status);
+        $data        = $request->except(['photo', 'nid_photo', '_token', '_method']);
 
-            // ── Status পরিবর্তন হলে MikroTik sync ──
-            if ($oldStatus !== $request->status) {
-                match ($request->status) {
-                    'active' => $oldMkStatus === 'pending'
-                                    ? $mikrotik->withRouter($router, fn($m) => $m->provisionCustomer($customer))
-                                    : $mikrotik->withRouter($router, fn($m) => $m->restoreCustomer($customer)),
-                    'suspended',
-                    'expired',
-                    'inactive' => $oldMkStatus === 'active'
-                                    ? $mikrotik->withRouter($router, fn($m) => $m->suspendCustomer($customer))
-                                    : null,
+        if ($request->hasFile('photo')) {
+            $data['photo'] = $request->file('photo')->store('customers/photos', 'public');
+        }
+        if ($request->hasFile('nid_photo')) {
+            $data['nid_photo'] = $request->file('nid_photo')->store('customers/nid', 'public');
+        }
+
+        $customer->update($data);
+        $customer->refresh();
+
+        // MikroTik sync
+        try {
+            $router = MikrotikRouter::where('is_active', 1)->first();
+            if ($router) {
+                $mikrotik = new MikrotikService();
+
+                match ($newStatus) {
+                    'active' => $mikrotik->withRouter($router, function ($m) use ($customer) {
+                        $exists = collect($m->getPPPoEUsers())->firstWhere('name', $customer->pppoe_username);
+                        $exists ? $m->restoreCustomer($customer) : $m->provisionCustomer($customer);
+                    }),
+                    'suspended', 'expired', 'inactive' =>
+                        $mikrotik->withRouter($router, fn($m) => $m->suspendCustomer($customer)),
                     default => null,
                 };
 
-                $mkStatus = match($request->status) {
-                    'active'                         => 'active',
-                    'suspended','expired','inactive'  => $oldMkStatus === 'active'
-                                                            ? 'suspended'
-                                                            : $oldMkStatus,
-                    default                          => $oldMkStatus,
-                };
-                $customer->update(['mikrotik_status' => $mkStatus]);
-            }
+                $customer->update(['mikrotik_status' => match ($newStatus) {
+                    'active'                           => 'active',
+                    'suspended', 'expired', 'inactive' => 'suspended',
+                    default                            => $oldMkStatus,
+                }]);
 
-            // ── Package পরিবর্তন হলে MikroTik sync ──
-            if ($oldPackage !== $customer->package_id && $oldMkStatus === 'active') {
-                $mikrotik->withRouter($router, fn($m) => $m->changeCustomerPackage($customer));
+                if ($oldPackage !== $customer->package_id && $newStatus === 'active') {
+                    $mikrotik->withRouter($router, fn($m) => $m->changeCustomerPackage($customer));
+                }
             }
+        } catch (\Exception $e) {
+            Log::warning('MikroTik sync failed: ' . $e->getMessage());
         }
-    } catch (\Exception $e) {
-        Log::warning("MikroTik update sync failed: " . $e->getMessage());
+
+        ActivityLog::log('Customer updated', 'Customer', $customer->id, $old, $customer->toArray());
+
+        return redirect()->route('customers.show', $customer)
+                         ->with('success', 'Customer updated successfully.');
     }
 
-    ActivityLog::log('Customer updated', 'Customer', $customer->id, $old, $customer->toArray());
+    // =========================================================================
+    // Status Update
+    // =========================================================================
 
-    return redirect()->route('customers.show', $customer)
-                     ->with('success', 'Customer updated successfully.');
-}
+    public function updateStatus(Request $request, Customer $customer)
+    {
+        $request->validate(['status' => 'required|in:active,inactive,suspended,expired']);
+        
+        $customer->update(['status' => $request->status]);
+        return back()->with('success', 'Status updated.');
+    }
+
+    // =========================================================================
+    // Delete Customer
+    // =========================================================================
 
     public function destroy(Customer $customer)
     {
-        // MikroTik থেকেও remove করো
-        try {
+       /*  try {
             $router = MikrotikRouter::where('is_active', 1)->first();
-            if ($router && $customer->mikrotik_status === 'active') {
+            if ($router) {
                 $mikrotik = new MikrotikService();
                 $mikrotik->withRouter($router, fn($m) => $m->removeCustomer($customer));
             }
         } catch (\Exception $e) {
-            Log::warning("MikroTik remove failed: " . $e->getMessage());
+            Log::warning('MikroTik remove failed: ' . $e->getMessage());
         }
 
         ActivityLog::log('Customer deleted', 'Customer', $customer->id, $customer->toArray(), null);
         $customer->delete();
 
         return redirect()->route('customers.index')
-                         ->with('success', 'Customer deleted successfully.');
+                         ->with('success', 'Customer deleted successfully.'); */
     }
 
-  public function updateStatus(Request $request, Customer $customer)
-{
-    $request->validate([
-        'status' => 'required|in:active,inactive,suspended,expired',
-    ]);
+    // =========================================================================
+    // AJAX Helpers
+    // =========================================================================
 
-    $old = $customer->status;
-    $customer->update(['status' => $request->status]);
-
-    // Status পরিবর্তনে MikroTik sync
-    try {
-        $router = MikrotikRouter::where('is_active', 1)->first();
-        if ($router) {
-            $mikrotik = new MikrotikService();
-
-            match ($request->status) {
-                'active' => $customer->mikrotik_status === 'pending'
-                                ? $mikrotik->withRouter($router, fn($m) => $m->provisionCustomer($customer))
-                                : $mikrotik->withRouter($router, fn($m) => $m->restoreCustomer($customer)),
-                'suspended',
-                'expired',
-                'inactive' => $customer->mikrotik_status === 'active'
-                                ? $mikrotik->withRouter($router, fn($m) => $m->suspendCustomer($customer))
-                                : null,
-                default => null,
-            };
-
-            // mikrotik_status DB update
-            $mkStatus = match($request->status) {
-                'active'                         => 'active',
-                'suspended','expired','inactive'  => $customer->mikrotik_status === 'active'
-                                                        ? 'suspended'
-                                                        : $customer->mikrotik_status,
-                default                          => $customer->mikrotik_status,
-            };
-            $customer->update(['mikrotik_status' => $mkStatus]);
-        }
-    } catch (\Exception $e) {
-        Log::warning("MikroTik status sync failed: " . $e->getMessage());
-    }
-
-    ActivityLog::log(
-        "Customer status changed: {$old} -> {$request->status}",
-        'Customer',
-        $customer->id
-    );
-
-    return back()->with('success', 'Status updated successfully.');
-}
-
-    // ══════════════════════════════════════════════
-    // Private Helper
-    // ══════════════════════════════════════════════
-
-    private function provisionToMikrotik(Customer $customer): void
+    // Zone select করলে SubZone load
+    public function getSubZones(Request $request)
     {
-        $router = MikrotikRouter::where('is_active', 1)->first();
-        if (!$router) {
-            $customer->update(['mikrotik_status' => 'pending']);
-            return;
-        }
+        $subZones = SubZone::where('zone_id', $request->zone_id)
+                           ->where('is_active', true)
+                           ->get(['id', 'name']);
+        return response()->json($subZones);
+    }
 
+    // Package select করলে price load
+    public function getPackagePrice(Request $request)
+    {
+        $package = Package::find($request->package_id);
+        return response()->json(['price' => $package?->price ?? 0]);
+    }
+
+    // ── Modal AJAX: Zone quick add ────────────────────────
+    public function quickAddZone(Request $request)
+    {
+        $request->validate(['name' => 'required|string|max:100|unique:zones,name']);
+        $zone = Zone::create(['name' => $request->name, 'is_active' => true]);
+        return response()->json(['success' => true, 'id' => $zone->id, 'name' => $zone->name]);
+    }
+
+    // ── Modal AJAX: ConnectionType quick add ──────────────
+    public function quickAddConnectionType(Request $request)
+    {
+        $request->validate(['name' => 'required|string|max:100|unique:connection_types,name']);
+        $ct = ConnectionType::create(['name' => $request->name, 'is_active' => true]);
+        return response()->json(['success' => true, 'id' => $ct->id, 'name' => $ct->name]);
+    }
+
+    // ── Modal AJAX: ClientType quick add ─────────────────
+    public function quickAddClientType(Request $request)
+    {
+        $request->validate(['name' => 'required|string|max:100|unique:client_types,name']);
+        $ct = ClientType::create(['name' => $request->name, 'is_active' => true]);
+        return response()->json(['success' => true, 'id' => $ct->id, 'name' => $ct->name]);
+    }
+
+    // ── Modal AJAX: ProtocolType quick add ───────────────
+    public function quickAddProtocolType(Request $request)
+    {
+        $request->validate(['name' => 'required|string|max:100|unique:protocol_types,name']);
+        $pt = ProtocolType::create(['name' => $request->name, 'is_active' => true]);
+        return response()->json(['success' => true, 'id' => $pt->id, 'name' => $pt->name]);
+    }
+
+    // =========================================================================
+    // MikroTik Provision
+    // =========================================================================
+
+    protected function provisionToMikrotik(Customer $customer)
+    {
         try {
-            $mikrotik = new MikrotikService();
-            $mikrotik->withRouter($router, fn($m) => $m->provisionCustomer($customer));
-            $customer->update(['mikrotik_status' => 'active']); // ✅ success = active
-            Log::info("Provisioned: {$customer->customer_code}");
+            $router = $customer->router ?? MikrotikRouter::active()->first();
+            if (!$router) return;
+            $service = new MikrotikService($router);
+            $service->addPppoeUser(
+                $customer->pppoe_username,
+                $customer->pppoe_password,
+                $customer->package->mikrotik_profile ?? 'default'
+            );
         } catch (\Exception $e) {
-            Log::warning("Provision failed [{$customer->customer_code}]: " . $e->getMessage());
-            $customer->update(['mikrotik_status' => 'pending']); // ❌ fail = pending
+            Log::error('MikroTik provision failed: ' . $e->getMessage());
         }
     }
 }
