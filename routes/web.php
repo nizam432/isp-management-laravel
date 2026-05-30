@@ -77,6 +77,8 @@ Route::middleware(['auth'])->group(function () {
         Route::put('{mikrotikRouter}',         [MikrotikController::class, 'update'])->name('update');
         Route::delete('{mikrotikRouter}',      [MikrotikController::class, 'destroy'])->name('destroy');
         Route::post('{mikrotikRouter}/pool',   [MikrotikController::class, 'addPool'])->name('pool.store');
+        Route::put('pool/{pool}',              [MikrotikController::class, 'updatePool'])->name('pool.update');
+        Route::delete('pool/{pool}',           [MikrotikController::class, 'destroyPool'])->name('pool.destroy');
         Route::post('bulk-suspend',            [MikrotikController::class, 'bulkSuspend'])->name('bulk.suspend');
         Route::post('sync-all',                [MikrotikController::class, 'syncAll'])->name('sync.all');
         Route::get('{router}/status',          [MikrotikController::class, 'routerStatus'])->name('router.status');
@@ -84,6 +86,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('{router}/active-sessions', [MikrotikController::class, 'activeSessions'])->name('active.sessions');
         Route::get('{router}/queues',          [MikrotikController::class, 'queues'])->name('queues');
         Route::get('{router}/profiles',        [MikrotikController::class, 'profiles'])->name('profiles');
+        
     
     });
 

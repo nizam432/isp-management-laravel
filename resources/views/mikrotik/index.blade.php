@@ -8,6 +8,20 @@
 @endsection
 @section('page_content')
 
+
+@if(session('error'))
+    <div class="alert alert-danger alert-dismissible">
+        <button type="button" class="close" data-dismiss="alert">&times;</button>
+        <i class="fas fa-times-circle mr-1"></i> {{ session('error') }}
+    </div>
+@endif
+@if(session('warning'))
+    <div class="alert alert-warning alert-dismissible">
+        <button type="button" class="close" data-dismiss="alert">&times;</button>
+        <i class="fas fa-exclamation-triangle mr-1"></i> {{ session('warning') }}
+    </div>
+@endif
+
 @foreach($routers as $router)
 <div class="card">
     <div class="card-header">
@@ -35,7 +49,8 @@
                 <i class="fas fa-plus"></i> Add IP Pool
             </button>
 
-            {{-- Delete Button --}}
+            {{-- Delete Button — customer না থাকলেই শুধু দেখাবে --}}
+            @if($router->customers_count === 0)
             <form action="{{ route('mikrotik.destroy', $router) }}" method="POST" class="d-inline"
                   onsubmit="return confirm('এই router delete করবেন?')">
                 @csrf @method('DELETE')
@@ -43,12 +58,18 @@
                     <i class="fas fa-trash"></i>
                 </button>
             </form>
+            @else
+            <button class="btn btn-xs btn-danger ml-1" disabled
+                    title="{{ $router->customers_count }} জন customer আছে — delete করা যাবে না">
+                <i class="fas fa-trash"></i>
+            </button>
+            @endif
         </div>
     </div>
 
     <div class="card-body p-0">
         <table class="table table-sm table-striped mb-0">
-            <thead>
+            <thead class="thead-dark">
                 <tr>
                     <th>Pool Name</th>
                     <th>Start IP</th>
@@ -57,6 +78,7 @@
                     <th>Used</th>
                     <th>Available</th>
                     <th>Usage</th>
+                    <th style="width:80px">Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -69,17 +91,35 @@
                     <td>{{ $pool->used_ip }}</td>
                     <td>{{ $pool->available_ip }}</td>
                     <td>
-                        <div class="progress" style="height:14px;">
+                        <div class="progress" style="height:14px; min-width:80px">
                             <div class="progress-bar bg-{{ $pool->usage_percent > 80 ? 'danger' : 'success' }}"
                                  style="width:{{ $pool->usage_percent }}%">
                                 {{ $pool->usage_percent }}%
                             </div>
                         </div>
                     </td>
+                    <td>
+                        {{-- Edit Pool --}}
+                        <button class="btn btn-xs btn-warning"
+                                onclick="editPool({{ $pool->id }}, '{{ $pool->pool_name }}', '{{ $pool->start_ip }}', '{{ $pool->end_ip }}', {{ $router->id }})"
+                                title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        {{-- Delete Pool --}}
+                        <form action="{{ route('mikrotik.pool.destroy', $pool) }}" method="POST" 
+                              class="d-inline delete-form">
+                            @csrf @method('DELETE')
+                            <button type="button" class="btn btn-xs btn-danger swal-delete" 
+                                    data-message="This IP pool will be permanently deleted and cannot be recovered.">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </form>
+
+                    </td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="7" class="text-center text-muted py-3">No IP pools added yet.</td>
+                    <td colspan="8" class="text-center text-muted py-3">No IP pools added yet.</td>
                 </tr>
                 @endforelse
             </tbody>
@@ -102,33 +142,27 @@
                 <div class="modal-body">
                     <div class="form-group">
                         <label>Router Name</label>
-                        <input type="text" name="name" class="form-control"
-                               value="{{ $router->name }}" required>
+                        <input type="text" name="name" class="form-control" value="{{ $router->name }}" required>
                     </div>
                     <div class="form-group">
                         <label>IP Address</label>
-                        <input type="text" name="ip_address" class="form-control"
-                               value="{{ $router->ip_address }}" required>
+                        <input type="text" name="ip_address" class="form-control" value="{{ $router->ip_address }}" required>
                     </div>
                     <div class="form-group">
                         <label>API Port</label>
-                        <input type="number" name="api_port" class="form-control"
-                               value="{{ $router->api_port }}" required>
+                        <input type="number" name="api_port" class="form-control" value="{{ $router->api_port }}" required>
                     </div>
                     <div class="form-group">
                         <label>Username</label>
-                        <input type="text" name="username" class="form-control"
-                               value="{{ $router->username }}" required>
+                        <input type="text" name="username" class="form-control" value="{{ $router->username }}" required>
                     </div>
                     <div class="form-group">
                         <label>Password <small class="text-muted">(খালি রাখলে পরিবর্তন হবে না)</small></label>
-                        <input type="password" name="password" class="form-control"
-                               placeholder="নতুন password দিন">
+                        <input type="password" name="password" class="form-control" placeholder="নতুন password দিন">
                     </div>
                     <div class="form-group">
                         <label>Area</label>
-                        <input type="text" name="area" class="form-control"
-                               value="{{ $router->area }}">
+                        <input type="text" name="area" class="form-control" value="{{ $router->area }}">
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -159,15 +193,18 @@
                     </div>
                     <div class="form-group">
                         <label>Start IP</label>
-                        <input type="text" name="start_ip" class="form-control" placeholder="192.168.1.1" required>
+                        <input type="text" name="start_ip" id="start_ip_{{ $router->id }}"
+                               class="form-control pool-start" placeholder="192.168.1.1" required>
                     </div>
                     <div class="form-group">
                         <label>End IP</label>
-                        <input type="text" name="end_ip" class="form-control" placeholder="192.168.1.254" required>
+                        <input type="text" name="end_ip" id="end_ip_{{ $router->id }}"
+                               class="form-control pool-end" placeholder="192.168.1.254" required>
                     </div>
                     <div class="form-group">
                         <label>Total IPs</label>
-                        <input type="number" name="total_ip" class="form-control" required>
+                        <input type="text" id="total_ip_{{ $router->id }}"
+                               class="form-control" readonly placeholder="Auto calculated">
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -182,6 +219,45 @@
 </div>
 
 @endforeach
+
+{{-- ── Edit Pool Modal (shared) ──────────────────────── --}}
+<div class="modal fade" id="editPoolModal">
+    <div class="modal-dialog">
+        <form id="editPoolForm" method="POST">
+            @csrf @method('PUT')
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-edit mr-1"></i> Edit IP Pool</h5>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Pool Name</label>
+                        <input type="text" name="pool_name" id="editPoolName" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Start IP</label>
+                        <input type="text" name="start_ip" id="editStartIp" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>End IP</label>
+                        <input type="text" name="end_ip" id="editEndIp" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Total IPs</label>
+                        <input type="text" id="editTotalIp" class="form-control" readonly>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-save mr-1"></i> Update Pool
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
 
 {{-- ── Add Router Modal ──────────────────────────────── --}}
 <div class="modal fade" id="addRouterModal">
@@ -233,3 +309,47 @@
 </div>
 
 @endsection
+
+@push('js')
+<script>
+// ── Total IP auto calculate ────────────────────────────
+function calcTotal(startId, endId, totalId) {
+    var start = document.getElementById(startId)?.value;
+    var end   = document.getElementById(endId)?.value;
+    if (start && end) {
+        var s = start.split('.').reduce((acc, oct) => (acc << 8) + parseInt(oct), 0) >>> 0;
+        var e = end.split('.').reduce((acc, oct)   => (acc << 8) + parseInt(oct), 0) >>> 0;
+        var total = e - s + 1;
+        if (document.getElementById(totalId)) {
+            document.getElementById(totalId).value = total > 0 ? total : '';
+        }
+    }
+}
+
+// Add pool forms
+document.querySelectorAll('.pool-start, .pool-end').forEach(function(el) {
+    el.addEventListener('input', function() {
+        var routerId = this.id.split('_').pop();
+        calcTotal('start_ip_' + routerId, 'end_ip_' + routerId, 'total_ip_' + routerId);
+    });
+});
+
+// Edit pool total
+document.getElementById('editStartIp').addEventListener('input', function() {
+    calcTotal('editStartIp', 'editEndIp', 'editTotalIp');
+});
+document.getElementById('editEndIp').addEventListener('input', function() {
+    calcTotal('editStartIp', 'editEndIp', 'editTotalIp');
+});
+
+// ── Edit Pool Modal ────────────────────────────────────
+function editPool(id, name, startIp, endIp, routerId) {
+    document.getElementById('editPoolName').value  = name;
+    document.getElementById('editStartIp').value   = startIp;
+    document.getElementById('editEndIp').value     = endIp;
+    document.getElementById('editPoolForm').action = '/mikrotik/pool/' + id;
+    calcTotal('editStartIp', 'editEndIp', 'editTotalIp');
+    $('#editPoolModal').modal('show');
+}
+</script>
+@endpush

@@ -22,10 +22,9 @@ class MikrotikController extends Controller
      */
     public function index()
     {
-        $routers = MikrotikRouter::withCount('ipPools')->latest()->get();
+        $routers = MikrotikRouter::withCount(['ipPools', 'customers'])->latest()->get();
         return view('mikrotik.index', compact('routers'));
     }
-
     /**
      * Store a newly added router in the database.
      */
@@ -40,10 +39,24 @@ class MikrotikController extends Controller
             'area'       => 'nullable|string|max:100',
         ]);
 
-        $router = MikrotikRouter::create($request->all());
+        $router = MikrotikRouter::create($request->all() + ['is_active' => false]);
+
+        // ── Connection test ──
+        try {
+            $mikrotik = new MikrotikService();
+            $mikrotik->withRouter($router, fn($m) => $m->getRouterIdentity());
+            $router->update(['is_active' => true, 'last_seen' => now()]);
+            $message = 'Router added and connected successfully.';
+        } catch (\Exception $e) {
+            $message = 'Router added but connection failed: ' . $e->getMessage();
+        }
+
         ActivityLog::log('Router added', 'MikrotikRouter', $router->id, null, $router->toArray());
 
-        return back()->with('success', 'Router added successfully.');
+        return back()->with(
+            $router->is_active ? 'success' : 'warning',
+            $message
+        );
     }
 
 
@@ -73,12 +86,40 @@ class MikrotikController extends Controller
      */
     public function destroy(MikrotikRouter $mikrotikRouter)
     {
+        if ($mikrotikRouter->customers()->count() > 0) {
+            return back()->with('error', 'এই router এ ' . $mikrotikRouter->customers()->count() . ' জন customer আছে — delete করা যাবে না।');
+        }
+
         $mikrotikRouter->ipPools()->delete();
         $mikrotikRouter->delete();
 
         return back()->with('success', 'Router deleted successfully.');
     }
+    public function updatePool(Request $request, $pool)
+    {
+        $pool = \App\Models\IpPool::findOrFail($pool);
+        $request->validate([
+            'pool_name' => 'required|string|max:100',
+            'start_ip'  => 'required|ip',
+            'end_ip'    => 'required|ip',
+        ]);
+        $total = ip2long($request->end_ip) - ip2long($request->start_ip) + 1;
+        $pool->update([
+            'pool_name' => $request->pool_name,
+            'start_ip'  => $request->start_ip,
+            'end_ip'    => $request->end_ip,
+            'total_ip'  => $total,
+        ]);
+        return back()->with('success', 'IP Pool updated successfully.');
+        
+    }
 
+    public function destroyPool($pool)
+    {
+        $pool = \App\Models\IpPool::findOrFail($pool);
+        $pool->delete();
+        return back()->with('success', 'IP Pool deleted successfully.');
+    }    
     /**
      * Add a new IP pool to the specified router.
      */
@@ -88,10 +129,19 @@ class MikrotikController extends Controller
             'pool_name' => 'required|string|max:100',
             'start_ip'  => 'required|ip',
             'end_ip'    => 'required|ip',
-            'total_ip'  => 'required|integer|min:1',
         ]);
 
-        $mikrotikRouter->ipPools()->create($request->all());
+        // Total IP auto calculate
+        $start = ip2long($request->start_ip);
+        $end   = ip2long($request->end_ip);
+        $total = $end - $start + 1;
+
+        $mikrotikRouter->ipPools()->create([
+            'pool_name' => $request->pool_name,
+            'start_ip'  => $request->start_ip,
+            'end_ip'    => $request->end_ip,
+            'total_ip'  => $total,
+        ]);
 
         return back()->with('success', 'IP Pool added successfully.');
     }

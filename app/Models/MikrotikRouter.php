@@ -33,4 +33,9 @@ class MikrotikRouter extends Model
     {
         return $query->where('is_active', 1);
     }
+    
+    public function customers()
+    {
+        return $this->hasMany(\App\Models\Customer::class, 'router_id');
+    }  
 }
