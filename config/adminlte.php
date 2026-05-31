@@ -332,7 +332,7 @@ return [
             'can'        => 'isp-admin',
             'submenu'    => [
                 ['text' => 'Routers',        'url' => 'mikrotik',              'icon' => 'fas fa-fw fa-network-wired'],
-                ['text' => 'Active Sessions','url' => 'mikrotik/active',       'icon' => 'fas fa-fw fa-circle text-success'],
+                ['text' => 'Active Sessions','url' => 'mikrotik/active-sessions',       'icon' => 'fas fa-fw fa-circle text-success'],
                 ['text' => 'Import',         'url' => 'import',                'icon' => 'fas fa-fw fa-file-import'],
             ],
         ],        
@@ -352,9 +352,9 @@ return [
             'icon' => 'fas fa-fw fa-list',
         ],
         [
-            'text' => 'Add Package',
-            'url'  => 'packages/create',
-            'icon' => 'fas fa-fw fa-plus',
+            'text' => 'Sync from mikrotik',
+            'url'  => 'packages/sync',
+            'icon' => 'fas fa-sync mr-1',
         ],
     ],
 ],        

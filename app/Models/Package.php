@@ -10,8 +10,8 @@ class Package extends Model
 
     protected $fillable = [
         'name', 'speed_download', 'speed_upload', 'data_limit',
-        'price', 'connection_fee', 'type', 'mikrotik_profile',
-        'is_active', 'description',
+        'price', 'connection_fee','client_type_id', 'btrc_price', 
+        'btrc_bandwidth','mikrotik_profile','is_active', 'description',
     ];
 
     protected $casts = [
@@ -47,52 +47,10 @@ class Package extends Model
     {
         return $this->data_limit == 0 ? 'Unlimited' : $this->data_limit . ' GB';
     }
+    public function clientType()
+    {
+        return $this->belongsTo(\App\Models\ClientType::class)->withDefault(['name' => 'All']);
+    }    
 }
 
-
-// ════════════════════════════════════════════════════════
-// FILE: app/Models/Agent.php
-// ════════════════════════════════════════════════════════
-namespace App\Models;
-
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-
-class Agent extends Model
-{
-    use HasFactory;
-
-    protected $fillable = [
-        'user_id', 'name', 'phone', 'area',
-        'commission_rate', 'balance', 'is_active',
-    ];
-
-    protected $casts = [
-        'is_active'       => 'boolean',
-        'commission_rate' => 'decimal:2',
-        'balance'         => 'decimal:2',
-    ];
-
-    // Relations
-    public function user()
-    {
-        return $this->belongsTo(User::class);
-    }
-
-    public function customers()
-    {
-        return $this->hasMany(Customer::class);
-    }
-
-    public function commissions()
-    {
-        return $this->hasMany(AgentCommission::class);
-    }
-
-    // Scopes
-    public function scopeActive($query)
-    {
-        return $query->where('is_active', 1);
-    }
-}
 

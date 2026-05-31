@@ -7,6 +7,7 @@ use App\Models\Customer;
 use App\Models\ActivityLog;
 use App\Services\MikrotikService;
 use App\Jobs\MikrotikSyncJob;
+use App\Models\Package;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
@@ -46,6 +47,10 @@ class MikrotikController extends Controller
             $mikrotik = new MikrotikService();
             $mikrotik->withRouter($router, fn($m) => $m->getRouterIdentity());
             $router->update(['is_active' => true, 'last_seen' => now()]);
+
+            // ── Sync all packages to new router ──
+            $this->syncAllPackagesToRouter($router);
+
             $message = 'Router added and connected successfully.';
         } catch (\Exception $e) {
             $message = 'Router added but connection failed: ' . $e->getMessage();
@@ -58,8 +63,39 @@ class MikrotikController extends Controller
             $message
         );
     }
+    private function syncAllPackagesToRouter(MikrotikRouter $router): void
+    {
+        $packages = Package::whereNotNull('mikrotik_profile')
+                           ->where('mikrotik_profile', '!=', '')
+                           ->get();
 
+        if ($packages->isEmpty()) return;
 
+        $mikrotik = new MikrotikService();
+
+        try {
+            $mikrotik->withRouter($router, function($m) use ($packages, $router) {
+                $existing = collect($m->getPPPoEProfiles())->pluck('name')->toArray();
+
+                foreach ($packages as $package) {
+                    if (in_array($package->mikrotik_profile, $existing)) {
+                        Log::info("Profile '{$package->mikrotik_profile}' already exists on [{$router->name}] — skipped");
+                        continue;
+                    }
+
+                    $m->createPPPoEProfile([
+                        'name'          => $package->mikrotik_profile,
+                        'upload_mbps'   => $package->speed_upload,
+                        'download_mbps' => $package->speed_download,
+                    ]);
+
+                    Log::info("Profile '{$package->mikrotik_profile}' created on [{$router->name}]");
+                }
+            });
+        } catch (\Exception $e) {
+            Log::warning("syncAllPackagesToRouter [{$router->name}] failed: " . $e->getMessage());
+        }
+    }
     public function update(Request $request, MikrotikRouter $mikrotikRouter)
     {
         $request->validate([
@@ -79,7 +115,25 @@ class MikrotikController extends Controller
 
         $mikrotikRouter->update($data);
 
-        return back()->with('success', 'Router updated successfully.');
+        // ── Connection test ──
+        try {
+            $mikrotik = new MikrotikService();
+            $mikrotik->withRouter($mikrotikRouter, fn($m) => $m->getRouterIdentity());
+            $mikrotikRouter->update(['is_active' => true, 'last_seen' => now()]);
+
+            // ── Sync all packages to router ──
+            $this->syncAllPackagesToRouter($mikrotikRouter);
+
+            $message = 'Router updated and connected successfully.';
+        } catch (\Exception $e) {
+            $mikrotikRouter->update(['is_active' => false]);
+            $message = 'Router updated but connection failed: ' . $e->getMessage();
+        }
+
+        return back()->with(
+            $mikrotikRouter->is_active ? 'success' : 'warning',
+            $message
+        );
     }
     /**
      * Delete the specified router along with all its IP pools.
@@ -203,7 +257,13 @@ class MikrotikController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
-
+    
+    public function activeSessionsPage()
+    {
+        $routers  = MikrotikRouter::where('is_active', 1)->get();
+        $customers = Customer::pluck('name', 'pppoe_username'); // username → name map
+        return view('mikrotik.active-sessions', compact('routers', 'customers'));
+    }
     /**
      * GET /mikrotik/{router}/queues
      * Simple Queue লিস্ট

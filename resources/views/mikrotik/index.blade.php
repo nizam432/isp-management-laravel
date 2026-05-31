@@ -49,18 +49,18 @@
                 <i class="fas fa-plus"></i> Add IP Pool
             </button>
 
-            {{-- Delete Button — customer না থাকলেই শুধু দেখাবে --}}
-            @if($router->customers_count === 0)
+        @if($router->customers_count === 0)
             <form action="{{ route('mikrotik.destroy', $router) }}" method="POST" class="d-inline"
                   onsubmit="return confirm('এই router delete করবেন?')">
                 @csrf @method('DELETE')
-                <button class="btn btn-xs btn-danger ml-1">
+               <button type="button" class="btn btn-xs btn-danger swal-delete" 
+                                    data-message="This router will be permanently deleted and cannot be recovered.">
                     <i class="fas fa-trash"></i>
                 </button>
             </form>
             @else
             <button class="btn btn-xs btn-danger ml-1" disabled
-                    title="{{ $router->customers_count }} জন customer আছে — delete করা যাবে না">
+                    title="This router has {{ $router->customers_count }} customers — cannot be deleted">
                 <i class="fas fa-trash"></i>
             </button>
             @endif
@@ -110,7 +110,7 @@
                               class="d-inline delete-form">
                             @csrf @method('DELETE')
                             <button type="button" class="btn btn-xs btn-danger swal-delete" 
-                                    data-message="This IP pool will be permanently deleted and cannot be recovered.">
+                                    data-message="This IP pool will be permanently deleted and cannot be recovered. ">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </form>

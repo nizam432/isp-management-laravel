@@ -44,10 +44,11 @@ Route::middleware(['auth'])->group(function () {
          ->name('customers.status');
 
     // ── Packages ───────────────────────────────
-    Route::resource('packages', PackageController::class);
-    Route::patch('packages/{package}/toggle', [PackageController::class, 'toggleStatus'])
-         ->name('packages.toggle');
+Route::get('packages/sync',  [PackageController::class, 'syncPreview'])->name('packages.sync.preview');
+Route::post('packages/sync', [PackageController::class, 'syncStore'])->name('packages.sync.store');
 
+Route::resource('packages', PackageController::class);
+Route::patch('packages/{package}/toggle', [PackageController::class, 'toggleStatus'])->name('packages.toggle');
     // ── Invoices ───────────────────────────────
     Route::resource('invoices', InvoiceController::class)->except(['edit', 'update']);
     Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'pdf'])
@@ -70,26 +71,25 @@ Route::middleware(['auth'])->group(function () {
     Route::post('agents/{agent}/pay-commission', [AgentController::class, 'payCommission'])
          ->name('agents.pay-commission');
 
-    // ── MikroTik ───────────────────────────────
+        // ── MikroTik ───────────────────────────────
     Route::prefix('mikrotik')->name('mikrotik.')->group(function () {
-        Route::get('/',                        [MikrotikController::class, 'index'])->name('index');
-        Route::post('/',                       [MikrotikController::class, 'store'])->name('store');
-        Route::put('{mikrotikRouter}',         [MikrotikController::class, 'update'])->name('update');
-        Route::delete('{mikrotikRouter}',      [MikrotikController::class, 'destroy'])->name('destroy');
-        Route::post('{mikrotikRouter}/pool',   [MikrotikController::class, 'addPool'])->name('pool.store');
-        Route::put('pool/{pool}',              [MikrotikController::class, 'updatePool'])->name('pool.update');
-        Route::delete('pool/{pool}',           [MikrotikController::class, 'destroyPool'])->name('pool.destroy');
-        Route::post('bulk-suspend',            [MikrotikController::class, 'bulkSuspend'])->name('bulk.suspend');
-        Route::post('sync-all',                [MikrotikController::class, 'syncAll'])->name('sync.all');
-        Route::get('{router}/status',          [MikrotikController::class, 'routerStatus'])->name('router.status');
-        Route::get('{router}/pppoe-users',     [MikrotikController::class, 'pppoeUsers'])->name('pppoe.users');
-        Route::get('{router}/active-sessions', [MikrotikController::class, 'activeSessions'])->name('active.sessions');
-        Route::get('{router}/queues',          [MikrotikController::class, 'queues'])->name('queues');
-        Route::get('{router}/profiles',        [MikrotikController::class, 'profiles'])->name('profiles');
-        
-    
+        Route::get('/',                          [MikrotikController::class, 'index'])->name('index');
+        Route::post('/',                         [MikrotikController::class, 'store'])->name('store');
+        Route::get('active-sessions',            [MikrotikController::class, 'activeSessionsPage'])->name('active-sessions.page'); // ← এটা আগে
+        Route::post('kick-by-username',          [MikrotikController::class, 'kickByUsername'])->name('kick-by-username');
+        Route::post('bulk-suspend',              [MikrotikController::class, 'bulkSuspend'])->name('bulk.suspend');
+        Route::post('sync-all',                  [MikrotikController::class, 'syncAll'])->name('sync.all');
+        Route::put('pool/{pool}',                [MikrotikController::class, 'updatePool'])->name('pool.update');
+        Route::delete('pool/{pool}',             [MikrotikController::class, 'destroyPool'])->name('pool.destroy');
+        Route::put('{mikrotikRouter}',           [MikrotikController::class, 'update'])->name('update');
+        Route::delete('{mikrotikRouter}',        [MikrotikController::class, 'destroy'])->name('destroy');
+        Route::post('{mikrotikRouter}/pool',     [MikrotikController::class, 'addPool'])->name('pool.store');
+        Route::get('{router}/status',            [MikrotikController::class, 'routerStatus'])->name('router.status');
+        Route::get('{router}/pppoe-users',       [MikrotikController::class, 'pppoeUsers'])->name('pppoe.users');
+        Route::get('{router}/active-sessions',   [MikrotikController::class, 'activeSessions'])->name('active.sessions');
+        Route::get('{router}/queues',            [MikrotikController::class, 'queues'])->name('queues');
+        Route::get('{router}/profiles',          [MikrotikController::class, 'profiles'])->name('profiles');
     });
-
     // ── Customer MikroTik ──────────────────────
     Route::prefix('customers/{customer}/mikrotik')->name('customers.mikrotik.')->group(function () {
         Route::get('session',         [MikrotikController::class, 'customerSession'])->name('session');

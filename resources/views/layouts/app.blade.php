@@ -18,7 +18,7 @@
         $message = session('success') ?? session('error') ?? session('warning');
         $color   = $type === 'success' ? '#28a745' : ($type === 'error' ? '#dc3545' : '#ffc107');
         $icon    = $type === 'success' ? 'check-circle' : ($type === 'error' ? 'times-circle' : 'exclamation-triangle');
-        $title   = $type === 'success' ? 'Success' : ($type === 'error' ? 'সমস্যা' : 'সতর্কতা');
+        $title   = $type === 'success' ? 'Success' : ($type === 'error' ? 'Error' : 'Error');
     @endphp
     <div style="position:fixed; top:20px; right:20px; z-index:9999; min-width:320px;">
         <div class="toast show" role="alert"
