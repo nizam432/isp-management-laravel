@@ -377,30 +377,42 @@ class CustomerController extends Controller
         }
     }
 
-    public function mikrotikInfo(Customer $customer)
-    {
-        try {
-            $router   = $customer->router ?? MikrotikRouter::where('is_active', 1)->first();
-            $mikrotik = new MikrotikService();
+public function mikrotikInfo(Customer $customer)
+{
+    try {
+        $router = $customer->router ?? MikrotikRouter::where('is_active', 1)->first();
 
-            // Account info
-            $account = $mikrotik->withRouter($router, function($m) use ($customer) {
-                $users = $m->getPPPoEUsers();
-                return collect($users)->firstWhere('name', $customer->pppoe_username);
-            });
-
-            // Live session
-            $session = $mikrotik->withRouter($router, fn($m) => $m->getCustomerSession($customer->pppoe_username));
-
-            return response()->json([
-                'success' => true,
-                'account' => $account,
-                'session' => $session,
-                'router'  => $router?->name,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()]);
+        if (!$router) {
+            return response()->json(['success' => false, 'message' => 'No router found.']);
         }
-    }  
-      
+
+        $mikrotik = new MikrotikService();
+
+        $account = $mikrotik->withRouter($router, function($m) use ($customer) {
+            $users = $m->getPPPoEUsers();
+            return collect($users)->firstWhere('name', $customer->pppoe_username);
+        });
+
+        $session = null;
+        try {
+            $session = $mikrotik->withRouter($router, fn($m) => $m->getCustomerSession($customer->pppoe_username));
+        } catch (\Exception $e) {
+            // session না পেলেও চলবে
+        }
+
+        return response()->json([
+            'success' => true,
+            'account' => $account ?? [],
+            'session' => $session ?? [],
+            'router'  => $router->name,
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => $e->getMessage()
+        ]);
+    }
+}  
+
 }

@@ -420,9 +420,7 @@
                 <button class="btn btn-primary btn-sm d-none" id="btn-restore" onclick="mkAction2('restore')">
                     <i class="fas fa-check-circle mr-1"></i> Restore
                 </button>
-                <button class="btn btn-danger btn-sm d-none" id="btn-remove" onclick="mkAction2('remove')">
-                    <i class="fas fa-trash mr-1"></i> Remove
-                </button>
+              
             </div>
         </div>
     </div>
@@ -565,7 +563,7 @@ document.querySelectorAll('.mk-info-btn').forEach(function(btn) {
                 document.getElementById('btn-provision').classList.toggle('d-none', !(status === 'pending'));
                 document.getElementById('btn-suspend').classList.toggle('d-none',   !(status === 'active'));
                 document.getElementById('btn-restore').classList.toggle('d-none',   !(status === 'suspended'));
-                document.getElementById('btn-remove').classList.toggle('d-none',    !(status === 'active' || status === 'suspended'));
+                //document.getElementById('btn-remove').classList.toggle('d-none',    !(status === 'active' || status === 'suspended'));
             })
             .catch(function() {
                 document.getElementById('mkinfo-body').innerHTML = '<div class="alert alert-danger">Connection failed.</div>';

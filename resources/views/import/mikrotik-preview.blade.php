@@ -34,19 +34,16 @@
 
     <div class="card-body">
 
-        {{-- ── Filter ─────────────────────────────────── --}}
+        {{-- Filter --}}
         <div class="row mb-3">
-            {{-- Search --}}
             <div class="col-md-4">
                 <div class="input-group input-group-sm">
                     <div class="input-group-prepend">
                         <span class="input-group-text"><i class="fas fa-search"></i></span>
                     </div>
-                    <input type="text" id="filterSearch" class="form-control"
-                           placeholder="Search username...">
+                    <input type="text" id="filterSearch" class="form-control" placeholder="Search username...">
                 </div>
             </div>
-            {{-- Status Filter --}}
             <div class="col-md-3">
                 <select id="filterStatus" class="form-control form-control-sm">
                     <option value="">All Status</option>
@@ -54,18 +51,16 @@
                     <option value="disabled">Disabled</option>
                 </select>
             </div>
-            {{-- Profile Filter --}}
             <div class="col-md-3">
                 <select id="filterProfile" class="form-control form-control-sm">
                     <option value="">All Profiles</option>
-                   @foreach(collect($users)->unique('profile') as $u)
+                    @foreach(collect($users)->unique('profile') as $u)
                         @if(!empty($u['profile']))
                             <option value="{{ $u['profile'] }}">{{ $u['profile'] }}</option>
                         @endif
                     @endforeach
                 </select>
             </div>
-            {{-- Result Count --}}
             <div class="col-md-2 d-flex align-items-center">
                 <span class="badge badge-info" id="filterCount">{{ count($users) }} results</span>
             </div>
@@ -73,7 +68,7 @@
 
         <div class="tab-content">
 
-            {{-- ── Tab 1: Single Import ─────────────────── --}}
+            {{-- Tab 1: Single Import --}}
             <div class="tab-pane fade show active" id="single" role="tabpanel">
                 <table class="table table-sm table-striped table-hover mb-0">
                     <thead class="thead-dark">
@@ -117,15 +112,16 @@
                             </td>
                             <td><code>{{ $user['password'] ?? '—' }}</code></td>
                             <td>
-                                <form action="{{ route('import.mikrotik.single') }}" method="POST" class="d-inline">
+                                <form action="{{ route('import.mikrotik.single') }}" method="POST" class="d-inline single-form">
                                     @csrf
                                     <input type="hidden" name="username"  value="{{ $user['name'] }}">
                                     <input type="hidden" name="password"  value="{{ $user['password'] ?? '' }}">
                                     <input type="hidden" name="profile"   value="{{ $profile }}">
                                     <input type="hidden" name="disabled"  value="{{ $disabled ? 'true' : 'false' }}">
                                     <input type="hidden" name="router_id" value="{{ $router->id }}">
-                                    <button type="submit" class="btn btn-xs btn-success"
-                                            onclick="return confirm('Import {{ $user['name'] }}?')">
+                                    <button type="button"
+                                            class="btn btn-xs btn-success swal-single-import"
+                                            data-username="{{ $user['name'] }}">
                                         <i class="fas fa-plus mr-1"></i> Add
                                     </button>
                                 </form>
@@ -140,9 +136,9 @@
                 </table>
             </div>
 
-            {{-- ── Tab 2: Bulk Import ───────────────────── --}}
+            {{-- Tab 2: Bulk Import --}}
             <div class="tab-pane fade" id="bulk" role="tabpanel">
-                <form action="{{ route('import.mikrotik.execute') }}" method="POST">
+                <form id="bulkImportForm" action="{{ route('import.mikrotik.execute') }}" method="POST">
                     @csrf
                     <input type="hidden" name="router_id" value="{{ $router->id }}">
 
@@ -229,8 +225,7 @@
                             <i class="fas fa-info-circle mr-1"></i>
                             <small>Profile → Package auto match. <strong>No Match</strong> = default package. Name & phone must be updated manually after import.</small>
                         </div>
-                        <button type="submit" class="btn btn-primary"
-                                onclick="return confirm('Import selected users?')">
+                        <button type="button" class="btn btn-primary" id="bulkImportBtn">
                             <i class="fas fa-file-import mr-1"></i> Bulk Import
                         </button>
                     </div>
@@ -245,6 +240,60 @@
 
 @push('js')
 <script>
+// ── Single Import SweetAlert ──────────────────────────
+document.querySelectorAll('.swal-single-import').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        var username = this.getAttribute('data-username');
+        var form     = this.closest('form');
+        Swal.fire({
+            title: 'Import Customer?',
+            text: username + ' will be added as a customer.',
+            icon: false,
+            showCancelButton: true,
+            confirmButtonColor: '#28a745',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, Import',
+            cancelButtonText: 'Cancel',
+            width: '340px',
+            padding: '1rem',
+        }).then(function(result) {
+            if (result.isConfirmed) form.submit();
+        });
+    });
+});
+
+// ── Bulk Import SweetAlert ────────────────────────────
+document.getElementById('bulkImportBtn').addEventListener('click', function() {
+    var selected = document.querySelectorAll('.user-check:checked').length;
+    if (selected === 0) {
+        Swal.fire({
+            title: 'No users selected',
+            text: 'Please select at least one user.',
+            icon: false,
+            confirmButtonColor: '#6c757d',
+            width: '320px',
+            padding: '1rem',
+        });
+        return;
+    }
+    Swal.fire({
+        title: 'Bulk Import?',
+        text: selected + ' users will be imported.',
+        icon: false,
+        showCancelButton: true,
+        confirmButtonColor: '#007bff',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, Import ' + selected + ' Users',
+        cancelButtonText: 'Cancel',
+        width: '360px',
+        padding: '1rem',
+    }).then(function(result) {
+        if (result.isConfirmed) {
+            document.getElementById('bulkImportForm').submit();
+        }
+    });
+});
+
 // ── Filter ────────────────────────────────────────────
 function applyFilter() {
     var search  = document.getElementById('filterSearch').value.toLowerCase();
@@ -253,9 +302,9 @@ function applyFilter() {
     var visible = 0;
 
     document.querySelectorAll('.user-row').forEach(function(row) {
-        var username    = row.getAttribute('data-username') || '';
-        var rowStatus   = row.getAttribute('data-status') || '';
-        var rowProfile  = row.getAttribute('data-profile') || '';
+        var username   = row.getAttribute('data-username') || '';
+        var rowStatus  = row.getAttribute('data-status') || '';
+        var rowProfile = row.getAttribute('data-profile') || '';
 
         var matchSearch  = !search  || username.includes(search);
         var matchStatus  = !status  || rowStatus === status;
@@ -269,7 +318,6 @@ function applyFilter() {
         }
     });
 
-    // Update row numbers
     var num = 1;
     document.querySelectorAll('.user-row:not([style*="none"]) .row-num').forEach(function(el) {
         el.textContent = num++;
@@ -287,9 +335,7 @@ document.getElementById('filterProfile').addEventListener('change', applyFilter)
 function toggleAll(el) {
     document.querySelectorAll('.user-check').forEach(function(cb) {
         var row = cb.closest('tr');
-        if (row && row.style.display !== 'none') {
-            cb.checked = el.checked;
-        }
+        if (row && row.style.display !== 'none') cb.checked = el.checked;
     });
     updateSelectedCount();
 }
@@ -313,7 +359,6 @@ function updateSelectedCount() {
     if (el) el.textContent = count + ' selected';
 }
 
-// Init count
 updateSelectedCount();
 </script>
 @endpush
