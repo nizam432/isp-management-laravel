@@ -25,15 +25,21 @@ class CustomerController extends Controller
 
     public function index(Request $request)
     {
-        $customers = Customer::with(['package', 'agent'])
+        $customers = Customer::with(['package', 'agent', 'zone', 'subZone', 'router', 'clientType', 'connectionType', 'protocolType'])
             ->when($request->search, fn($q) => $q
                 ->where('name',           'like', "%{$request->search}%")
                 ->orWhere('phone',         'like', "%{$request->search}%")
                 ->orWhere('customer_code', 'like', "%{$request->search}%"))
-            ->when($request->status,       fn($q) => $q->where('status',       $request->status))
-            ->when($request->area,         fn($q) => $q->where('area',         $request->area))
-            ->when($request->package_id,   fn($q) => $q->where('package_id',   $request->package_id))
-            ->when($request->billing_date, fn($q) => $q->where('billing_date', $request->billing_date))
+            ->when($request->status,             fn($q) => $q->where('status',             $request->status))
+            ->when($request->package_id,         fn($q) => $q->where('package_id',         $request->package_id))
+            ->when($request->billing_date,       fn($q) => $q->where('billing_date',       $request->billing_date))
+            ->when($request->router_id,          fn($q) => $q->where('router_id',          $request->router_id))
+            ->when($request->client_type_id,     fn($q) => $q->where('client_type_id',     $request->client_type_id))
+            ->when($request->zone_id,            fn($q) => $q->where('zone_id',            $request->zone_id))
+            ->when($request->sub_zone_id,        fn($q) => $q->where('sub_zone_id',        $request->sub_zone_id))
+            ->when($request->protocol_type_id,   fn($q) => $q->where('protocol_type_id',   $request->protocol_type_id))
+            ->when($request->connection_type_id, fn($q) => $q->where('connection_type_id', $request->connection_type_id))
+            ->when($request->agent_id,           fn($q) => $q->where('agent_id',           $request->agent_id))
             ->latest()
             ->paginate(20);
 
@@ -42,13 +48,21 @@ class CustomerController extends Controller
         $suspendedCustomers = Customer::where('status', 'suspended')->count();
         $expiredCustomers   = Customer::where('status', 'expired')->count();
 
-        $packages = Package::active()->get();
-        $areas    = Customer::select('area')->distinct()->whereNotNull('area')->pluck('area')->sort()->values();
+        $packages        = Package::active()->get();
+        $routers         = \App\Models\MikrotikRouter::where('is_active', 1)->get();
+        $clientTypes     = \App\Models\ClientType::active()->get();
+        $zones           = \App\Models\Zone::active()->get();
+        $subZones        = \App\Models\SubZone::active()->get();
+        $protocolTypes   = \App\Models\ProtocolType::active()->get();
+        $connectionTypes = \App\Models\ConnectionType::active()->get();
+        $agents          = \App\Models\Agent::active()->get();
+        $smsTemplates    = \App\Models\SmsTemplate::active()->get();
 
         return view('customers.index', compact(
             'customers',
             'totalCustomers', 'activeCustomers', 'suspendedCustomers', 'expiredCustomers',
-            'packages', 'areas'
+            'packages', 'routers', 'clientTypes', 'zones', 'subZones',
+            'protocolTypes', 'connectionTypes', 'agents', 'smsTemplates'
         ));
     }
 
@@ -362,4 +376,31 @@ class CustomerController extends Controller
             Log::error('MikroTik provision failed: ' . $e->getMessage());
         }
     }
+
+    public function mikrotikInfo(Customer $customer)
+    {
+        try {
+            $router   = $customer->router ?? MikrotikRouter::where('is_active', 1)->first();
+            $mikrotik = new MikrotikService();
+
+            // Account info
+            $account = $mikrotik->withRouter($router, function($m) use ($customer) {
+                $users = $m->getPPPoEUsers();
+                return collect($users)->firstWhere('name', $customer->pppoe_username);
+            });
+
+            // Live session
+            $session = $mikrotik->withRouter($router, fn($m) => $m->getCustomerSession($customer->pppoe_username));
+
+            return response()->json([
+                'success' => true,
+                'account' => $account,
+                'session' => $session,
+                'router'  => $router?->name,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }  
+      
 }

@@ -7,25 +7,25 @@
 <div class="row mb-3">
     <div class="col-md-3">
         <div class="small-box bg-success">
-            <div class="inner"><h3>{{ $todaySent }}</h3><p>আজকে Sent</p></div>
+            <div class="inner"><h3>{{ $todaySent }}</h3><p>Today Sent</p></div>
             <div class="icon"><i class="fas fa-paper-plane"></i></div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="small-box bg-primary">
-            <div class="inner"><h3>{{ number_format($totalSent) }}</h3><p>মোট Success</p></div>
+            <div class="inner"><h3>{{ number_format($totalSent) }}</h3><p>Total Success</p></div>
             <div class="icon"><i class="fas fa-check-circle"></i></div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="small-box bg-danger">
-            <div class="inner"><h3>{{ number_format($totalFailed) }}</h3><p>মোট Failed</p></div>
+            <div class="inner"><h3>{{ number_format($totalFailed) }}</h3><p>Total Failed</p></div>
             <div class="icon"><i class="fas fa-times-circle"></i></div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="small-box bg-info">
-            <div class="inner"><h3>{{ number_format($totalSent + $totalFailed) }}</h3><p>সর্বমোট SMS</p></div>
+            <div class="inner"><h3>{{ number_format($totalSent + $totalFailed) }}</h3><p>Total SMS</p></div>
             <div class="icon"><i class="fas fa-sms"></i></div>
         </div>
     </div>
@@ -192,7 +192,7 @@
                 <tr>
                     <td colspan="8" class="text-center text-muted py-4">
                         <i class="fas fa-inbox fa-2x d-block mb-2"></i>
-                        কোনো SMS log পাওয়া যায়নি।
+                        SMS Log Empty।
                     </td>
                 </tr>
                 @endforelse
@@ -201,7 +201,7 @@
     </div>
     <div class="card-footer d-flex justify-content-between align-items-center">
         <small class="text-muted">
-            মোট {{ $logs->total() }} টি record — page {{ $logs->currentPage() }}/{{ $logs->lastPage() }}
+            Total {{ $logs->total() }}  record — page {{ $logs->currentPage() }}/{{ $logs->lastPage() }}
         </small>
         {{ $logs->withQueryString()->links('pagination::bootstrap-4') }}
     </div>

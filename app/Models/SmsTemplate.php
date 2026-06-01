@@ -10,14 +10,17 @@ class SmsTemplate extends Model
 
     protected $casts = ['is_active' => 'boolean'];
 
+
     const VARIABLES = [
-        '{name}'    => 'Customer Name',
-        '{mobile}'  => 'Mobile Number',
-        '{amount}'  => 'Bill Amount',
-        '{date}'    => 'Date',
-        '{month}'   => 'Month',
-        '{package}' => 'Package Name',
-        '{company}' => 'Company Name',
+        '{name}'           => 'Customer Name',
+        '{mobile}'         => 'Mobile Number',
+        '{amount}'         => 'Bill Amount',
+        '{date}'           => 'Date',
+        '{month}'          => 'Month',
+        '{package}'        => 'Package Name',
+        '{company}'        => 'Company Name',
+        '{pppoe_username}' => 'PPPoE Username',
+        '{pppoe_password}' => 'PPPoE Password',
     ];
 
     public function scopeActive($query)

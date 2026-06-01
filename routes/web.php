@@ -40,8 +40,8 @@ Route::middleware(['auth'])->group(function () {
 
     // ── Customers ──────────────────────────────
     Route::resource('customers', CustomerController::class);
-    Route::patch('customers/{customer}/status', [CustomerController::class, 'updateStatus'])
-         ->name('customers.status');
+    Route::patch('customers/{customer}/status', [CustomerController::class, 'updateStatus'])->name('customers.status');
+    Route::get('customers/{customer}/mikrotik-info', [CustomerController::class, 'mikrotikInfo'])->name('customers.mikrotik-info');     
 
     // ── Packages ───────────────────────────────
 Route::get('packages/sync',  [PackageController::class, 'syncPreview'])->name('packages.sync.preview');
@@ -68,8 +68,7 @@ Route::patch('packages/{package}/toggle', [PackageController::class, 'toggleStat
 
     // ── Agents ─────────────────────────────────
     Route::resource('agents', AgentController::class)->except(['edit']);
-    Route::post('agents/{agent}/pay-commission', [AgentController::class, 'payCommission'])
-         ->name('agents.pay-commission');
+    Route::post('agents/{agent}/pay-commission', [AgentController::class, 'payCommission'])->name('agents.pay-commission');
 
         // ── MikroTik ───────────────────────────────
     Route::prefix('mikrotik')->name('mikrotik.')->group(function () {
@@ -129,7 +128,8 @@ Route::patch('packages/{package}/toggle', [PackageController::class, 'toggleStat
         Route::get('customers',         [ReportController::class, 'customers'])->name('customers');
         Route::get('export/{type}/pdf', [ReportController::class, 'exportPdf'])->name('export.pdf');
     });
-
+    
+    // ── SMS ────────────────────────────────
     Route::prefix('sms')->name('sms.')->group(function () {
         Route::get('/',                         [SmsController::class, 'index'])->name('index');
         Route::post('gateway/{gateway}/toggle', [SmsController::class, 'toggleGateway'])->name('gateway.toggle');

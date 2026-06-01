@@ -85,8 +85,7 @@
             </div>
             <div class="card-body">
                 <p class="text-muted small mb-2">
-                    Message-এ এই variables ব্যবহার করলে SMS পাঠানোর সময় auto replace হবে।
-                    Click করলে copy হবে।
+                    Use these variables in your message — they will be auto replaced when SMS is sent. Click to copy.
                 </p>
                 <div class="row">
                     @foreach(\App\Models\SmsTemplate::VARIABLES as $var => $label)
@@ -141,7 +140,7 @@
                         <div id="preview"
                              class="p-2 bg-light rounded border small"
                              style="min-height:55px; white-space:pre-wrap; color:#333;">
-                            Message preview এখানে দেখাবে...
+                            Message preview will appear here...
                         </div>
                     </div>
 
@@ -166,8 +165,8 @@
 @push('js')
 <script>
 const sampleData = {
-    name: 'রহিম সাহেব', mobile: '01712345678',
-    amount: '৫০০', date: '{{ now()->format("d M Y") }}',
+    name: 'Mr Rahim', mobile: '01712345678',
+    amount: '500', date: '{{ now()->format("d M Y") }}',
     month: '{{ now()->format("F Y") }}',
     package: 'Home 10Mbps', company: 'ABC Internet'
 };
