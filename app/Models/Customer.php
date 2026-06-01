@@ -129,4 +129,21 @@ class Customer extends Model
 
         return $code;
     }
+    // Expire date = connection date + 30 days (or last payment + 30 days)
+    public function getExpireDateAttribute()
+    {
+        if ($this->last_payment_date) {
+            return \Carbon\Carbon::parse($this->last_payment_date)->addDays(30);
+        }
+        if ($this->connection_date) {
+            return \Carbon\Carbon::parse($this->connection_date)->addDays(30);
+        }
+        return null;
+    }
+
+    // Next bill date = expire date
+    public function getNextBillDateAttribute()
+    {
+        return $this->expire_date;
+    }    
 }
