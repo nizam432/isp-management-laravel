@@ -1,7 +1,7 @@
 <?php
 
-namespace App\Http\Controllers;
-
+namespace App\Http\Controllers\Settings;
+use App\Http\Controllers\Controller;
 use App\Models\Setting;
 use App\Models\Package;
 use Illuminate\Http\Request;

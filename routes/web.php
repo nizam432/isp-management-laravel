@@ -283,7 +283,7 @@ Route::patch('packages/{package}/toggle', [PackageController::class, 'toggleStat
     Route::get('departments/{department}/positions', [EmployeeController::class, 'getPositions'])->name('departments.positions');  
     
     Route::prefix('settings')->name('settings.')->group(function () {
-        Route::get('general',  [App\Http\Controllers\SettingController::class, 'index'])->name('general');
-        Route::put('general',  [App\Http\Controllers\SettingController::class, 'update'])->name('update');
+        Route::get('general',  [App\Http\Controllers\Settings\SettingController::class, 'index'])->name('general');
+        Route::put('general',  [App\Http\Controllers\Settings\SettingController::class, 'update'])->name('update');
     });
 }); // end auth
