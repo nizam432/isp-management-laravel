@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Controllers\HR;
-
+use App\Http\Controllers\Controller; 
 use App\Models\HR\SalaryAdvance;
 use App\Models\HR\Employee;
 use Illuminate\Http\Request;
@@ -12,7 +12,7 @@ class SalaryAdvanceController extends Controller
     {
         $advances  = SalaryAdvance::with('employee')->latest()->paginate(20);
         $employees = Employee::active()->get();
-        return view('hr.salary-advance', compact('advances', 'employees'));
+        return view('hr.salary-advance.index', compact('advances', 'employees'));
     }
 
     public function store(Request $request)

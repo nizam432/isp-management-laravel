@@ -1,6 +1,6 @@
 <?php
 namespace App\Http\Controllers\HR;
-
+use App\Http\Controllers\Controller;
 use App\Models\HR\SalaryHead;
 use Illuminate\Http\Request;
 
@@ -9,7 +9,7 @@ class SalaryHeadController extends Controller
     public function index()
     {
         $heads = SalaryHead::latest()->get();
-        return view('hr.salary-heads', compact('heads'));
+        return view('hr.salary-heads.index', compact('heads'));
     }
 
     public function store(Request $request)

@@ -23,6 +23,13 @@ use App\Http\Controllers\Settings\SubZoneController;
 use App\Http\Controllers\Settings\ConnectionTypeController;
 use App\Http\Controllers\Settings\ClientTypeController;
 use App\Http\Controllers\Settings\ProtocolTypeController;
+use App\Http\Controllers\HR\EmployeeController;
+use App\Http\Controllers\HR\DepartmentController;
+use App\Http\Controllers\HR\PositionController;
+use App\Http\Controllers\HR\SalaryHeadController;
+use App\Http\Controllers\HR\PayrollController;
+use App\Http\Controllers\HR\LeaveController;
+use App\Http\Controllers\HR\SalaryAdvanceController;
 // ─────────────────────────────────────────────
 // Public Routes
 // ─────────────────────────────────────────────
@@ -240,65 +247,43 @@ Route::patch('packages/{package}/toggle', [PackageController::class, 'toggleStat
         Route::delete('protocol-types/{protocolType}',         [ProtocolTypeController::class, 'destroy']) ->name('protocol-types.destroy');
     });
 
-    // ── Departments ──────────────────────────────────────
-    Route::prefix('departments')->name('departments.')->group(function () {
-        Route::get('/',              [App\Http\Controllers\DepartmentController::class, 'index'])->name('index');
-        Route::post('/',             [App\Http\Controllers\DepartmentController::class, 'store'])->name('store');
-        Route::put('/{department}',  [App\Http\Controllers\DepartmentController::class, 'update'])->name('update');
-        Route::delete('/{department}',[App\Http\Controllers\DepartmentController::class, 'destroy'])->name('destroy');
-    });
+    Route::resource('employees', EmployeeController::class);
+    Route::resource('departments', DepartmentController::class);
+    Route::resource('positions', PositionController::class);
+    Route::resource('salary-heads', SalaryHeadController::class);
 
-    // ── Positions ─────────────────────────────────────────
-    Route::prefix('positions')->name('positions.')->group(function () {
-        Route::get('/',            [App\Http\Controllers\PositionController::class, 'index'])->name('index');
-        Route::post('/',           [App\Http\Controllers\PositionController::class, 'store'])->name('store');
-        Route::put('/{position}',  [App\Http\Controllers\PositionController::class, 'update'])->name('update');
-        Route::delete('/{position}',[App\Http\Controllers\PositionController::class, 'destroy'])->name('destroy');
-    });
-
-    // ── Salary Heads ──────────────────────────────────────
-    Route::prefix('salary-heads')->name('salary-heads.')->group(function () {
-        Route::get('/',              [App\Http\Controllers\SalaryHeadController::class, 'index'])->name('index');
-        Route::post('/',             [App\Http\Controllers\SalaryHeadController::class, 'store'])->name('store');
-        Route::put('/{salaryHead}',  [App\Http\Controllers\SalaryHeadController::class, 'update'])->name('update');
-        Route::delete('/{salaryHead}',[App\Http\Controllers\SalaryHeadController::class, 'destroy'])->name('destroy');
-    });
-
-    // ── Employees ─────────────────────────────────────────
-    Route::resource('employees', App\Http\Controllers\EmployeeController::class);
-    Route::delete('employees/documents/{document}', [App\Http\Controllers\EmployeeController::class, 'destroyDocument'])->name('employees.documents.destroy');
-    Route::get('departments/{department}/positions', [App\Http\Controllers\EmployeeController::class, 'getPositions'])->name('departments.positions');
-
-    // ── Payroll ───────────────────────────────────────────
     Route::prefix('payroll')->name('payroll.')->group(function () {
-        Route::get('/',              [App\Http\Controllers\PayrollController::class, 'index'])->name('index');
-        Route::get('/generate',      [App\Http\Controllers\PayrollController::class, 'generate'])->name('generate');
-        Route::post('/',             [App\Http\Controllers\PayrollController::class, 'store'])->name('store');
-        Route::get('/{payroll}',     [App\Http\Controllers\PayrollController::class, 'show'])->name('show');
-        Route::post('/{payroll}/pay',[App\Http\Controllers\PayrollController::class, 'pay'])->name('pay');
-        Route::get('/{payroll}/payslip',[App\Http\Controllers\PayrollController::class, 'payslip'])->name('payslip');
+        Route::get('/',                  [PayrollController::class, 'index'])->name('index');
+        Route::get('/generate',          [PayrollController::class, 'generate'])->name('generate');
+        Route::post('/',                 [PayrollController::class, 'store'])->name('store');
+        Route::get('/{payroll}',         [PayrollController::class, 'show'])->name('show');
+        Route::post('/{payroll}/pay',    [PayrollController::class, 'pay'])->name('pay');
+        Route::get('/{payroll}/payslip', [PayrollController::class, 'payslip'])->name('payslip');
     });
 
-    // ── Leave ─────────────────────────────────────────────
     Route::prefix('leave')->name('leave.')->group(function () {
-        Route::get('/',                       [App\Http\Controllers\LeaveController::class, 'index'])->name('index');
-        Route::get('/create',                 [App\Http\Controllers\LeaveController::class, 'create'])->name('create');
-        Route::post('/',                      [App\Http\Controllers\LeaveController::class, 'store'])->name('store');
-        Route::post('/{leave}/approve',       [App\Http\Controllers\LeaveController::class, 'approve'])->name('approve');
-        Route::post('/{leave}/reject',        [App\Http\Controllers\LeaveController::class, 'reject'])->name('reject');
-        Route::get('/types',                  [App\Http\Controllers\LeaveController::class, 'types'])->name('types');
-        Route::post('/types',                 [App\Http\Controllers\LeaveController::class, 'storeType'])->name('types.store');
-        Route::put('/types/{type}',           [App\Http\Controllers\LeaveController::class, 'updateType'])->name('types.update');
-        Route::delete('/types/{type}',        [App\Http\Controllers\LeaveController::class, 'destroyType'])->name('types.destroy');
+        Route::get('/',                 [LeaveController::class, 'index'])->name('index');
+        Route::get('/create',           [LeaveController::class, 'create'])->name('create');
+        Route::post('/',                [LeaveController::class, 'store'])->name('store');
+        Route::post('/{leave}/approve', [LeaveController::class, 'approve'])->name('approve');
+        Route::post('/{leave}/reject',  [LeaveController::class, 'reject'])->name('reject');
+        Route::get('/types',            [LeaveController::class, 'types'])->name('types');
+        Route::post('/types',           [LeaveController::class, 'storeType'])->name('types.store');
+        Route::put('/types/{type}',     [LeaveController::class, 'updateType'])->name('types.update');
+        Route::delete('/types/{type}',  [LeaveController::class, 'destroyType'])->name('types.destroy');
     });
 
-    // ── Salary Advance ────────────────────────────────────
     Route::prefix('salary-advance')->name('salary-advance.')->group(function () {
-        Route::get('/',              [App\Http\Controllers\SalaryAdvanceController::class, 'index'])->name('index');
-        Route::post('/',             [App\Http\Controllers\SalaryAdvanceController::class, 'store'])->name('store');
-        Route::post('/{advance}/deduct',[App\Http\Controllers\SalaryAdvanceController::class, 'deduct'])->name('deduct');
+        Route::get('/',                  [SalaryAdvanceController::class, 'index'])->name('index');
+        Route::post('/',                 [SalaryAdvanceController::class, 'store'])->name('store');
+        Route::post('/{advance}/deduct', [SalaryAdvanceController::class, 'deduct'])->name('deduct');
     });
 
+    Route::delete('employees/documents/{document}', [EmployeeController::class, 'destroyDocument'])->name('employees.documents.destroy');
+    Route::get('departments/{department}/positions', [EmployeeController::class, 'getPositions'])->name('departments.positions');  
     
-
+    Route::prefix('settings')->name('settings.')->group(function () {
+        Route::get('general',  [App\Http\Controllers\SettingController::class, 'index'])->name('general');
+        Route::put('general',  [App\Http\Controllers\SettingController::class, 'update'])->name('update');
+    });
 }); // end auth

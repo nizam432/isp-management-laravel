@@ -488,6 +488,7 @@ return [
             'icon' => 'fas fa-fw fa-cog',
             'can'  => 'isp-admin',
             'submenu' => [
+                ['text' => 'General Settings', 'url' => 'settings/general', 'icon' => 'fas fa-fw fa-sliders-h'],
                 ['text' => 'Zone',     'url' => 'settings/zones',     'icon' => 'fas fa-fw fa-map-marked-alt'],
                 ['text' => 'Sub Zone', 'url' => 'settings/sub-zones', 'icon' => 'fas fa-fw fa-map-pin'],
                 ['text' => 'Connection Type', 'url' => 'settings/connection-types', 'icon' => 'fas fa-fw fa-plug'],
@@ -495,6 +496,60 @@ return [
                 ['text' => 'Protocol Type', 'url' => 'settings/protocol-types', 'icon' => 'fas fa-fw fa-network-wired'],
           ],
         ],
+
+        [
+            'text'       => 'HR & Payroll',
+            'icon'       => 'fas fa-fw fa-user-tie',
+            'icon_color' => 'blue',
+            'can'        => 'isp-admin',
+            'submenu'    => [
+                [
+                    'text' => 'Departments',
+                    'url'  => 'departments',
+                    'icon' => 'fas fa-fw fa-building',
+                ],
+                [
+                    'text' => 'Positions',
+                    'url'  => 'positions',
+                    'icon' => 'fas fa-fw fa-briefcase',
+                ],
+                [
+                    'text' => 'Salary Heads',
+                    'url'  => 'salary-heads',
+                    'icon' => 'fas fa-fw fa-list',
+                ],
+                [
+                    'text' => 'Employee List',
+                    'url'  => 'employees',
+                    'icon' => 'fas fa-fw fa-users',
+                ],
+                [
+                    'text' => 'Add Employee',
+                    'url'  => 'employees/create',
+                    'icon' => 'fas fa-fw fa-user-plus',
+                ],
+                [
+                    'text' => 'Payroll',
+                    'url'  => 'payroll',
+                    'icon' => 'fas fa-fw fa-money-bill-wave',
+                ],
+                [
+                    'text' => 'Leave Types',
+                    'url'  => 'leave/types',
+                    'icon' => 'fas fa-fw fa-calendar-times',
+                ],
+                [
+                    'text' => 'Leave Applications',
+                    'url'  => 'leave',
+                    'icon' => 'fas fa-fw fa-calendar-check',
+                ],
+                [
+                    'text' => 'Salary Advance',
+                    'url'  => 'salary-advance',
+                    'icon' => 'fas fa-fw fa-hand-holding-usd',
+                ],
+            ],
+        ],        
          ['header' => 'RESELLER', 'can' => 'create-reseller'],
         [
             'text'       => 'My Resellers',

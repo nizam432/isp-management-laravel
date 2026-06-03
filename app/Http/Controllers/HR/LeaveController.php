@@ -1,6 +1,8 @@
 <?php
 
+
 namespace App\Http\Controllers\HR;
+use App\Http\Controllers\Controller; 
 
 use App\Models\HR\Employee;
 use App\Models\HR\LeaveType;
@@ -19,14 +21,14 @@ class LeaveController extends Controller
             ->paginate(20);
 
         $employees = Employee::active()->get();
-        return view('leave.index', compact('leaves', 'employees'));
+        return view('hr.leave.index', compact('leaves', 'employees'));
     }
 
     public function create()
     {
         $employees  = Employee::active()->get();
         $leaveTypes = LeaveType::active()->get();
-        return view('leave.create', compact('employees', 'leaveTypes'));
+        return view('hr.leave.create', compact('employees', 'leaveTypes'));
     }
 
     public function store(Request $request)
@@ -96,7 +98,7 @@ class LeaveController extends Controller
     public function types()
     {
         $types = LeaveType::latest()->get();
-        return view('leave.types', compact('types'));
+        return view('hr.leave.types', compact('types'));
     }
 
     public function storeType(Request $request)

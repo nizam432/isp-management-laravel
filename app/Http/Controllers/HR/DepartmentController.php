@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Controllers\HR;
-
+use App\Http\Controllers\Controller; 
 use App\Models\HR\Department;
 use App\Models\HR\Position;
 use Illuminate\Http\Request;
@@ -12,7 +12,7 @@ class DepartmentController extends Controller
     {
         $departments = Department::withCount(['positions', 'employees'])->latest()->get();
         $positions   = Position::with('department')->latest()->get();
-        return view('hr.departments', compact('departments', 'positions'));
+        return view('hr.departments.index', compact('departments', 'positions'));
     }
 
     public function store(Request $request)

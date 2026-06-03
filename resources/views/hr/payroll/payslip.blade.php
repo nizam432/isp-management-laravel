@@ -1,4 +1,7 @@
 {{-- resources/views/hr/payroll/payslip.blade.php --}}
+@php
+    use App\Models\Setting;
+@endphp
 <!DOCTYPE html>
 <html>
 <head>

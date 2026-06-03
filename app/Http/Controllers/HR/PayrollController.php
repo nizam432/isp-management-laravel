@@ -1,14 +1,14 @@
 <?php
 
 namespace App\Http\Controllers\HR;
-
+use App\Http\Controllers\Controller; 
+use Illuminate\Http\Request;
 use App\Models\HR\Employee;
 use App\Models\HR\Payroll;
 use App\Models\HR\PayrollDetail;
 use App\Models\HR\SalaryHead;
 use App\Models\HR\SalaryAdvance;
-use Illuminate\HR\Http\Request;
-use Illuminate\HR\Support\Facades\DB;
+use Illuminate\Support\Facades\DB;
 
 class PayrollController extends Controller
 {
@@ -19,7 +19,7 @@ class PayrollController extends Controller
                             ->where('month', $month)
                             ->latest()
                             ->paginate(20);
-        return view('payroll.index', compact('payrolls', 'month'));
+        return view('hr.payroll.index', compact('payrolls', 'month'));
     }
 
     public function generate(Request $request)
@@ -28,7 +28,7 @@ class PayrollController extends Controller
         $employees   = Employee::active()->with('advances')->get();
         $salaryHeads = SalaryHead::active()->get();
 
-        return view('payroll.generate', compact('employees', 'salaryHeads', 'month'));
+        return view('hr.payroll.generate', compact('employees', 'salaryHeads', 'month'));
     }
 
     public function store(Request $request)
@@ -113,7 +113,7 @@ class PayrollController extends Controller
     public function show(Payroll $payroll)
     {
         $payroll->load(['employee.department', 'employee.position', 'details.salaryHead']);
-        return view('payroll.show', compact('payroll'));
+        return view('hr.payroll.show', compact('payroll'));
     }
 
     public function pay(Request $request, Payroll $payroll)
@@ -136,6 +136,6 @@ class PayrollController extends Controller
     public function payslip(Payroll $payroll)
     {
         $payroll->load(['employee.department', 'employee.position', 'details.salaryHead']);
-        return view('payroll.payslip', compact('payroll'));
+        return view('hr.payroll.payslip', compact('payroll'));
     }
 }

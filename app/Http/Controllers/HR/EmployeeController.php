@@ -1,13 +1,13 @@
 <?php
 
 namespace App\Http\Controllers\HR;
-
+use App\Http\Controllers\Controller;
 use App\Models\HR\Employee;
 use App\Models\HR\Department;
 use App\Models\HR\Position;
 use App\Models\HR\EmployeeDocument;
 use App\Models\HR\EmployeeEducation;
-use App\Models\HR\User;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -29,14 +29,14 @@ class EmployeeController extends Controller
 
         $departments = Department::active()->get();
 
-        return view('employees.index', compact('employees', 'departments'));
+        return view('hr.employees.index', compact('employees', 'departments'));
     }
 
     public function create()
     {
         $departments = Department::active()->get();
         $positions   = Position::active()->get();
-        return view('employees.create', compact('departments', 'positions'));
+        return view('hr.employees.create', compact('departments', 'positions'));
     }
 
     public function store(Request $request)
@@ -133,7 +133,7 @@ class EmployeeController extends Controller
     public function show(Employee $employee)
     {
         $employee->load(['department', 'position', 'documents', 'educations', 'payrolls', 'advances', 'leaves.leaveType']);
-        return view('employees.show', compact('employee'));
+        return view('hr.employees.show', compact('employee'));
     }
 
     public function edit(Employee $employee)
@@ -141,7 +141,7 @@ class EmployeeController extends Controller
         $employee->load(['documents', 'educations']);
         $departments = Department::active()->get();
         $positions   = Position::active()->get();
-        return view('employees.edit', compact('employee', 'departments', 'positions'));
+        return view('hr.employees.edit', compact('employee', 'departments', 'positions'));
     }
 
     public function update(Request $request, Employee $employee)
