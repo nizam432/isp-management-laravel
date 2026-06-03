@@ -240,6 +240,65 @@ Route::patch('packages/{package}/toggle', [PackageController::class, 'toggleStat
         Route::delete('protocol-types/{protocolType}',         [ProtocolTypeController::class, 'destroy']) ->name('protocol-types.destroy');
     });
 
+    // ── Departments ──────────────────────────────────────
+    Route::prefix('departments')->name('departments.')->group(function () {
+        Route::get('/',              [App\Http\Controllers\DepartmentController::class, 'index'])->name('index');
+        Route::post('/',             [App\Http\Controllers\DepartmentController::class, 'store'])->name('store');
+        Route::put('/{department}',  [App\Http\Controllers\DepartmentController::class, 'update'])->name('update');
+        Route::delete('/{department}',[App\Http\Controllers\DepartmentController::class, 'destroy'])->name('destroy');
+    });
+
+    // ── Positions ─────────────────────────────────────────
+    Route::prefix('positions')->name('positions.')->group(function () {
+        Route::get('/',            [App\Http\Controllers\PositionController::class, 'index'])->name('index');
+        Route::post('/',           [App\Http\Controllers\PositionController::class, 'store'])->name('store');
+        Route::put('/{position}',  [App\Http\Controllers\PositionController::class, 'update'])->name('update');
+        Route::delete('/{position}',[App\Http\Controllers\PositionController::class, 'destroy'])->name('destroy');
+    });
+
+    // ── Salary Heads ──────────────────────────────────────
+    Route::prefix('salary-heads')->name('salary-heads.')->group(function () {
+        Route::get('/',              [App\Http\Controllers\SalaryHeadController::class, 'index'])->name('index');
+        Route::post('/',             [App\Http\Controllers\SalaryHeadController::class, 'store'])->name('store');
+        Route::put('/{salaryHead}',  [App\Http\Controllers\SalaryHeadController::class, 'update'])->name('update');
+        Route::delete('/{salaryHead}',[App\Http\Controllers\SalaryHeadController::class, 'destroy'])->name('destroy');
+    });
+
+    // ── Employees ─────────────────────────────────────────
+    Route::resource('employees', App\Http\Controllers\EmployeeController::class);
+    Route::delete('employees/documents/{document}', [App\Http\Controllers\EmployeeController::class, 'destroyDocument'])->name('employees.documents.destroy');
+    Route::get('departments/{department}/positions', [App\Http\Controllers\EmployeeController::class, 'getPositions'])->name('departments.positions');
+
+    // ── Payroll ───────────────────────────────────────────
+    Route::prefix('payroll')->name('payroll.')->group(function () {
+        Route::get('/',              [App\Http\Controllers\PayrollController::class, 'index'])->name('index');
+        Route::get('/generate',      [App\Http\Controllers\PayrollController::class, 'generate'])->name('generate');
+        Route::post('/',             [App\Http\Controllers\PayrollController::class, 'store'])->name('store');
+        Route::get('/{payroll}',     [App\Http\Controllers\PayrollController::class, 'show'])->name('show');
+        Route::post('/{payroll}/pay',[App\Http\Controllers\PayrollController::class, 'pay'])->name('pay');
+        Route::get('/{payroll}/payslip',[App\Http\Controllers\PayrollController::class, 'payslip'])->name('payslip');
+    });
+
+    // ── Leave ─────────────────────────────────────────────
+    Route::prefix('leave')->name('leave.')->group(function () {
+        Route::get('/',                       [App\Http\Controllers\LeaveController::class, 'index'])->name('index');
+        Route::get('/create',                 [App\Http\Controllers\LeaveController::class, 'create'])->name('create');
+        Route::post('/',                      [App\Http\Controllers\LeaveController::class, 'store'])->name('store');
+        Route::post('/{leave}/approve',       [App\Http\Controllers\LeaveController::class, 'approve'])->name('approve');
+        Route::post('/{leave}/reject',        [App\Http\Controllers\LeaveController::class, 'reject'])->name('reject');
+        Route::get('/types',                  [App\Http\Controllers\LeaveController::class, 'types'])->name('types');
+        Route::post('/types',                 [App\Http\Controllers\LeaveController::class, 'storeType'])->name('types.store');
+        Route::put('/types/{type}',           [App\Http\Controllers\LeaveController::class, 'updateType'])->name('types.update');
+        Route::delete('/types/{type}',        [App\Http\Controllers\LeaveController::class, 'destroyType'])->name('types.destroy');
+    });
+
+    // ── Salary Advance ────────────────────────────────────
+    Route::prefix('salary-advance')->name('salary-advance.')->group(function () {
+        Route::get('/',              [App\Http\Controllers\SalaryAdvanceController::class, 'index'])->name('index');
+        Route::post('/',             [App\Http\Controllers\SalaryAdvanceController::class, 'store'])->name('store');
+        Route::post('/{advance}/deduct',[App\Http\Controllers\SalaryAdvanceController::class, 'deduct'])->name('deduct');
+    });
+
     
 
 }); // end auth
