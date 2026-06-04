@@ -38,7 +38,26 @@ class EmployeeController extends Controller
         $positions   = Position::active()->get();
         return view('hr.employees.create', compact('departments', 'positions'));
     }
+    
+    public function resignTerminate(Request $request, Employee $employee)
+    {
+        $request->validate([
+            'status'         => 'required|in:resigned,terminated',
+            'leaving_date'   => 'required|date',
+            'leaving_reason' => 'nullable|string|max:255',
+            'leaving_note'   => 'nullable|string',
+        ]);
 
+        $employee->update([
+            'status'         => $request->status,
+            'leaving_date'   => $request->leaving_date,
+            'leaving_reason' => $request->leaving_reason,
+            'leaving_note'   => $request->leaving_note,
+        ]);
+
+        return back()->with('success', "Employee '{$employee->name}' has been " . $request->status . ".");
+    }
+    
     public function store(Request $request)
     {
         $request->validate([

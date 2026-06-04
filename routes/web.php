@@ -281,7 +281,7 @@ Route::patch('packages/{package}/toggle', [PackageController::class, 'toggleStat
 
     Route::delete('employees/documents/{document}', [EmployeeController::class, 'destroyDocument'])->name('employees.documents.destroy');
     Route::get('departments/{department}/positions', [EmployeeController::class, 'getPositions'])->name('departments.positions');  
-    
+    Route::post('employees/{employee}/resign-terminate', [EmployeeController::class, 'resignTerminate'])->name('employees.resign-terminate');
     Route::prefix('settings')->name('settings.')->group(function () {
         Route::get('general',  [App\Http\Controllers\Settings\SettingController::class, 'index'])->name('general');
         Route::put('general',  [App\Http\Controllers\Settings\SettingController::class, 'update'])->name('update');

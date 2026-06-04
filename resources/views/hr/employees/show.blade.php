@@ -2,6 +2,12 @@
 @extends('layouts.app')
 @section('page_title', 'Employee — ' . $employee->name)
 @section('page_actions')
+    @if($employee->status === 'active')
+    <button class="btn btn-danger btn-sm mr-1"
+            data-toggle="modal" data-target="#resignTerminateModal">
+        <i class="fas fa-user-times mr-1"></i> Resign / Terminate
+    </button>
+    @endif
     <a href="{{ route('employees.edit', $employee) }}" class="btn btn-warning btn-sm mr-1">
         <i class="fas fa-edit mr-1"></i> Edit
     </a>
@@ -64,7 +70,7 @@
                     </tr>
                     <tr>
                         <td class="text-muted small">Basic Salary</td>
-                        <td><strong>৳ {{ number_format($employee->basic_salary) }}</strong></td>
+                        <td><strong>{{ number_format($employee->basic_salary) }}</strong></td>
                     </tr>
                 </table>
             </div>
@@ -151,7 +157,7 @@
                     <thead class="thead-dark">
                         <tr>
                             <th>Degree</th>
-                            <th>Institution/Board</th>
+                            <th>Institution / Board</th>
                             <th>Passing Year</th>
                         </tr>
                     </thead>
@@ -180,7 +186,7 @@
                     <thead class="thead-dark">
                         <tr>
                             <th>Document Name</th>
-                            <th>Action</th>
+                            <th style="width:120px">Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -233,9 +239,9 @@
                         @forelse($employee->payrolls->take(6) as $payroll)
                         <tr>
                             <td>{{ \Carbon\Carbon::parse($payroll->month . '-01')->format('M Y') }}</td>
-                            <td>৳ {{ number_format($payroll->gross_salary) }}</td>
-                            <td>৳ {{ number_format($payroll->total_deduction) }}</td>
-                            <td><strong>৳ {{ number_format($payroll->net_salary) }}</strong></td>
+                            <td>{{ number_format($payroll->gross_salary) }}</td>
+                            <td>{{ number_format($payroll->total_deduction) }}</td>
+                            <td><strong>{{ number_format($payroll->net_salary) }}</strong></td>
                             <td>
                                 <span class="badge badge-{{ $payroll->status === 'paid' ? 'success' : 'warning' }}">
                                     {{ ucfirst($payroll->status) }}
@@ -330,6 +336,75 @@
         </div>
         @endif
 
+    </div>
+</div>
+
+{{-- Resign / Terminate Modal --}}
+<div class="modal fade" id="resignTerminateModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title text-danger">
+                    <i class="fas fa-user-times mr-1"></i> Resign / Terminate — {{ $employee->name }}
+                </h6>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <form action="{{ route('employees.resign-terminate', $employee) }}" method="POST">
+                @csrf
+                <div class="modal-body">
+
+                    {{-- Action --}}
+                    <div class="form-group">
+                        <label class="font-weight-bold">Action <span class="text-danger">*</span></label>
+                        <div class="mt-1">
+                            <div class="custom-control custom-radio d-inline-block mr-4">
+                                <input type="radio" id="action_resign" name="status"
+                                       value="resigned" class="custom-control-input" checked>
+                                <label class="custom-control-label text-warning" for="action_resign">
+                                    <i class="fas fa-sign-out-alt mr-1"></i> Resign
+                                </label>
+                            </div>
+                            <div class="custom-control custom-radio d-inline-block">
+                                <input type="radio" id="action_terminate" name="status"
+                                       value="terminated" class="custom-control-input">
+                                <label class="custom-control-label text-danger" for="action_terminate">
+                                    <i class="fas fa-ban mr-1"></i> Terminate
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Effective Date --}}
+                    <div class="form-group">
+                        <label class="font-weight-bold">Effective Date <span class="text-danger">*</span></label>
+                        <input type="date" name="leaving_date" class="form-control"
+                               value="{{ now()->format('Y-m-d') }}" required>
+                    </div>
+
+                    {{-- Reason --}}
+                    <div class="form-group">
+                        <label class="font-weight-bold">Reason</label>
+                        <input type="text" name="leaving_reason" class="form-control"
+                               placeholder="e.g. Personal reason, Policy violation...">
+                    </div>
+
+                    {{-- Note --}}
+                    <div class="form-group mb-0">
+                        <label class="font-weight-bold">Note</label>
+                        <textarea name="leaving_note" class="form-control" rows="2"
+                                  placeholder="Additional details..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-danger btn-sm">
+                        <i class="fas fa-check mr-1"></i> Confirm
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
