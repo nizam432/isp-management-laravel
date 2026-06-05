@@ -10,13 +10,16 @@ class Payment extends Model
     use HasFactory;
 
     protected $fillable = [
-        'invoice_id', 'customer_id', 'amount', 'method',
-        'transaction_id', 'paid_at', 'received_by', 'remarks',
+        'invoice_id', 'customer_id','paid_at', 'amount', 'method',
+        'transaction_id', 'remarks', 'status', 'received_by',
+        'receive_from', 'send_sms', 'set_next_billing_date', 'payment_date',
     ];
 
     protected $casts = [
-        'paid_at' => 'datetime',
-        'amount'  => 'decimal:2',
+        'amount'                 => 'decimal:2',
+        'send_sms'               => 'boolean',
+        'set_next_billing_date'  => 'boolean',
+        'payment_date'           => 'date',
     ];
 
     // Relations
@@ -35,25 +38,36 @@ class Payment extends Model
         return $this->belongsTo(User::class, 'received_by');
     }
 
-    public function commission()
+    public function voidLog()
     {
-        return $this->hasOne(AgentCommission::class);
+        return $this->hasOne(PaymentVoid::class);
     }
 
     // Scopes
-    public function scopeByMethod($query, $method)
+    public function scopeActive($query)
     {
-        return $query->where('method', $method);
+        return $query->where('status', 'active');
     }
 
-    public function scopeToday($query)
+    public function scopeVoided($query)
     {
-        return $query->whereDate('paid_at', today());
+        return $query->where('status', 'void');
     }
 
     public function scopeThisMonth($query)
     {
-        return $query->whereMonth('paid_at', now()->month)
-                     ->whereYear('paid_at', now()->year);
+        return $query->whereMonth('payment_date', now()->month)
+                     ->whereYear('payment_date', now()->year);
+    }
+
+    // Helpers
+    public function isVoid(): bool
+    {
+        return $this->status === 'void';
+    }
+
+    public function isActive(): bool
+    {
+        return $this->status === 'active';
     }
 }

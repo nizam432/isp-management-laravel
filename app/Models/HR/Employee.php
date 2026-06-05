@@ -2,7 +2,7 @@
 
 namespace App\Models\HR;
 use Illuminate\Database\Eloquent\Model;
-
+use App\Models\User;
 class Employee extends Model
 {
     protected $fillable = [

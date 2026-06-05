@@ -4,169 +4,160 @@ namespace App\Http\Controllers;
 
 use App\Models\Payment;
 use App\Models\Invoice;
-use App\Models\AgentCommission;
-use App\Models\ActivityLog;
-use App\Models\MikrotikRouter;
-use App\Services\MikrotikService;
-use App\Services\SmsService;
+use App\Models\Customer;
+use App\Models\User;
+use App\Services\BillingService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 
 class PaymentController extends Controller
 {
+    public function __construct(protected BillingService $billing) {}
+
+    /**
+     * Payments list — history
+     */
     public function index(Request $request)
     {
-        $payments = Payment::with(['customer', 'invoice', 'receivedBy'])
-            ->when($request->method, fn($q) => $q->where('method', $request->method))
-            ->when($request->date,   fn($q) => $q->whereDate('paid_at', $request->date))
+        $payments = Payment::with(['invoice', 'customer', 'receivedBy', 'voidLog'])
             ->when($request->search, fn($q) => $q->whereHas('customer', fn($c) =>
-                $c->where('name',  'like', "%{$request->search}%")
+                $c->where('name', 'like', "%{$request->search}%")
                   ->orWhere('phone', 'like', "%{$request->search}%")))
-            ->latest('paid_at')
-            ->paginate(20);
+            ->when($request->method, fn($q) => $q->where('method', $request->method))
+            ->when($request->status, fn($q) => $q->where('status', $request->status))
+            ->when($request->received_by, fn($q) => $q->where('received_by', $request->received_by))
+            ->when($request->date_from, fn($q) => $q->whereDate('payment_date', '>=', $request->date_from))
+            ->when($request->date_to, fn($q) => $q->whereDate('payment_date', '<=', $request->date_to))
+            ->when($request->zone_id, fn($q) => $q->whereHas('customer', fn($c) =>
+                $c->where('zone_id', $request->zone_id)))
+            ->latest()
+            ->paginate(20)
+            ->withQueryString();
 
-        $todayTotal = Payment::today()->sum('amount');
-        $monthTotal = Payment::thisMonth()->sum('amount');
+        // Stats
+        $totalThisMonth  = Payment::active()->thisMonth()->sum('amount');
+        $totalAllTime    = Payment::active()->sum('amount');
+        $cashThisMonth   = Payment::active()->thisMonth()->where('method', 'cash')->sum('amount');
+        $mobileThisMonth = Payment::active()->thisMonth()
+            ->whereIn('method', ['bkash', 'nagad', 'rocket'])->sum('amount');
 
-        return view('payments.index', compact('payments', 'todayTotal', 'monthTotal'));
+        $employees = User::role('employee')->get();
+        $zones     = \App\Models\Zone::all();
+
+        return view('payments.index', compact(
+            'payments', 'totalThisMonth', 'totalAllTime',
+            'cashThisMonth', 'mobileThisMonth', 'employees', 'zones'
+        ));
     }
 
     /**
-     * Payment record করো।
-     * পুরো বিল দিলে → MikroTik এ restore + SMS যাবে।
+     * Invoice row এর Pay button — modal payment
      */
-    public function store(Request $request)
+    public function payInvoice(Request $request, Invoice $invoice)
     {
         $request->validate([
-            'invoice_id'     => 'required|exists:invoices,id',
-            'amount'         => 'required|numeric|min:1',
-            'method'         => 'required|in:cash,bkash,nagad,rocket,card,bank',
-            'transaction_id' => 'nullable|string|max:100',
-            'paid_at'        => 'required|date',
-            'remarks'        => 'nullable|string|max:255',
+            'amount'                => 'required|numeric|min:1',
+            'method'                => 'required|in:cash,bkash,nagad,rocket,card,bank,advance',
+            'payment_date'          => 'required|date',
+            'received_by'           => 'nullable|exists:users,id',
+            'transaction_id'        => 'nullable|string|max:100',
+            'discount'              => 'nullable|numeric|min:0',
+            'remarks'               => 'nullable|string|max:255',
+            'send_sms'              => 'nullable|boolean',
+            'set_next_billing_date' => 'nullable|boolean',
         ]);
 
-        $invoice = Invoice::with('customer.agent')->findOrFail($request->invoice_id);
         $customer = $invoice->customer;
 
-        // Payment save করো
-        $payment = Payment::create([
-            'invoice_id'     => $invoice->id,
-            'customer_id'    => $invoice->customer_id,
-            'amount'         => $request->amount,
-            'method'         => $request->method,
-            'transaction_id' => $request->transaction_id,
-            'paid_at'        => $request->paid_at,
-            'received_by'    => auth()->id(),
-            'remarks'        => $request->remarks,
+        $result = $this->billing->collectPayment($customer, $request->all());
+
+        // SMS পাঠানো
+        if ($request->send_sms) {
+            // SMS service call করুন
+        }
+
+        return redirect()->route('invoices.index')
+            ->with('success', 'Payment সফল হয়েছে।');
+    }
+
+    /**
+     * Collect Payment page — customer select করে total due pay
+     */
+    public function collectPage()
+    {
+        $employees = User::role(['isp-admin', 'employee'])->get();
+        return view('payments.collect', compact('employees'));
+    }
+
+    public function collectStore(Request $request)
+    {
+        $request->validate([
+            'customer_id'           => 'required|exists:customers,id',
+            'amount'                => 'required|numeric|min:1',
+            'method'                => 'required|in:cash,bkash,nagad,rocket,card,bank',
+            'payment_date'          => 'required|date',
+            'received_by'           => 'nullable|exists:users,id',
+            'transaction_id'        => 'nullable|string|max:100',
+            'remarks'               => 'nullable|string|max:255',
+            'send_sms'              => 'nullable|boolean',
+            'set_next_billing_date' => 'nullable|boolean',
         ]);
 
-        // Invoice status recalculate
-        $totalPaid = $invoice->payments()->sum('amount');
+        $customer = Customer::findOrFail($request->customer_id);
+        $result   = $this->billing->collectPayment($customer, $request->all());
 
-        if ($totalPaid >= $invoice->amount) {
-            $invoice->update(['status' => 'paid', 'due_amount' => 0]);
-
-            // ── Payment Confirm SMS ──────────────────────
-            $this->sendSms(fn($sms) => $sms->sendPaymentConfirm(
-                $customer->phone,
-                $customer->name,
-                $payment->amount,
-                strtoupper($payment->method)
-            ), 'payment confirm SMS');
-
-            // ── Auto-Restore MikroTik ────────────────────
-            if (in_array($customer->mikrotik_status ?? '', ['suspended', 'disabled'])) {
-                $this->restoreOnMikrotik($customer);
-
-                // Restore SMS
-                $this->sendSms(fn($sms) => $sms->sendRestoreNotice(
-                    $customer->phone,
-                    $customer->name
-                ), 'restore SMS');
-            }
-
-        } else {
-            $invoice->update([
-                'status'     => 'partial',
-                'due_amount' => $invoice->amount - $totalPaid,
-            ]);
+        if ($request->send_sms) {
+            // SMS service call করুন
         }
 
-        // Agent commission
-        if ($customer->agent && $customer->agent->commission_rate > 0) {
-            AgentCommission::create([
-                'agent_id'   => $customer->agent_id,
-                'payment_id' => $payment->id,
-                'amount'     => round(
-                    $payment->amount * $customer->agent->commission_rate / 100, 2
-                ),
-                'status' => 'pending',
-            ]);
+        $msg = 'Payment সফল।';
+        if ($result['advance_added'] > 0) {
+            $msg .= ' ৳' . number_format($result['advance_added'], 2) . ' advance balance এ জমা হয়েছে।';
         }
 
-        ActivityLog::log('Payment received', 'Payment', $payment->id, null, $payment->toArray());
-
-        return back()->with('success', 'Payment recorded successfully.');
-    }
-
-    public function destroy(Payment $payment)
-    {
-        $invoice = $payment->invoice;
-        $old     = $payment->toArray();
-
-        $payment->commission()->delete();
-        $payment->delete();
-
-        $totalPaid = $invoice->payments()->sum('amount');
-
-        if ($totalPaid <= 0) {
-            $invoice->update(['status' => 'unpaid', 'due_amount' => $invoice->amount]);
-        } else {
-            $invoice->update([
-                'status'     => 'partial',
-                'due_amount' => $invoice->amount - $totalPaid,
-            ]);
-        }
-
-        ActivityLog::log('Payment deleted', 'Payment', $old['id'], $old, null);
-
-        return back()->with('success', 'Payment deleted successfully.');
-    }
-
-    // ══════════════════════════════════════════════
-    // Private Helpers
-    // ══════════════════════════════════════════════
-
-    /**
-     * SMS পাঠাও — fail হলে শুধু log করো, exception throw করো না
-     */
-    private function sendSms(callable $callback, string $label): void
-    {
-        try {
-            $sms = new SmsService();
-            $callback($sms);
-        } catch (\Exception $e) {
-            Log::warning("SMS failed [{$label}]: " . $e->getMessage());
-        }
+        return redirect()->route('payments.collect')->with('success', $msg);
     }
 
     /**
-     * MikroTik এ customer restore করো
+     * Customer এর total due — AJAX (Collect Payment page এ)
      */
-    private function restoreOnMikrotik($customer): void
+    public function customerDue(Customer $customer)
     {
-        try {
-            $router = MikrotikRouter::where('is_active', 1)->first();
-            if (!$router) return;
+        $due = Invoice::where('customer_id', $customer->id)
+            ->whereIn('status', ['unpaid', 'partial', 'overdue'])
+            ->sum('due_amount');
 
-            $mikrotik = new MikrotikService();
-            $mikrotik->withRouter($router, fn($m) => $m->restoreCustomer($customer));
-            $customer->update(['status' => 'active', 'mikrotik_status' => 'active']);
+        $invoices = Invoice::where('customer_id', $customer->id)
+            ->whereIn('status', ['unpaid', 'partial', 'overdue'])
+            ->orderBy('month', 'asc')
+            ->get(['id', 'invoice_no', 'month', 'amount', 'due_amount', 'status']);
 
-            Log::info("Auto-restored customer {$customer->customer_code} after payment.");
-        } catch (\Exception $e) {
-            Log::warning("MikroTik restore failed [{$customer->customer_code}]: " . $e->getMessage());
+        return response()->json([
+            'customer'        => $customer->load('package'),
+            'total_due'       => floatval($due),
+            'advance_balance' => floatval($customer->advance_balance),
+            'invoices'        => $invoices,
+        ]);
+    }
+
+    /**
+     * Void payment — শুধু ISP Admin
+     */
+    public function void(Request $request, Payment $payment)
+    {
+        if (! auth()->user()->hasRole('isp-admin')) {
+            return back()->with('error', 'শুধু ISP Admin void করতে পারবে।');
         }
+
+        if ($payment->isVoid()) {
+            return back()->with('error', 'এই payment ইতিমধ্যে void করা হয়েছে।');
+        }
+
+        $request->validate([
+            'reason' => 'required|string|max:255',
+        ]);
+
+        $this->billing->voidPayment($payment, $request->reason);
+
+        return back()->with('success', 'Payment void হয়েছে। Amount advance balance এ জমা হয়েছে।');
     }
 }

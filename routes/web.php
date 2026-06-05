@@ -30,6 +30,7 @@ use App\Http\Controllers\HR\SalaryHeadController;
 use App\Http\Controllers\HR\PayrollController;
 use App\Http\Controllers\HR\LeaveController;
 use App\Http\Controllers\HR\SalaryAdvanceController;
+
 // ─────────────────────────────────────────────
 // Public Routes
 // ─────────────────────────────────────────────
@@ -48,54 +49,55 @@ Route::middleware(['auth'])->group(function () {
     // ── Customers ──────────────────────────────
     Route::resource('customers', CustomerController::class);
     Route::patch('customers/{customer}/status', [CustomerController::class, 'updateStatus'])->name('customers.status');
-    Route::get('customers/{customer}/mikrotik-info', [CustomerController::class, 'mikrotikInfo'])->name('customers.mikrotik-info');     
+    Route::get('customers/{customer}/mikrotik-info', [CustomerController::class, 'mikrotikInfo'])->name('customers.mikrotik-info');
 
     // ── Packages ───────────────────────────────
-Route::get('packages/sync',  [PackageController::class, 'syncPreview'])->name('packages.sync.preview');
-Route::post('packages/sync', [PackageController::class, 'syncStore'])->name('packages.sync.store');
+    Route::get('packages/sync',  [PackageController::class, 'syncPreview'])->name('packages.sync.preview');
+    Route::post('packages/sync', [PackageController::class, 'syncStore'])->name('packages.sync.store');
+    Route::resource('packages', PackageController::class);
+    Route::patch('packages/{package}/toggle', [PackageController::class, 'toggleStatus'])->name('packages.toggle');
 
-Route::resource('packages', PackageController::class);
-Route::patch('packages/{package}/toggle', [PackageController::class, 'toggleStatus'])->name('packages.toggle');
     // ── Invoices ───────────────────────────────
     Route::resource('invoices', InvoiceController::class)->except(['edit', 'update']);
-    Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'pdf'])
-         ->name('invoices.pdf');
-    Route::post('invoices/bulk-generate', [InvoiceController::class, 'bulkGenerate'])
-         ->name('invoices.bulk-generate');
+    Route::get('invoices/{invoice}/pdf',     [InvoiceController::class, 'pdf'])->name('invoices.pdf');
+    Route::post('invoices/bulk-generate',    [InvoiceController::class, 'bulkGenerate'])->name('invoices.bulk-generate');
 
     // ── Payments ───────────────────────────────
-    Route::get('payments',              [PaymentController::class, 'index'])->name('payments.index');
-    Route::post('payments',             [PaymentController::class, 'store'])->name('payments.store');
-    Route::delete('payments/{payment}', [PaymentController::class, 'destroy'])->name('payments.destroy');
+    Route::get('payments',                          [PaymentController::class, 'index'])->name('payments.index');
+    Route::post('payments/invoice/{invoice}',       [PaymentController::class, 'payInvoice'])->name('payments.pay-invoice');
+    Route::get('payments/collect',                  [PaymentController::class, 'collectPage'])->name('payments.collect');
+    Route::post('payments/collect',                 [PaymentController::class, 'collectStore'])->name('payments.collect-store');
+    Route::get('payments/customer-due/{customer}',  [PaymentController::class, 'customerDue'])->name('payments.customer-due');
+    Route::post('payments/{payment}/void',          [PaymentController::class, 'void'])->name('payments.void');
 
     // ── Tickets ────────────────────────────────
     Route::resource('tickets', TicketController::class)->except(['edit']);
-    Route::post('tickets/{ticket}/reply', [TicketController::class, 'reply'])
-         ->name('tickets.reply');
+    Route::post('tickets/{ticket}/reply', [TicketController::class, 'reply'])->name('tickets.reply');
 
     // ── Agents ─────────────────────────────────
     Route::resource('agents', AgentController::class)->except(['edit']);
     Route::post('agents/{agent}/pay-commission', [AgentController::class, 'payCommission'])->name('agents.pay-commission');
 
-        // ── MikroTik ───────────────────────────────
+    // ── MikroTik ───────────────────────────────
     Route::prefix('mikrotik')->name('mikrotik.')->group(function () {
-        Route::get('/',                          [MikrotikController::class, 'index'])->name('index');
-        Route::post('/',                         [MikrotikController::class, 'store'])->name('store');
-        Route::get('active-sessions',            [MikrotikController::class, 'activeSessionsPage'])->name('active-sessions.page'); // ← এটা আগে
-        Route::post('kick-by-username',          [MikrotikController::class, 'kickByUsername'])->name('kick-by-username');
-        Route::post('bulk-suspend',              [MikrotikController::class, 'bulkSuspend'])->name('bulk.suspend');
-        Route::post('sync-all',                  [MikrotikController::class, 'syncAll'])->name('sync.all');
-        Route::put('pool/{pool}',                [MikrotikController::class, 'updatePool'])->name('pool.update');
-        Route::delete('pool/{pool}',             [MikrotikController::class, 'destroyPool'])->name('pool.destroy');
-        Route::put('{mikrotikRouter}',           [MikrotikController::class, 'update'])->name('update');
-        Route::delete('{mikrotikRouter}',        [MikrotikController::class, 'destroy'])->name('destroy');
-        Route::post('{mikrotikRouter}/pool',     [MikrotikController::class, 'addPool'])->name('pool.store');
-        Route::get('{router}/status',            [MikrotikController::class, 'routerStatus'])->name('router.status');
-        Route::get('{router}/pppoe-users',       [MikrotikController::class, 'pppoeUsers'])->name('pppoe.users');
-        Route::get('{router}/active-sessions',   [MikrotikController::class, 'activeSessions'])->name('active.sessions');
-        Route::get('{router}/queues',            [MikrotikController::class, 'queues'])->name('queues');
-        Route::get('{router}/profiles',          [MikrotikController::class, 'profiles'])->name('profiles');
+        Route::get('/',                        [MikrotikController::class, 'index'])->name('index');
+        Route::post('/',                       [MikrotikController::class, 'store'])->name('store');
+        Route::get('active-sessions',          [MikrotikController::class, 'activeSessionsPage'])->name('active-sessions.page');
+        Route::post('kick-by-username',        [MikrotikController::class, 'kickByUsername'])->name('kick-by-username');
+        Route::post('bulk-suspend',            [MikrotikController::class, 'bulkSuspend'])->name('bulk.suspend');
+        Route::post('sync-all',                [MikrotikController::class, 'syncAll'])->name('sync.all');
+        Route::put('pool/{pool}',              [MikrotikController::class, 'updatePool'])->name('pool.update');
+        Route::delete('pool/{pool}',           [MikrotikController::class, 'destroyPool'])->name('pool.destroy');
+        Route::put('{mikrotikRouter}',         [MikrotikController::class, 'update'])->name('update');
+        Route::delete('{mikrotikRouter}',      [MikrotikController::class, 'destroy'])->name('destroy');
+        Route::post('{mikrotikRouter}/pool',   [MikrotikController::class, 'addPool'])->name('pool.store');
+        Route::get('{router}/status',          [MikrotikController::class, 'routerStatus'])->name('router.status');
+        Route::get('{router}/pppoe-users',     [MikrotikController::class, 'pppoeUsers'])->name('pppoe.users');
+        Route::get('{router}/active-sessions', [MikrotikController::class, 'activeSessions'])->name('active.sessions');
+        Route::get('{router}/queues',          [MikrotikController::class, 'queues'])->name('queues');
+        Route::get('{router}/profiles',        [MikrotikController::class, 'profiles'])->name('profiles');
     });
+
     // ── Customer MikroTik ──────────────────────
     Route::prefix('customers/{customer}/mikrotik')->name('customers.mikrotik.')->group(function () {
         Route::get('session',         [MikrotikController::class, 'customerSession'])->name('session');
@@ -110,13 +112,13 @@ Route::patch('packages/{package}/toggle', [PackageController::class, 'toggleStat
     // ── Import ─────────────────────────────────
     Route::prefix('import')->name('import.')->group(function () {
         Route::get('/',                 [ImportController::class, 'index'])->name('index');
-        Route::any('mikrotik/preview', [ImportController::class, 'mikrotikPreview'])->name('mikrotik.preview');
+        Route::any('mikrotik/preview',  [ImportController::class, 'mikrotikPreview'])->name('mikrotik.preview');
         Route::post('mikrotik/execute', [ImportController::class, 'mikrotikImport'])->name('mikrotik.execute');
         Route::post('csv/preview',      [ImportController::class, 'csvPreview'])->name('csv.preview');
         Route::post('csv/execute',      [ImportController::class, 'csvImport'])->name('csv.execute');
         Route::get('csv/template',      [ImportController::class, 'downloadTemplate'])->name('csv.template');
-        Route::post('mikrotik/single', [ImportController::class, 'mikrotikSingleImport'])->name('mikrotik.single');   
-   });
+        Route::post('mikrotik/single',  [ImportController::class, 'mikrotikSingleImport'])->name('mikrotik.single');
+    });
 
     // ── Inventory ──────────────────────────────
     Route::prefix('inventory')->name('inventory.')->group(function () {
@@ -135,23 +137,22 @@ Route::patch('packages/{package}/toggle', [PackageController::class, 'toggleStat
         Route::get('customers',         [ReportController::class, 'customers'])->name('customers');
         Route::get('export/{type}/pdf', [ReportController::class, 'exportPdf'])->name('export.pdf');
     });
-    
-    // ── SMS ────────────────────────────────
+
+    // ── SMS ────────────────────────────────────
     Route::prefix('sms')->name('sms.')->group(function () {
-        Route::get('/',                         [SmsController::class, 'index'])->name('index');
-        Route::post('gateway/{gateway}/toggle', [SmsController::class, 'toggleGateway'])->name('gateway.toggle');
-        Route::post('gateway/{gateway}/config', [SmsController::class, 'updateConfig'])->name('gateway.config');
-        Route::post('test',                     [SmsController::class, 'sendTest'])->name('test');
-        Route::post('bulk',                     [SmsController::class, 'sendBulk'])->name('bulk');
-        Route::delete('logs',                   [SmsController::class, 'clearLogs'])->name('logs.clear');
-        Route::get('reports',                   [App\Http\Controllers\SmsReportController::class, 'index'])->name('reports');
-        Route::get('reports/details',           [App\Http\Controllers\SmsReportController::class, 'details'])->name('reports.details');
-        Route::get('templates',              [App\Http\Controllers\SmsTemplateController::class, 'index'])->name('templates.index');
-        Route::post('templates',             [App\Http\Controllers\SmsTemplateController::class, 'store'])->name('templates.store');
-        Route::put('templates/{smsTemplate}',[App\Http\Controllers\SmsTemplateController::class, 'update'])->name('templates.update');
-        Route::delete('templates/{smsTemplate}',[App\Http\Controllers\SmsTemplateController::class, 'destroy'])->name('templates.destroy');
-        Route::post('templates/{smsTemplate}/toggle',[App\Http\Controllers\SmsTemplateController::class, 'toggle'])->name('templates.toggle');
-        
+        Route::get('/',                          [SmsController::class, 'index'])->name('index');
+        Route::post('gateway/{gateway}/toggle',  [SmsController::class, 'toggleGateway'])->name('gateway.toggle');
+        Route::post('gateway/{gateway}/config',  [SmsController::class, 'updateConfig'])->name('gateway.config');
+        Route::post('test',                      [SmsController::class, 'sendTest'])->name('test');
+        Route::post('bulk',                      [SmsController::class, 'sendBulk'])->name('bulk');
+        Route::delete('logs',                    [SmsController::class, 'clearLogs'])->name('logs.clear');
+        Route::get('reports',                    [App\Http\Controllers\SmsReportController::class, 'index'])->name('reports');
+        Route::get('reports/details',            [App\Http\Controllers\SmsReportController::class, 'details'])->name('reports.details');
+        Route::get('templates',                  [App\Http\Controllers\SmsTemplateController::class, 'index'])->name('templates.index');
+        Route::post('templates',                 [App\Http\Controllers\SmsTemplateController::class, 'store'])->name('templates.store');
+        Route::put('templates/{smsTemplate}',    [App\Http\Controllers\SmsTemplateController::class, 'update'])->name('templates.update');
+        Route::delete('templates/{smsTemplate}', [App\Http\Controllers\SmsTemplateController::class, 'destroy'])->name('templates.destroy');
+        Route::post('templates/{smsTemplate}/toggle', [App\Http\Controllers\SmsTemplateController::class, 'toggle'])->name('templates.toggle');
     });
 
     // ── SMS Settings (ISP Admin — tenant gateway config) ──
@@ -161,7 +162,7 @@ Route::patch('packages/{package}/toggle', [PackageController::class, 'toggleStat
         Route::post('/{slug}/toggle', [TenantSmsController::class, 'toggle'])->name('toggle');
     });
 
-    // ── My Resellers (Master Reseller only) ───
+    // ── My Resellers (Master Reseller only) ────
     Route::prefix('my-resellers')->name('my-resellers.')->middleware(['can:create-reseller'])->group(function () {
         Route::get('/',             [MyResellerController::class, 'index'])->name('index');
         Route::get('/create',       [MyResellerController::class, 'create'])->name('create');
@@ -174,10 +175,9 @@ Route::patch('packages/{package}/toggle', [PackageController::class, 'toggleStat
     // ── Super Admin ────────────────────────────
     Route::prefix('super-admin')->name('super-admin.')->middleware(['superadmin'])->group(function () {
 
-        // Dashboard
         Route::get('/', [SuperAdminTenantController::class, 'dashboard'])->name('dashboard');
 
-        // Tenants (ISP Management)
+        // Tenants
         Route::prefix('tenants')->name('tenants.')->group(function () {
             Route::get('/',             [SuperAdminTenantController::class, 'index'])->name('index');
             Route::get('/create',       [SuperAdminTenantController::class, 'create'])->name('create');
@@ -197,60 +197,69 @@ Route::patch('packages/{package}/toggle', [PackageController::class, 'toggleStat
             Route::post('/{plan}/toggle', [SuperAdminPlanController::class, 'toggle'])->name('toggle');
         });
 
-        // SMS Gateways (enable/disable for ISPs)
+        // SMS Gateways
         Route::prefix('sms')->name('sms.')->group(function () {
-            Route::get('/',                 [SuperAdminSmsGatewayController::class, 'index'])->name('index');
-            Route::post('/{gateway}/toggle',[SuperAdminSmsGatewayController::class, 'toggle'])->name('toggle');
+            Route::get('/',                  [SuperAdminSmsGatewayController::class, 'index'])->name('index');
+            Route::post('/{gateway}/toggle', [SuperAdminSmsGatewayController::class, 'toggle'])->name('toggle');
         });
-        
-            
-            }); // end super-admin
-            
+
+    }); // end super-admin
+
+    // ── Settings ───────────────────────────────
     Route::middleware(['auth', 'can:isp-admin'])->prefix('settings')->name('settings.')->group(function () {
 
-        // ── Zones ──────────────────────────────────────────────
-        Route::get   ('zones',         [ZoneController::class, 'index'])   ->name('zones.index');
-        Route::get   ('zones/data',    [ZoneController::class, 'data'])    ->name('zones.data');
-        Route::post  ('zones',         [ZoneController::class, 'store'])   ->name('zones.store');
-        Route::put   ('zones/{zone}',  [ZoneController::class, 'update'])  ->name('zones.update');
-        Route::delete('zones/{zone}',  [ZoneController::class, 'destroy']) ->name('zones.destroy');
+        Route::get('general', [App\Http\Controllers\Settings\SettingController::class, 'index'])->name('general');
+        Route::put('general', [App\Http\Controllers\Settings\SettingController::class, 'update'])->name('update');
 
-        // ── Sub Zones ───────────────────────────────────────────
-        Route::get   ('sub-zones',           [SubZoneController::class, 'index'])   ->name('sub-zones.index');
-        Route::get   ('sub-zones/data',      [SubZoneController::class, 'data'])    ->name('sub-zones.data');
-        Route::post  ('sub-zones',           [SubZoneController::class, 'store'])   ->name('sub-zones.store');
-        Route::put   ('sub-zones/{subZone}', [SubZoneController::class, 'update'])  ->name('sub-zones.update');
-        Route::delete('sub-zones/{subZone}', [SubZoneController::class, 'destroy']) ->name('sub-zones.destroy');
+        // Zones
+        Route::get   ('zones',        [ZoneController::class, 'index'])  ->name('zones.index');
+        Route::get   ('zones/data',   [ZoneController::class, 'data'])   ->name('zones.data');
+        Route::post  ('zones',        [ZoneController::class, 'store'])  ->name('zones.store');
+        Route::put   ('zones/{zone}', [ZoneController::class, 'update']) ->name('zones.update');
+        Route::delete('zones/{zone}', [ZoneController::class, 'destroy'])->name('zones.destroy');
 
-        // ── Connection Types ──────────────────────────────────── ← এগুলো যোগ করুন
-        Route::get   ('connection-types',                        [ConnectionTypeController::class, 'index'])   ->name('connection-types.index');
-        Route::get   ('connection-types/data',                   [ConnectionTypeController::class, 'data'])    ->name('connection-types.data');
-        Route::post  ('connection-types',                        [ConnectionTypeController::class, 'store'])   ->name('connection-types.store');
-        Route::put   ('connection-types/{connectionType}',       [ConnectionTypeController::class, 'update'])  ->name('connection-types.update');
-        Route::post  ('connection-types/{connectionType}/toggle',[ConnectionTypeController::class, 'toggle'])  ->name('connection-types.toggle');
-        Route::delete('connection-types/{connectionType}',       [ConnectionTypeController::class, 'destroy']) ->name('connection-types.destroy');
+        // Sub Zones
+        Route::get   ('sub-zones',           [SubZoneController::class, 'index'])  ->name('sub-zones.index');
+        Route::get   ('sub-zones/data',      [SubZoneController::class, 'data'])   ->name('sub-zones.data');
+        Route::post  ('sub-zones',           [SubZoneController::class, 'store'])  ->name('sub-zones.store');
+        Route::put   ('sub-zones/{subZone}', [SubZoneController::class, 'update']) ->name('sub-zones.update');
+        Route::delete('sub-zones/{subZone}', [SubZoneController::class, 'destroy'])->name('sub-zones.destroy');
 
-        // ── Client Types ──────────────────────────────────────── ← এগুলো যোগ করুন
-        Route::get   ('client-types',               [ClientTypeController::class, 'index'])   ->name('client-types.index');
-        Route::get   ('client-types/data',          [ClientTypeController::class, 'data'])    ->name('client-types.data');
-        Route::post  ('client-types',               [ClientTypeController::class, 'store'])   ->name('client-types.store');
-        Route::put   ('client-types/{clientType}',  [ClientTypeController::class, 'update'])  ->name('client-types.update');
-        Route::post  ('client-types/{clientType}/toggle', [ClientTypeController::class, 'toggle'])  ->name('client-types.toggle');
-        Route::delete('client-types/{clientType}',  [ClientTypeController::class, 'destroy']) ->name('client-types.destroy');
-        
-        // ── protocol Types ──────────────────────────────────────── ← এগুলো যোগ করুন
-        Route::get   ('protocol-types',                        [ProtocolTypeController::class, 'index'])   ->name('protocol-types.index');
-        Route::get   ('protocol-types/data',                   [ProtocolTypeController::class, 'data'])    ->name('protocol-types.data');
-        Route::post  ('protocol-types',                        [ProtocolTypeController::class, 'store'])   ->name('protocol-types.store');
-        Route::put   ('protocol-types/{protocolType}',         [ProtocolTypeController::class, 'update'])  ->name('protocol-types.update');
-        Route::post  ('protocol-types/{protocolType}/toggle',  [ProtocolTypeController::class, 'toggle'])  ->name('protocol-types.toggle');
-        Route::delete('protocol-types/{protocolType}',         [ProtocolTypeController::class, 'destroy']) ->name('protocol-types.destroy');
-    });
+        // Connection Types
+        Route::get   ('connection-types',                         [ConnectionTypeController::class, 'index'])  ->name('connection-types.index');
+        Route::get   ('connection-types/data',                    [ConnectionTypeController::class, 'data'])   ->name('connection-types.data');
+        Route::post  ('connection-types',                         [ConnectionTypeController::class, 'store'])  ->name('connection-types.store');
+        Route::put   ('connection-types/{connectionType}',        [ConnectionTypeController::class, 'update']) ->name('connection-types.update');
+        Route::post  ('connection-types/{connectionType}/toggle', [ConnectionTypeController::class, 'toggle']) ->name('connection-types.toggle');
+        Route::delete('connection-types/{connectionType}',        [ConnectionTypeController::class, 'destroy'])->name('connection-types.destroy');
 
+        // Client Types
+        Route::get   ('client-types',                    [ClientTypeController::class, 'index'])  ->name('client-types.index');
+        Route::get   ('client-types/data',               [ClientTypeController::class, 'data'])   ->name('client-types.data');
+        Route::post  ('client-types',                    [ClientTypeController::class, 'store'])  ->name('client-types.store');
+        Route::put   ('client-types/{clientType}',       [ClientTypeController::class, 'update']) ->name('client-types.update');
+        Route::post  ('client-types/{clientType}/toggle',[ClientTypeController::class, 'toggle']) ->name('client-types.toggle');
+        Route::delete('client-types/{clientType}',       [ClientTypeController::class, 'destroy'])->name('client-types.destroy');
+
+        // Protocol Types
+        Route::get   ('protocol-types',                        [ProtocolTypeController::class, 'index'])  ->name('protocol-types.index');
+        Route::get   ('protocol-types/data',                   [ProtocolTypeController::class, 'data'])   ->name('protocol-types.data');
+        Route::post  ('protocol-types',                        [ProtocolTypeController::class, 'store'])  ->name('protocol-types.store');
+        Route::put   ('protocol-types/{protocolType}',         [ProtocolTypeController::class, 'update']) ->name('protocol-types.update');
+        Route::post  ('protocol-types/{protocolType}/toggle',  [ProtocolTypeController::class, 'toggle']) ->name('protocol-types.toggle');
+        Route::delete('protocol-types/{protocolType}',         [ProtocolTypeController::class, 'destroy'])->name('protocol-types.destroy');
+
+    }); // end settings
+
+    // ── HR ─────────────────────────────────────
     Route::resource('employees', EmployeeController::class);
     Route::resource('departments', DepartmentController::class);
     Route::resource('positions', PositionController::class);
     Route::resource('salary-heads', SalaryHeadController::class);
+
+    Route::delete('employees/documents/{document}', [EmployeeController::class, 'destroyDocument'])->name('employees.documents.destroy');
+    Route::get('departments/{department}/positions', [EmployeeController::class, 'getPositions'])->name('departments.positions');
+    Route::post('employees/{employee}/resign-terminate', [EmployeeController::class, 'resignTerminate'])->name('employees.resign-terminate');
 
     Route::prefix('payroll')->name('payroll.')->group(function () {
         Route::get('/',                  [PayrollController::class, 'index'])->name('index');
@@ -279,11 +288,4 @@ Route::patch('packages/{package}/toggle', [PackageController::class, 'toggleStat
         Route::post('/{advance}/deduct', [SalaryAdvanceController::class, 'deduct'])->name('deduct');
     });
 
-    Route::delete('employees/documents/{document}', [EmployeeController::class, 'destroyDocument'])->name('employees.documents.destroy');
-    Route::get('departments/{department}/positions', [EmployeeController::class, 'getPositions'])->name('departments.positions');  
-    Route::post('employees/{employee}/resign-terminate', [EmployeeController::class, 'resignTerminate'])->name('employees.resign-terminate');
-    Route::prefix('settings')->name('settings.')->group(function () {
-        Route::get('general',  [App\Http\Controllers\Settings\SettingController::class, 'index'])->name('general');
-        Route::put('general',  [App\Http\Controllers\Settings\SettingController::class, 'update'])->name('update');
-    });
 }); // end auth

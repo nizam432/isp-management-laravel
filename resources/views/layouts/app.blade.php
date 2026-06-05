@@ -1,8 +1,10 @@
 {{-- resources/views/layouts/app.blade.php --}}
 @extends('adminlte::page')
 @section('title', config('adminlte.title'))
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 
 @section('content_header')
+
     <div class="d-flex justify-content-between align-items-center">
         <h1 class="m-0">@yield('page_title')</h1>
         <div>@yield('page_actions')</div>
@@ -10,7 +12,6 @@
 @stop
 
 @section('content')
-
     {{-- Global Toast Notification --}}
     @if(session('success') || session('error') || session('warning'))
     @php
@@ -103,5 +104,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     @yield('extra_js')
+    
 @stop
