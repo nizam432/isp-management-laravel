@@ -53,7 +53,10 @@ class Payment extends Model
     {
         return $query->where('status', 'void');
     }
-
+    public function scopeToday($query)
+    {
+        return $query->whereDate('payment_date', today());
+    }
     public function scopeThisMonth($query)
     {
         return $query->whereMonth('payment_date', now()->month)

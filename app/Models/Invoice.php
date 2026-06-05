@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-
+use Illuminate\Support\Facades\DB;
 class Invoice extends Model
 {
     use HasFactory;
@@ -53,12 +53,17 @@ class Invoice extends Model
         return $query->where('month', $month);
     }
 
-    // Auto generate invoice number
     public static function generateNumber()
     {
-        $last = self::latest()->first();
-        $number = $last ? (intval(substr($last->invoice_no, -4)) + 1) : 1;
         $year = date('Y');
+        
+        $last = self::where('invoice_no', 'like', 'INV-' . $year . '-%')
+                    ->lockForUpdate()
+                    ->orderByRaw('CAST(SUBSTRING_INDEX(invoice_no, "-", -1) AS UNSIGNED) DESC')
+                    ->first();
+        
+        $number = $last ? (intval(substr($last->invoice_no, -4)) + 1) : 1;
+        
         return 'INV-' . $year . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
     }
 

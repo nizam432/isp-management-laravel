@@ -160,7 +160,7 @@
                     <td>{{ number_format($payment->amount) }}</td>
                     <td><span class="badge badge-info">{{ strtoupper($payment->method) }}</span></td>
                     <td>{{ $payment->receivedBy->name ?? 'N/A' }}</td>
-                    <td>{{ $payment->paid_at->format('d M Y h:i A') }}</td>
+                    <td><td></td></td>
                 </tr>
                 @empty
                 <tr><td colspan="6" class="text-center text-muted">No payments found.</td></tr>
