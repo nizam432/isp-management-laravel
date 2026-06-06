@@ -359,15 +359,50 @@
     </div>
 </div>
 
-{{-- ── Bill Table ────────────────────────────── --}}
+{{-- ── Invoice Table ────────────────────────────── --}}
+
+{{-- Bulk Actions + Per Page --}}
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <div id="bulkActions" class="d-none">
+        <button type="button" class="btn btn-danger btn-sm mr-1" id="bulkDelete">
+            <i class="fas fa-trash mr-1"></i> Delete Selected
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm mr-1" id="bulkPdf">
+            <i class="fas fa-file-pdf mr-1"></i> PDF
+        </button>
+        <button type="button" class="btn btn-success btn-sm mr-1" id="bulkXlsx">
+            <i class="fas fa-file-excel mr-1"></i> XLSX
+        </button>
+        <button type="button" class="btn btn-info btn-sm" id="bulkSms">
+            <i class="fas fa-sms mr-1"></i> Send SMS
+        </button>
+    </div>
+    <div class="ml-auto d-flex align-items-center">
+        <label class="mr-2 mb-0 text-muted" style="font-size:13px;">Show</label>
+        <select id="perPage" class="form-control form-control-sm" style="width:80px;">
+            <option value="10" {{ request('per_page', 20) == 10 ? 'selected' : '' }}>10</option>
+            <option value="20" {{ request('per_page', 20) == 20 ? 'selected' : '' }}>20</option>
+            <option value="30" {{ request('per_page', 20) == 30 ? 'selected' : '' }}>30</option>
+            <option value="100" {{ request('per_page', 20) == 100 ? 'selected' : '' }}>100</option>
+            <option value="500" {{ request('per_page', 20) == 500 ? 'selected' : '' }}>500</option>
+            <option value="1000" {{ request('per_page', 20) == 1000 ? 'selected' : '' }}>1000</option>
+            <option value="99999" {{ request('per_page', 20) == 99999 ? 'selected' : '' }}>All</option>
+        </select>
+        <label class="ml-2 mb-0 text-muted" style="font-size:13px;">records</label>
+    </div>
+</div>
+
 <div class="card">
     <div class="card-body p-0">
         <table class="table table-hover table-sm mb-0">
             <thead class="bg-light">
                 <tr>
+                    <th style="width:30px;">
+                        <input type="checkbox" id="selectAll">
+                    </th>
                     <th>Invoice No</th>
                     <th>Customer</th>
-                    <th>Month</th>
+                    <th>Package / Month</th>
                     <th>Amount</th>
                     <th>Due</th>
                     <th>Status</th>
@@ -379,6 +414,11 @@
                 @forelse($invoices as $invoice)
                 <tr>
                     <td>
+                        <input type="checkbox" class="invoice-check"
+                            value="{{ $invoice->id }}"
+                            data-status="{{ $invoice->status }}">
+                    </td>
+                    <td>
                         <a href="{{ route('invoices.show', $invoice) }}" class="text-danger font-weight-bold">
                             {{ $invoice->invoice_no }}
                         </a>
@@ -387,13 +427,20 @@
                         <a href="{{ route('customers.show', $invoice->customer) }}">
                             {{ $invoice->customer->name }}
                         </a>
-                        <br><small class="text-muted">{{ $invoice->customer->phone }}</small>
+                        <br>
+                        <small class="text-muted">{{ $invoice->customer->phone }}</small>
+                        <br>
+                        <small class="text-muted">ID: {{ $invoice->customer->customer_id ?? $invoice->customer_id }}</small>
                     </td>
-                    <td>{{ $invoice->month }}</td>
-                    <td>৳{{ number_format($invoice->amount, 0) }}</td>
+                    <td>
+                        <span>{{ $invoice->package->name ?? '-' }}</span>
+                        <br>
+                        <small class="text-muted">{{ \Carbon\Carbon::createFromFormat('Y-m', $invoice->month)->format('F Y') }}</small>
+                    </td>
+                    <td>&#2547;{{ number_format($invoice->amount, 0) }}</td>
                     <td>
                         @if($invoice->due_amount > 0)
-                            <span class="text-danger font-weight-bold">৳{{ number_format($invoice->due_amount, 0) }}</span>
+                            <span class="text-danger font-weight-bold">&#2547;{{ number_format($invoice->due_amount, 0) }}</span>
                         @else
                             <span class="text-success">0</span>
                         @endif
@@ -411,13 +458,11 @@
                     </td>
                     <td>{{ $invoice->due_date ? $invoice->due_date->format('d M Y') : '-' }}</td>
                     <td>
-                        {{-- View --}}
                         <a href="{{ route('invoices.show', $invoice) }}"
                            class="btn btn-xs btn-info" title="View">
                             <i class="fas fa-eye"></i>
                         </a>
 
-                        {{-- Pay — শুধু unpaid/partial/overdue --}}
                         @if($invoice->status !== 'paid')
                             <button type="button"
                                 class="btn btn-xs btn-success pay-btn"
@@ -436,16 +481,14 @@
                             </button>
                         @endif
 
-                        {{-- PDF --}}
                         <a href="{{ route('invoices.pdf', $invoice) }}"
                            class="btn btn-xs btn-secondary" title="PDF">
                             <i class="fas fa-file-pdf"></i>
                         </a>
 
-                        {{-- Delete — শুধু unpaid --}}
                         @if($invoice->status === 'unpaid')
                             <form action="{{ route('invoices.destroy', $invoice) }}" method="POST" class="d-inline"
-                                onsubmit="return confirm('Delete this bill?')">
+                                onsubmit="return confirm('Delete this invoice?')">
                                 @csrf @method('DELETE')
                                 <button class="btn btn-xs btn-danger" title="Delete">
                                     <i class="fas fa-trash"></i>
@@ -456,17 +499,18 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="8" class="text-center text-muted py-4">No bills found.</td>
+                    <td colspan="9" class="text-center text-muted py-4">No invoices found.</td>
                 </tr>
                 @endforelse
             </tbody>
         </table>
     </div>
-    @if($invoices->hasPages())
-    <div class="card-footer">
-        {{ $invoices->links() }}
+    <div class="card-footer d-flex justify-content-between align-items-center">
+        <small class="text-muted">
+            Showing {{ $invoices->firstItem() ?? 0 }}–{{ $invoices->lastItem() ?? 0 }} of {{ $invoices->total() }} records
+        </small>
+        {{ $invoices->appends(request()->query())->links() }}
     </div>
-    @endif
 </div>
 
 {{-- ══════════════════════════════════════════════
@@ -478,21 +522,44 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header bg-primary">
-                <h5 class="modal-title text-white"><i class="fas fa-file-bill mr-1"></i> New Invoice</h5>
+                <h5 class="modal-title text-white"><i class="fas fa-file-invoice mr-1"></i> New Invoice</h5>
                 <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
             </div>
-            <form action="{{ route('invoices.store') }}" method="POST">
+            <form id="newInvoiceForm" action="{{ route('invoices.store') }}" method="POST">
                 @csrf
                 <div class="modal-body">
+
+                    {{-- Error alert --}}
+                    <div id="invoiceError" class="alert alert-danger d-none"></div>
+
                     <div class="form-group">
                         <label>Customer <span class="text-danger">*</span></label>
-                        <select name="customer_id" class="form-control select2" required>
+                        <select name="customer_id" id="inv_customer" class="form-control select2" required>
                             <option value="">— Select Customer —</option>
-                            @foreach(\App\Models\Customer::active()->get() as $c)
-                                <option value="{{ $c->id }}">{{ $c->name }} ({{ $c->phone }})</option>
+                            @foreach(\App\Models\Customer::active()->with('package')->get() as $c)
+                                <option value="{{ $c->id }}"
+                                    data-package="{{ $c->package->name ?? '-' }}"
+                                    data-price="{{ $c->package->price ?? 0 }}"
+                                    data-advance="{{ $c->advance_balance ?? 0 }}">
+                                    {{ $c->name }} ({{ $c->phone }})
+                                </option>
                             @endforeach
                         </select>
                     </div>
+
+                    {{-- Package + Advance + Due info --}}
+                    <div id="inv_customer_info" class="d-none mb-3">
+                        <div class="bg-light rounded px-3 py-2" style="font-size:13px;">
+                            <span class="text-muted">Package:</span> <strong id="inv_package_name"></strong>
+                            &nbsp;|&nbsp;
+                            <span class="text-muted">Advance Balance:</span>
+                            <strong class="text-success" id="inv_advance_balance"></strong>
+                            &nbsp;|&nbsp;
+                            <span class="text-muted">Total Due:</span>
+                            <strong class="text-danger" id="inv_total_due"></strong>
+                        </div>
+                    </div>
+
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-group">
@@ -509,22 +576,32 @@
                             </div>
                         </div>
                     </div>
+
                     <div class="row">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="form-group">
                                 <label>Amount <span class="text-danger">*</span></label>
-                                <input type="number" name="amount" class="form-control"
-                                    step="0.01" min="0" required>
+                                <input type="number" name="amount" id="inv_amount" class="form-control"
+                                    step="0.01" min="0" required readonly
+                                    style="background:#f9f9f9;">
                             </div>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="form-group">
                                 <label>Discount</label>
-                                <input type="number" name="discount" class="form-control"
+                                <input type="number" name="discount" id="inv_discount" class="form-control"
                                     step="0.01" min="0" value="0">
                             </div>
                         </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Payable Amount</label>
+                                <input type="text" id="inv_payable" class="form-control"
+                                    readonly style="background:#e9f7ef; color:#155724; font-weight:600;">
+                            </div>
+                        </div>
                     </div>
+
                     <div class="form-group">
                         <label>Notes</label>
                         <textarea name="notes" class="form-control" rows="2"></textarea>
@@ -532,8 +609,8 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary btn-sm">
-                        <i class="fas fa-save mr-1"></i> Create Bill
+                    <button type="submit" class="btn btn-primary btn-sm" id="newInvoiceSubmit">
+                        <i class="fas fa-save mr-1"></i> Create Invoice
                     </button>
                 </div>
             </form>
@@ -785,6 +862,77 @@ $(function () {
         }
     });
 
+    // New Invoice — Customer select → package price auto-fill + total due
+    $('#inv_customer').on('change', function () {
+        var opt        = $(this).find('option:selected');
+        var customerId = $(this).val();
+        var price      = parseFloat(opt.data('price')) || 0;
+        var advance    = parseFloat(opt.data('advance')) || 0;
+        var pkg        = opt.data('package') || '-';
+
+        if (customerId) {
+            $('#inv_package_name').text(pkg);
+            $('#inv_advance_balance').text('BDT ' + advance.toFixed(2));
+            $('#inv_total_due').text('Loading...');
+            $('#inv_customer_info').removeClass('d-none');
+            $('#inv_amount').val(price.toFixed(2));
+            $('#inv_payable').val(price.toFixed(2));
+            $('#inv_discount').val(0);
+
+            // Fetch total due via AJAX
+            $.get('/payments/customer-due/' + customerId, function (data) {
+                var due = parseFloat(data.total_due).toFixed(2);
+                $('#inv_total_due').text('BDT ' + due);
+                $('#inv_advance_balance').text('BDT ' + parseFloat(data.advance_balance).toFixed(2));
+            });
+        } else {
+            $('#inv_customer_info').addClass('d-none');
+            $('#inv_amount').val('');
+            $('#inv_payable').val('');
+            $('#inv_discount').val(0);
+        }
+    });
+
+    // New Invoice — Discount → Payable auto-calculate
+    $('#inv_discount').on('input', function () {
+        var amount   = parseFloat($('#inv_amount').val()) || 0;
+        var discount = parseFloat($(this).val()) || 0;
+        var payable  = amount - discount;
+        $('#inv_payable').val(payable >= 0 ? payable.toFixed(2) : '0.00');
+    });
+
+    // New Invoice — AJAX submit
+    $('#newInvoiceForm').on('submit', function (e) {
+        e.preventDefault();
+        $('#invoiceError').addClass('d-none');
+        $('#newInvoiceSubmit').prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i> Creating...');
+
+        $.ajax({
+            url: $(this).attr('action'),
+            method: 'POST',
+            data: $(this).serialize(),
+            success: function () {
+                $('#newInvoiceModal').modal('hide');
+                toastr.success('Invoice created successfully.');
+                setTimeout(function () { window.location.reload(); }, 1000);
+            },
+            error: function (xhr) {
+                var msg = 'Something went wrong.';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    msg = xhr.responseJSON.message;
+                } else if (xhr.status === 302 || xhr.status === 200) {
+                    // Redirect means success
+                    $('#newInvoiceModal').modal('hide');
+                    toastr.success('Invoice created successfully.');
+                    setTimeout(function () { window.location.reload(); }, 1000);
+                    return;
+                }
+                $('#invoiceError').removeClass('d-none').text(msg);
+                $('#newInvoiceSubmit').prop('disabled', false).html('<i class="fas fa-save mr-1"></i> Create Invoice');
+            }
+        });
+    });
+
     // Filter toggle
     $('#filterToggle').on('click', function () {
         $('#filterBody').slideToggle();
@@ -793,6 +941,96 @@ $(function () {
 
     // Select2 init
     $('.select2').select2({ width: '100%' });
+
+    // Per page change
+    $('#perPage').on('change', function () {
+        var url = new URL(window.location.href);
+        url.searchParams.set('per_page', $(this).val());
+        window.location.href = url.toString();
+    });
+
+    // Select All checkbox
+    $('#selectAll').on('change', function () {
+        $('.invoice-check').prop('checked', this.checked);
+        toggleBulkActions();
+    });
+
+    // Individual checkbox
+    $(document).on('change', '.invoice-check', function () {
+        toggleBulkActions();
+        if (!this.checked) $('#selectAll').prop('checked', false);
+        if ($('.invoice-check:checked').length === $('.invoice-check').length) {
+            $('#selectAll').prop('checked', true);
+        }
+    });
+
+    function toggleBulkActions() {
+        var count = $('.invoice-check:checked').length;
+        if (count > 0) {
+            $('#bulkActions').removeClass('d-none');
+        } else {
+            $('#bulkActions').addClass('d-none');
+        }
+    }
+
+    function getSelectedIds() {
+        return $('.invoice-check:checked').map(function() { return $(this).val(); }).get();
+    }
+
+    // Bulk Delete
+    $('#bulkDelete').on('click', function () {
+        var ids = $('.invoice-check:checked').filter(function() {
+            return $(this).data('status') === 'unpaid';
+        }).map(function() { return $(this).val(); }).get();
+
+        if (ids.length === 0) {
+            alert('No unpaid invoices selected for deletion.');
+            return;
+        }
+        if (!confirm('Delete ' + ids.length + ' unpaid invoice(s)?')) return;
+
+        $.post('/invoices/bulk-delete', {
+            _token: '{{ csrf_token() }}',
+            ids: ids
+        }, function () {
+            window.location.reload();
+        });
+    });
+
+    // Bulk PDF
+    $('#bulkPdf').on('click', function () {
+        var ids = getSelectedIds();
+        if (ids.length === 0) return;
+        window.location.href = '/invoices/bulk-pdf?ids=' + ids.join(',');
+    });
+
+    // Bulk XLSX
+    $('#bulkXlsx').on('click', function () {
+        var ids = getSelectedIds();
+        if (ids.length === 0) return;
+        window.location.href = '/invoices/bulk-xlsx?ids=' + ids.join(',');
+    });
+
+    // Bulk SMS
+    $('#bulkSms').on('click', function () {
+        var ids = getSelectedIds();
+        if (ids.length === 0) return;
+        if (!confirm('Send SMS to ' + ids.length + ' customer(s)?')) return;
+        $.post('/invoices/bulk-sms', {
+            _token: '{{ csrf_token() }}',
+            ids: ids
+        }, function (res) {
+            alert(res.message ?? 'SMS sent successfully.');
+        });
+    });
+
+    // Success/Error toast from session
+    @if(session('success'))
+        toastr.success('{{ session('success') }}');
+    @endif
+    @if(session('error'))
+        toastr.error('{{ session('error') }}');
+    @endif
 
 });
 </script>

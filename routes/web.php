@@ -61,6 +61,9 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('invoices', InvoiceController::class)->except(['edit', 'update']);
     Route::get('invoices/{invoice}/pdf',     [InvoiceController::class, 'pdf'])->name('invoices.pdf');
     Route::post('invoices/bulk-generate',    [InvoiceController::class, 'bulkGenerate'])->name('invoices.bulk-generate');
+    Route::post('invoices/bulk-delete',      [InvoiceController::class, 'bulkDelete'])->name('invoices.bulk-delete');
+    Route::get('invoices/bulk-xlsx',         [InvoiceController::class, 'bulkXlsx'])->name('invoices.bulk-xlsx');
+    Route::post('invoices/bulk-sms',         [InvoiceController::class, 'bulkSms'])->name('invoices.bulk-sms');
 
     // ── Payments ───────────────────────────────
     Route::get('payments',                          [PaymentController::class, 'index'])->name('payments.index');

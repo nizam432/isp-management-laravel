@@ -12,8 +12,9 @@ use Illuminate\Support\Facades\DB;
 class BillingService
 {
     /**
-     * Payment নেওয়া — FIFO logic + advance balance
-     * যেকোনো invoice থেকে pay করলেও সবচেয়ে পুরানো unpaid invoice আগে paid হবে
+     * Collect payment using FIFO logic.
+     * Regardless of which invoice is selected, the oldest unpaid invoice is paid first.
+     * Any excess amount is added to the customer's advance balance.
      */
     public function collectPayment(Customer $customer, array $data): array
     {
@@ -23,7 +24,7 @@ class BillingService
             $remaining    = $totalPaid;
             $paidInvoices = [];
 
-            // FIFO — পুরানো unpaid invoice আগে
+            // FIFO — oldest unpaid invoice first
             $unpaidInvoices = Invoice::where('customer_id', $customer->id)
                 ->whereIn('status', ['unpaid', 'partial', 'overdue'])
                 ->orderBy('month', 'asc')
@@ -35,24 +36,24 @@ class BillingService
                 $due = floatval($invoice->due_amount);
 
                 if ($remaining >= $due) {
-                    // এই invoice পুরো paid
+                    // Fully pay this invoice
                     $payAmount = $due;
                     $remaining -= $due;
 
-                    $payment = Payment::create([
-                        'invoice_id'             => $invoice->id,
-                        'customer_id'            => $customer->id,
-                        'amount'                 => $payAmount,
-                        'method'                 => $data['method'],
-                        'transaction_id'         => $data['transaction_id'] ?? null,
-                        'remarks'                => $data['remarks'] ?? null,
-                        'received_by'            => $data['received_by'] ?? null,
-                        'receive_from'           => $data['receive_from'] ?? null,
-                        'send_sms'               => $data['send_sms'] ?? false,
-                        'set_next_billing_date'  => $data['set_next_billing_date'] ?? false,
-                        'payment_date'           => $data['payment_date'] ?? now()->toDateString(),
-                        'status'                 => 'active',
-                        'paid_at'                => now(),
+                    Payment::create([
+                        'invoice_id'            => $invoice->id,
+                        'customer_id'           => $customer->id,
+                        'amount'                => $payAmount,
+                        'method'                => $data['method'],
+                        'transaction_id'        => $data['transaction_id'] ?? null,
+                        'remarks'               => $data['remarks'] ?? null,
+                        'received_by'           => $data['received_by'] ?? null,
+                        'receive_from'          => $data['receive_from'] ?? null,
+                        'send_sms'              => $data['send_sms'] ?? false,
+                        'set_next_billing_date' => $data['set_next_billing_date'] ?? false,
+                        'payment_date'          => $data['payment_date'] ?? now()->toDateString(),
+                        'status'                => 'active',
+                        'paid_at'               => now(),
                     ]);
 
                     $invoice->update([
@@ -67,20 +68,20 @@ class BillingService
                     $payAmount = $remaining;
                     $remaining = 0;
 
-                    $payment = Payment::create([
-                        'invoice_id'             => $invoice->id,
-                        'customer_id'            => $customer->id,
-                        'amount'                 => $payAmount,
-                        'method'                 => $data['method'],
-                        'transaction_id'         => $data['transaction_id'] ?? null,
-                        'remarks'                => $data['remarks'] ?? null,
-                        'received_by'            => $data['received_by'] ?? null,
-                        'receive_from'           => $data['receive_from'] ?? null,
-                        'send_sms'               => $data['send_sms'] ?? false,
-                        'set_next_billing_date'  => $data['set_next_billing_date'] ?? false,
-                        'payment_date'           => $data['payment_date'] ?? now()->toDateString(),
-                        'status'                 => 'active',
-                        'paid_at'                => now(),
+                    Payment::create([
+                        'invoice_id'            => $invoice->id,
+                        'customer_id'           => $customer->id,
+                        'amount'                => $payAmount,
+                        'method'                => $data['method'],
+                        'transaction_id'        => $data['transaction_id'] ?? null,
+                        'remarks'               => $data['remarks'] ?? null,
+                        'received_by'           => $data['received_by'] ?? null,
+                        'receive_from'          => $data['receive_from'] ?? null,
+                        'send_sms'              => $data['send_sms'] ?? false,
+                        'set_next_billing_date' => $data['set_next_billing_date'] ?? false,
+                        'payment_date'          => $data['payment_date'] ?? now()->toDateString(),
+                        'status'                => 'active',
+                        'paid_at'               => now(),
                     ]);
 
                     $invoice->update([
@@ -92,7 +93,7 @@ class BillingService
                 }
             }
 
-            // Extra টাকা → advance balance এ জমা
+            // Add any excess amount to the customer's advance balance
             if ($remaining > 0) {
                 $customer->increment('advance_balance', $remaining);
 
@@ -106,29 +107,32 @@ class BillingService
             }
 
             return [
-                'paid_invoices'    => $paidInvoices,
-                'advance_added'    => $remaining > 0 ? $remaining : 0,
-                'total_paid'       => $totalPaid,
+                'paid_invoices' => $paidInvoices,
+                'advance_added' => $remaining > 0 ? $remaining : 0,
+                'total_paid'    => $totalPaid,
             ];
         });
     }
 
     /**
-     * Invoice generate হলে advance balance থেকে auto-deduct
+     * Auto-deduct from advance balance when a new invoice is generated.
+     * Uses lockForUpdate to get fresh data and prevent race conditions.
      */
     public function applyAdvanceToInvoice(Invoice $invoice): void
     {
-        $customer = $invoice->customer;
+        DB::transaction(function () use ($invoice) {
 
-        if ($customer->advance_balance <= 0) return;
-
-        DB::transaction(function () use ($invoice, $customer) {
+            // Get fresh data from DB with lock to prevent race conditions
+            $customer = Customer::lockForUpdate()->find($invoice->customer_id);
+            $invoice  = Invoice::lockForUpdate()->find($invoice->id);
 
             $due     = floatval($invoice->due_amount);
             $advance = floatval($customer->advance_balance);
 
+            if ($advance <= 0) return;
+
             if ($advance >= $due) {
-                // Advance দিয়ে পুরো invoice paid
+                // Advance covers the full invoice amount
                 $deduct = $due;
 
                 Payment::create([
@@ -146,7 +150,7 @@ class BillingService
                 $customer->decrement('advance_balance', $deduct);
 
             } else {
-                // Advance দিয়ে partial
+                // Advance partially covers the invoice
                 $deduct = $advance;
 
                 Payment::create([
@@ -164,7 +168,9 @@ class BillingService
                     'due_amount' => $due - $deduct,
                     'status'     => 'partial',
                 ]);
-                $customer->update(['advance_balance' => 0]);
+
+                // Decrement instead of setting to 0 to avoid overwriting concurrent updates
+                $customer->decrement('advance_balance', $deduct);
             }
 
             AdvanceTransaction::create([
@@ -178,18 +184,18 @@ class BillingService
     }
 
     /**
-     * Payment void করা — শুধু ISP Admin
-     * Void amount → advance balance এ জমা
-     * Invoice গুলো reverse → unpaid
+     * Void a payment. Only ISP Admin can void payments.
+     * The voided amount is added back to the customer's advance balance.
+     * The related invoice is reversed to its previous status.
      */
     public function voidPayment(Payment $payment, string $reason): void
     {
         DB::transaction(function () use ($payment, $reason) {
 
-            // Payment void mark করো
+            // Mark payment as void
             $payment->update(['status' => 'void']);
 
-            // Void log
+            // Log the void
             PaymentVoid::create([
                 'payment_id' => $payment->id,
                 'voided_by'  => auth()->id(),
@@ -198,8 +204,8 @@ class BillingService
                 'voided_at'  => now(),
             ]);
 
-            // Invoice reverse করো
-            $invoice = $payment->invoice;
+            // Recalculate invoice status after void
+            $invoice   = $payment->invoice;
             $totalPaid = $invoice->payments()->active()->sum('amount');
             $due       = $invoice->amount - $invoice->discount - $totalPaid;
 
@@ -214,7 +220,7 @@ class BillingService
 
             $invoice->update(['due_amount' => $due, 'status' => $status]);
 
-            // Void amount → advance balance এ জমা
+            // Refund void amount to customer's advance balance
             $customer = $payment->customer;
             $customer->increment('advance_balance', $payment->amount);
 
@@ -230,23 +236,24 @@ class BillingService
     }
 
     /**
-     * Advance manually add করা
+     * Manually add advance balance for a customer.
      */
     public function addAdvance(Customer $customer, array $data): Payment
     {
         return DB::transaction(function () use ($customer, $data) {
 
-            // Dummy payment — invoice ছাড়া advance
+            // Create a payment record without an invoice
             $payment = Payment::create([
-                'invoice_id'    => null,
-                'customer_id'   => $customer->id,
-                'amount'        => $data['amount'],
-                'method'        => $data['method'],
-                'transaction_id'=> $data['transaction_id'] ?? null,
-                'remarks'       => $data['remarks'] ?? 'Manual advance',
-                'received_by'   => $data['received_by'] ?? null,
-                'payment_date'  => $data['payment_date'] ?? now()->toDateString(),
-                'status'        => 'active',
+                'invoice_id'     => null,
+                'customer_id'    => $customer->id,
+                'amount'         => $data['amount'],
+                'method'         => $data['method'],
+                'transaction_id' => $data['transaction_id'] ?? null,
+                'remarks'        => $data['remarks'] ?? 'Manual advance',
+                'received_by'    => $data['received_by'] ?? null,
+                'payment_date'   => $data['payment_date'] ?? now()->toDateString(),
+                'status'         => 'active',
+                'paid_at'        => now(),
             ]);
 
             $customer->increment('advance_balance', $data['amount']);
@@ -265,12 +272,12 @@ class BillingService
     }
 
     /**
-     * Stats cards এর জন্য data
+     * Get stats data for invoice list page cards.
      */
     public function getInvoiceStats(): array
     {
-        $thisMonth  = now()->format('Y-m');
-        $lastMonth  = now()->subMonth()->format('Y-m');
+        $thisMonth = now()->format('Y-m');
+        $lastMonth = now()->subMonth()->format('Y-m');
 
         $paidThis   = Invoice::where('month', $thisMonth)->where('status', 'paid')->count();
         $paidLast   = Invoice::where('month', $lastMonth)->where('status', 'paid')->count();
@@ -284,7 +291,7 @@ class BillingService
             ->whereYear('payment_date', now()->subMonth()->year)
             ->sum('amount');
 
-        $totalDue     = Invoice::whereIn('status', ['unpaid', 'partial', 'overdue'])->sum('due_amount');
+        $totalDue = Invoice::whereIn('status', ['unpaid', 'partial', 'overdue'])->sum('due_amount');
 
         $generatedThis = Invoice::where('month', $thisMonth)->count();
         $generatedLast = Invoice::where('month', $lastMonth)->count();
@@ -294,19 +301,19 @@ class BillingService
         $monthlyBillThis = Invoice::where('month', $thisMonth)->sum('amount');
         $monthlyBillLast = Invoice::where('month', $lastMonth)->sum('amount');
 
-        $totalClients = Customer::active()->count();
-        $collectionRate = $totalClients > 0 ? round(($paidThis / $totalClients) * 100) : 0;
+        $totalClients       = Customer::active()->count();
+        $collectionRate     = $totalClients > 0 ? round(($paidThis / $totalClients) * 100) : 0;
         $collectionRateLast = $totalClients > 0 ? round(($paidLast / $totalClients) * 100) : 0;
 
         return [
-            'paid_clients'    => ['current' => $paidThis,         'last' => $paidLast],
-            'unpaid_clients'  => ['current' => $unpaidThis,        'last' => $unpaidLast],
-            'received_bill'   => ['current' => $receivedThis,      'last' => $receivedLast],
+            'paid_clients'    => ['current' => $paidThis,        'last' => $paidLast],
+            'unpaid_clients'  => ['current' => $unpaidThis,       'last' => $unpaidLast],
+            'received_bill'   => ['current' => $receivedThis,     'last' => $receivedLast],
             'total_due'       => $totalDue,
-            'generated_bill'  => ['current' => $generatedThis,     'last' => $generatedLast],
+            'generated_bill'  => ['current' => $generatedThis,    'last' => $generatedLast],
             'advance_amount'  => $advanceTotal,
-            'monthly_bill'    => ['current' => $monthlyBillThis,   'last' => $monthlyBillLast],
-            'collection_rate' => ['current' => $collectionRate,    'last' => $collectionRateLast],
+            'monthly_bill'    => ['current' => $monthlyBillThis,  'last' => $monthlyBillLast],
+            'collection_rate' => ['current' => $collectionRate,   'last' => $collectionRateLast],
         ];
     }
 }
