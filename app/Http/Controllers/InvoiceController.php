@@ -82,6 +82,12 @@ class InvoiceController extends Controller
                          ->exists();
 
         if ($exists) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'An invoice already exists for this customer and month.'
+                ], 422);
+            }
             return back()->with('error', 'An invoice already exists for this customer and month.');
         }
 
@@ -106,6 +112,13 @@ class InvoiceController extends Controller
         }
 
         ActivityLog::log('Invoice created', 'Invoice', $invoice->id, null, $invoice->toArray());
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Invoice created successfully.'
+            ]);
+        }
 
         return redirect()->route('invoices.index')->with('success', 'Invoice created successfully.');
     }
@@ -254,42 +267,7 @@ class InvoiceController extends Controller
 
         return response()->stream($callback, 200, $headers);
     }
-/**
- * Bulk PDF download as ZIP.
- */
-    public function bulkPdf(Request $request)
-    {
-        $ids      = explode(',', $request->ids ?? '');
-        $invoices = Invoice::with(['customer', 'package', 'payments'])->whereIn('id', $ids)->get();
 
-        if ($invoices->count() === 1) {
-            $invoice = $invoices->first();
-            $pdf     = Pdf::loadView('invoices.pdf', compact('invoice'));
-            return $pdf->download('invoice-' . $invoice->invoice_no . '.pdf');
-        }
-
-        // Multiple — ZIP করে download
-        $zip      = new \ZipArchive();
-        $zipName  = 'invoices-' . now()->format('Y-m-d') . '.zip';
-        $zipPath  = storage_path('app/temp/' . $zipName);
-
-        if (!file_exists(storage_path('app/temp'))) {
-            mkdir(storage_path('app/temp'), 0755, true);
-        }
-
-        $zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
-
-        foreach ($invoices as $invoice) {
-            $pdf     = Pdf::loadView('invoices.pdf', compact('invoice'));
-            $pdfPath = storage_path('app/temp/' . $invoice->invoice_no . '.pdf');
-            $pdf->save($pdfPath);
-            $zip->addFile($pdfPath, $invoice->invoice_no . '.pdf');
-        }
-
-        $zip->close();
-
-        return response()->download($zipPath)->deleteFileAfterSend(true);
-    }
     /**
      * Bulk SMS send.
      */

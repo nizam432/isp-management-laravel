@@ -380,12 +380,12 @@
     <div class="ml-auto d-flex align-items-center">
         <label class="mr-2 mb-0 text-muted" style="font-size:13px;">Show</label>
         <select id="perPage" class="form-control form-control-sm" style="width:80px;">
-            <option value="10" {{ request('per_page', 20) == 10 ? 'selected' : '' }}>10</option>
-            <option value="20" {{ request('per_page', 20) == 20 ? 'selected' : '' }}>20</option>
-            <option value="30" {{ request('per_page', 20) == 30 ? 'selected' : '' }}>30</option>
-            <option value="100" {{ request('per_page', 20) == 100 ? 'selected' : '' }}>100</option>
-            <option value="500" {{ request('per_page', 20) == 500 ? 'selected' : '' }}>500</option>
-            <option value="1000" {{ request('per_page', 20) == 1000 ? 'selected' : '' }}>1000</option>
+            <option value="10"    {{ request('per_page', 20) == 10    ? 'selected' : '' }}>10</option>
+            <option value="20"    {{ request('per_page', 20) == 20    ? 'selected' : '' }}>20</option>
+            <option value="50"    {{ request('per_page', 20) == 50    ? 'selected' : '' }}>50</option>
+            <option value="100"   {{ request('per_page', 20) == 100   ? 'selected' : '' }}>100</option>
+            <option value="500"   {{ request('per_page', 20) == 500   ? 'selected' : '' }}>500</option>
+            <option value="1000"  {{ request('per_page', 20) == 1000  ? 'selected' : '' }}>1000</option>
             <option value="99999" {{ request('per_page', 20) == 99999 ? 'selected' : '' }}>All</option>
         </select>
         <label class="ml-2 mb-0 text-muted" style="font-size:13px;">records</label>
@@ -404,6 +404,7 @@
                     <th>Customer</th>
                     <th>Package / Month</th>
                     <th>Amount</th>
+                    <th>Discount</th>
                     <th>Due</th>
                     <th>Status</th>
                     <th>Due Date</th>
@@ -430,7 +431,7 @@
                         <br>
                         <small class="text-muted">{{ $invoice->customer->phone }}</small>
                         <br>
-                        <small class="text-muted">ID: {{ $invoice->customer->customer_id ?? $invoice->customer_id }}</small>
+                        <small class="text-muted text-primary">{{ $invoice->customer->customer_code ?? '-' }}</small>
                     </td>
                     <td>
                         <span>{{ $invoice->package->name ?? '-' }}</span>
@@ -438,6 +439,13 @@
                         <small class="text-muted">{{ \Carbon\Carbon::createFromFormat('Y-m', $invoice->month)->format('F Y') }}</small>
                     </td>
                     <td>&#2547;{{ number_format($invoice->amount, 0) }}</td>
+                    <td>
+                        @if($invoice->discount > 0)
+                            <span class="text-warning">&#2547;{{ number_format($invoice->discount, 0) }}</span>
+                        @else
+                            <span class="text-muted">-</span>
+                        @endif
+                    </td>
                     <td>
                         @if($invoice->due_amount > 0)
                             <span class="text-danger font-weight-bold">&#2547;{{ number_format($invoice->due_amount, 0) }}</span>
@@ -499,7 +507,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="9" class="text-center text-muted py-4">No invoices found.</td>
+                    <td colspan="10" class="text-center text-muted py-4">No invoices found.</td>
                 </tr>
                 @endforelse
             </tbody>
@@ -911,21 +919,19 @@ $(function () {
             url: $(this).attr('action'),
             method: 'POST',
             data: $(this).serialize(),
-            success: function () {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            success: function (res) {
                 $('#newInvoiceModal').modal('hide');
-                toastr.success('Invoice created successfully.');
+                toastr.success(res.message ?? 'Invoice created successfully.');
                 setTimeout(function () { window.location.reload(); }, 1000);
             },
             error: function (xhr) {
                 var msg = 'Something went wrong.';
                 if (xhr.responseJSON && xhr.responseJSON.message) {
                     msg = xhr.responseJSON.message;
-                } else if (xhr.status === 302 || xhr.status === 200) {
-                    // Redirect means success
-                    $('#newInvoiceModal').modal('hide');
-                    toastr.success('Invoice created successfully.');
-                    setTimeout(function () { window.location.reload(); }, 1000);
-                    return;
+                } else if (xhr.responseJSON && xhr.responseJSON.errors) {
+                    var errors = xhr.responseJSON.errors;
+                    msg = Object.values(errors).flat().join(' ');
                 }
                 $('#invoiceError').removeClass('d-none').text(msg);
                 $('#newInvoiceSubmit').prop('disabled', false).html('<i class="fas fa-save mr-1"></i> Create Invoice');

@@ -1,3 +1,7 @@
+@push('css')
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+@endpush
+
 @extends('layouts.app')
 
 @section('title', 'Collect Payment')
@@ -205,6 +209,7 @@
 @endsection
 
 @push('js')
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 $(function () {
 
@@ -259,12 +264,18 @@ $(function () {
 
     // Recalculate balance
     function recalculate() {
-        var due     = parseFloat($('#tbl_due').text()) || 0;
-        var advance = parseFloat($('#tbl_advance').text()) || 0;
-        var amount  = parseFloat($('#tbl_amount').val()) || 0;
-        var total   = amount + advance;
-        var balance = due - total;
-        var advAfter = total > due ? (total - due) : 0;
+        var due      = parseFloat($('#tbl_due').text()) || 0;
+        var advance  = parseFloat($('#tbl_advance').text()) || 0;
+        var amount   = parseFloat($('#tbl_amount').val()) || 0;
+
+        // Advance first deducts from due, then received amount covers the rest
+        var dueAfterAdvance = Math.max(due - advance, 0);
+        var advanceUsed     = Math.min(advance, due);
+        var advanceLeft     = advance - advanceUsed;
+
+        // After advance, remaining due covered by received amount
+        var balance  = dueAfterAdvance - amount;
+        var advAfter = balance < 0 ? (advanceLeft + Math.abs(balance)) : advanceLeft;
 
         $('#tbl_balance').text(balance > 0 ? balance.toFixed(2) : '0.00');
         $('#tbl_advance_after').text(advAfter > 0 ? advAfter.toFixed(2) : '0.00');

@@ -144,12 +144,13 @@ class PaymentController extends Controller
      */
     public function void(Request $request, Payment $payment)
     {
-        if (! auth()->user()->hasRole('isp-admin')) {
-            return back()->with('error', 'শুধু ISP Admin void করতে পারবে।');
-        }
+        // TODO: restrict to isp-admin when role system is ready
+        // if (! auth()->user()->hasRole('isp-admin')) {
+        //     return back()->with('error', 'Only ISP Admin can void payments.');
+        // }
 
         if ($payment->isVoid()) {
-            return back()->with('error', 'এই payment ইতিমধ্যে void করা হয়েছে।');
+            return back()->with('error', 'This payment has already been voided.');
         }
 
         $request->validate([
@@ -158,6 +159,6 @@ class PaymentController extends Controller
 
         $this->billing->voidPayment($payment, $request->reason);
 
-        return back()->with('success', 'Payment void হয়েছে। Amount advance balance এ জমা হয়েছে।');
+        return back()->with('success', 'Payment voided successfully. Amount has been added to advance balance.');
     }
 }

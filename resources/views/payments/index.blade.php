@@ -242,7 +242,8 @@
                         @endif
 
                         {{-- Void — ISP Admin only --}}
-                        @if($payment->isActive() && auth()->user()->hasRole('isp-admin'))
+                        {{-- @if($payment->isActive() && auth()->user()->hasRole('isp-admin')) --}}
+                        @if($payment->isActive())
                             <button type="button"
                                 class="btn btn-xs btn-danger void-btn"
                                 title="Void Payment"
@@ -342,6 +343,14 @@ $(function () {
     });
 
     $('.select2').select2({ width: '100%' });
+
+    // Toast notifications
+    @if(session('success'))
+        toastr.success('{{ session('success') }}');
+    @endif
+    @if(session('error'))
+        toastr.error('{{ session('error') }}');
+    @endif
 
 });
 </script>
