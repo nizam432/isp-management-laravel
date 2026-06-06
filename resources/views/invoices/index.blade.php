@@ -373,9 +373,9 @@
         <button type="button" class="btn btn-success btn-sm mr-1" id="bulkXlsx">
             <i class="fas fa-file-excel mr-1"></i> XLSX
         </button>
-        <button type="button" class="btn btn-info btn-sm" id="bulkSms">
+        {{-- <button type="button" class="btn btn-info btn-sm" id="bulkSms">
             <i class="fas fa-sms mr-1"></i> Send SMS
-        </button>
+        </button> --}}
     </div>
     <div class="ml-auto d-flex align-items-center">
         <label class="mr-2 mb-0 text-muted" style="font-size:13px;">Show</label>
@@ -466,15 +466,10 @@
                     </td>
                     <td>{{ $invoice->due_date ? $invoice->due_date->format('d M Y') : '-' }}</td>
                     <td>
-                        <a href="{{ route('invoices.show', $invoice) }}"
-                           class="btn btn-xs btn-info" title="View">
-                            <i class="fas fa-eye"></i>
-                        </a>
-
                         @if($invoice->status !== 'paid')
                             <button type="button"
-                                class="btn btn-xs btn-success pay-btn"
-                                title="Pay"
+                                class="btn btn-sm btn-success pay-btn"
+                                title="Pay Now"
                                 data-invoice-id="{{ $invoice->id }}"
                                 data-invoice-no="{{ $invoice->invoice_no }}"
                                 data-customer="{{ $invoice->customer->name }}"
@@ -485,21 +480,21 @@
                                 data-customer-id="{{ $invoice->customer_id }}"
                                 data-toggle="modal"
                                 data-target="#payModal">
-                                <i class="fas fa-money-bill-wave"></i>
+                                <i class="fas fa-money-bill-wave mr-1"></i> Pay Now
                             </button>
                         @endif
 
-                        <a href="{{ route('invoices.pdf', $invoice) }}"
-                           class="btn btn-xs btn-secondary" title="PDF">
-                            <i class="fas fa-file-pdf"></i>
+                        <a href="{{ route('invoices.show', $invoice) }}"
+                           class="btn btn-sm btn-info" title="View Invoice">
+                            <i class="fas fa-file-invoice mr-1"></i> Invoice
                         </a>
 
                         @if($invoice->status === 'unpaid')
                             <form action="{{ route('invoices.destroy', $invoice) }}" method="POST" class="d-inline"
                                 onsubmit="return confirm('Delete this invoice?')">
                                 @csrf @method('DELETE')
-                                <button class="btn btn-xs btn-danger" title="Delete">
-                                    <i class="fas fa-trash"></i>
+                                <button class="btn btn-sm btn-danger" title="Delete">
+                                    <i class="fas fa-trash mr-1"></i> Delete
                                 </button>
                             </form>
                         @endif
@@ -548,23 +543,30 @@
                                 <option value="{{ $c->id }}"
                                     data-package="{{ $c->package->name ?? '-' }}"
                                     data-price="{{ $c->package->price ?? 0 }}"
-                                    data-advance="{{ $c->advance_balance ?? 0 }}">
+                                    data-advance="{{ $c->advance_balance ?? 0 }}"
+                                    data-name="{{ $c->name }}"
+                                    data-username="{{ $c->pppoe_username ?? '-' }}"
+                                    data-code="{{ $c->customer_code ?? '-' }}">
                                     {{ $c->name }} ({{ $c->phone }})
                                 </option>
                             @endforeach
                         </select>
                     </div>
 
-                    {{-- Package + Advance + Due info --}}
-                    <div id="inv_customer_info" class="d-none mb-3">
-                        <div class="bg-light rounded px-3 py-2" style="font-size:13px;">
-                            <span class="text-muted">Package:</span> <strong id="inv_package_name"></strong>
-                            &nbsp;|&nbsp;
-                            <span class="text-muted">Advance Balance:</span>
-                            <strong class="text-success" id="inv_advance_balance"></strong>
-                            &nbsp;|&nbsp;
-                            <span class="text-muted">Total Due:</span>
-                            <strong class="text-danger" id="inv_total_due"></strong>
+                    {{-- Customer Info --}}
+                    <div id="inv_customer_info" class="d-none">
+                        <div class="bg-light rounded px-3 py-2 mb-3" style="font-size:13px; line-height:1.8;">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <span class="text-muted">Name:</span> <strong id="inv_customer_name"></strong><br>
+                                    <span class="text-muted">Username:</span> <span id="inv_username"></span><br>
+                                    <span class="text-muted">Total Due:</span> <strong class="text-danger" id="inv_total_due"></strong>
+                                </div>
+                                <div class="col-md-6">
+                                    <span class="text-muted">Customer Code:</span> <strong class="text-primary" id="inv_customer_code"></strong><br>
+                                    <span class="text-muted">Package:</span> <strong id="inv_package_name"></strong>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -723,8 +725,8 @@
                                 <label>Received By</label>
                                 <select name="received_by" class="form-control form-control-sm select2">
                                     <option value="">— Select —</option>
-                                    @foreach(\App\Models\User::all() as $user)
-                                        <option value="{{ $user->id }}">{{ $user->name }}</option>
+                                    @foreach(\App\Models\HR\Employee::select('id','name')->where('status','active')->get() as $emp)
+                                        <option value="{{ $emp->id }}">{{ $emp->name }}</option>
                                     @endforeach
                                 </select>
                             </div>
@@ -784,11 +786,11 @@
                     </div>
 
                     <div class="d-flex" style="gap:20px;">
-                        <div class="form-check">
+                        {{-- <div class="form-check">
                             <input type="checkbox" name="set_next_billing_date" value="1"
                                 class="form-check-input" id="setNextBilling" checked>
                             <label class="form-check-label" for="setNextBilling">Set next billing date</label>
-                        </div>
+                        </div> --}}
                         <div class="form-check">
                             <input type="checkbox" name="send_sms" value="1"
                                 class="form-check-input" id="sendSms" checked>
@@ -877,8 +879,14 @@ $(function () {
         var price      = parseFloat(opt.data('price')) || 0;
         var advance    = parseFloat(opt.data('advance')) || 0;
         var pkg        = opt.data('package') || '-';
+        var name       = opt.data('name') || '-';
+        var username   = opt.data('username') || '-';
+        var code       = opt.data('code') || '-';
 
         if (customerId) {
+            $('#inv_customer_name').text(name);
+            $('#inv_username').text(username);
+            $('#inv_customer_code').text(code);
             $('#inv_package_name').text(pkg);
             $('#inv_advance_balance').text('BDT ' + advance.toFixed(2));
             $('#inv_total_due').text('Loading...');

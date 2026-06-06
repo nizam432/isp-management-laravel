@@ -30,7 +30,7 @@ class PaymentController extends Controller
             ->when($request->zone_id, fn($q) => $q->whereHas('customer', fn($c) =>
                 $c->where('zone_id', $request->zone_id)))
             ->latest()
-            ->paginate(20)
+            ->paginate($request->get('per_page', 20))
             ->withQueryString();
 
         // Stats
@@ -84,7 +84,7 @@ class PaymentController extends Controller
      */
     public function collectPage()
     {
-        $employees = User::role(['isp-admin', 'employee'])->get();
+        $employees = \App\Models\HR\Employee::select('id', 'name')->where('status', 'active')->get();
         return view('payments.collect', compact('employees'));
     }
 

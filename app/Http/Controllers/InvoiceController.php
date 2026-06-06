@@ -11,6 +11,8 @@ use App\Models\ActivityLog;
 use App\Services\BillingService;
 use Illuminate\Http\Request;
 use Barryvdh\DomPDF\Facade\Pdf;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class InvoiceController extends Controller
 {
@@ -44,10 +46,7 @@ class InvoiceController extends Controller
             ->paginate($request->get('per_page', 20))
             ->withQueryString();
 
-        // Stats cards data
-        $stats = $this->billing->getInvoiceStats();
-
-        // Filter dropdowns
+        $stats           = $this->billing->getInvoiceStats();
         $packages        = Package::active()->get();
         $routers         = MikrotikRouter::where('is_active', 1)->get();
         $zones           = Zone::all();
@@ -62,8 +61,6 @@ class InvoiceController extends Controller
 
     /**
      * Store a newly created invoice.
-     * Prevents duplicate invoices for the same customer and month.
-     * Automatically deducts from advance balance if available.
      */
     public function store(Request $request)
     {
@@ -76,17 +73,13 @@ class InvoiceController extends Controller
             'notes'       => 'nullable|string',
         ]);
 
-        // Prevent duplicate invoice for same customer + month
         $exists = Invoice::where('customer_id', $request->customer_id)
                          ->where('month', $request->month)
                          ->exists();
 
         if ($exists) {
             if ($request->expectsJson()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'An invoice already exists for this customer and month.'
-                ], 422);
+                return response()->json(['success' => false, 'message' => 'An invoice already exists for this customer and month.'], 422);
             }
             return back()->with('error', 'An invoice already exists for this customer and month.');
         }
@@ -106,7 +99,6 @@ class InvoiceController extends Controller
             'status'      => 'unpaid',
         ]);
 
-        // Auto-deduct from advance balance if available
         if ($customer->advance_balance > 0) {
             $this->billing->applyAdvanceToInvoice($invoice);
         }
@@ -114,10 +106,7 @@ class InvoiceController extends Controller
         ActivityLog::log('Invoice created', 'Invoice', $invoice->id, null, $invoice->toArray());
 
         if ($request->expectsJson()) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Invoice created successfully.'
-            ]);
+            return response()->json(['success' => true, 'message' => 'Invoice created successfully.']);
         }
 
         return redirect()->route('invoices.index')->with('success', 'Invoice created successfully.');
@@ -134,8 +123,6 @@ class InvoiceController extends Controller
 
     /**
      * Delete an invoice.
-     * Paid invoices cannot be deleted.
-     * Invoices with payments cannot be deleted.
      */
     public function destroy(Invoice $invoice)
     {
@@ -163,9 +150,7 @@ class InvoiceController extends Controller
     }
 
     /**
-     * Bulk generate invoices for all active customers for a given month.
-     * Skips customers who already have an invoice for that month.
-     * Automatically deducts from advance balance if available.
+     * Bulk generate invoices for all active customers.
      */
     public function bulkGenerate(Request $request)
     {
@@ -176,16 +161,11 @@ class InvoiceController extends Controller
         $skipped   = 0;
 
         foreach ($customers as $customer) {
-
-            // Skip if invoice already exists for this customer and month
             $exists = Invoice::where('customer_id', $customer->id)
                              ->where('month', $request->month)
                              ->exists();
 
-            if ($exists) {
-                $skipped++;
-                continue;
-            }
+            if ($exists) { $skipped++; continue; }
 
             $invoice = Invoice::create([
                 'invoice_no'  => Invoice::generateNumber(),
@@ -198,8 +178,6 @@ class InvoiceController extends Controller
                 'status'      => 'unpaid',
             ]);
 
-            // Auto-deduct from advance balance if available
-            // Refresh customer to get latest advance_balance from DB after each deduction
             if ($customer->advance_balance > 0) {
                 $this->billing->applyAdvanceToInvoice($invoice);
                 $customer->refresh();
@@ -233,39 +211,96 @@ class InvoiceController extends Controller
         $ids      = explode(',', $request->ids ?? '');
         $invoices = Invoice::with(['customer', 'package'])->whereIn('id', $ids)->get();
 
-        $csvHeader = ['Invoice No', 'Customer', 'Phone', 'Customer ID', 'Package', 'Month', 'Amount', 'Due', 'Status', 'Due Date'];
-        $rows      = [$csvHeader];
+        $spreadsheet = new Spreadsheet();
+        $sheet       = $spreadsheet->getActiveSheet();
 
-        foreach ($invoices as $inv) {
-            $rows[] = [
-                $inv->invoice_no,
-                $inv->customer->name,
-                $inv->customer->phone,
-                $inv->customer->customer_id ?? $inv->customer_id,
-                $inv->package->name ?? '-',
-                $inv->month,
-                $inv->amount,
-                $inv->due_amount,
-                $inv->status,
-                $inv->due_date?->format('d M Y') ?? '-',
-            ];
+        // Header row
+        $headers = ['A' => 'Invoice No', 'B' => 'Customer', 'C' => 'Customer Code', 'D' => 'Phone',
+                    'E' => 'Package', 'F' => 'Month', 'G' => 'Amount', 'H' => 'Discount',
+                    'I' => 'Due', 'J' => 'Status', 'K' => 'Due Date'];
+
+        foreach ($headers as $col => $header) {
+            $sheet->setCellValue($col . '1', $header);
+            $sheet->getColumnDimension($col)->setAutoSize(true);
         }
 
-        $filename = 'invoices-' . now()->format('Y-m-d') . '.csv';
-        $headers  = [
-            'Content-Type'        => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-        ];
+        // Style header
+        $sheet->getStyle('A1:K1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:K1')->getFill()
+            ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+            ->getStartColor()->setARGB('FF3C8DBC');
 
-        $callback = function () use ($rows) {
-            $file = fopen('php://output', 'w');
-            foreach ($rows as $row) {
-                fputcsv($file, $row);
-            }
-            fclose($file);
-        };
+        // Data rows
+        foreach ($invoices as $row => $inv) {
+            $r = $row + 2;
+            $sheet->setCellValue('A' . $r, $inv->invoice_no);
+            $sheet->setCellValue('B' . $r, $inv->customer->name);
+            $sheet->setCellValue('C' . $r, $inv->customer->customer_code ?? '-');
+            $sheet->setCellValue('D' . $r, $inv->customer->phone);
+            $sheet->setCellValue('E' . $r, $inv->package->name ?? '-');
+            $sheet->setCellValue('F' . $r, $inv->month);
+            $sheet->setCellValue('G' . $r, floatval($inv->amount));
+            $sheet->setCellValue('H' . $r, floatval($inv->discount));
+            $sheet->setCellValue('I' . $r, floatval($inv->due_amount));
+            $sheet->setCellValue('J' . $r, $inv->status);
+            $sheet->setCellValue('K' . $r, $inv->due_date?->format('d M Y') ?? '-');
+        }
 
-        return response()->stream($callback, 200, $headers);
+        $filename = 'invoices-' . now()->format('Y-m-d') . '.xlsx';
+        $tempPath = storage_path('app/temp/' . $filename);
+
+        if (!file_exists(storage_path('app/temp'))) {
+            mkdir(storage_path('app/temp'), 0755, true);
+        }
+
+        $writer = new Xlsx($spreadsheet);
+        $writer->save($tempPath);
+
+        return response()->download($tempPath, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
+    }
+
+    /**
+     * Bulk PDF download.
+     */
+    public function bulkPdf(Request $request)
+    {
+        $ids      = explode(',', $request->ids ?? '');
+        $invoices = Invoice::with(['customer', 'package', 'payments'])->whereIn('id', $ids)->get();
+
+        if ($invoices->count() === 0) {
+            return back()->with('error', 'No invoices selected.');
+        }
+
+        // Single invoice — direct download
+        if ($invoices->count() === 1) {
+            $invoice = $invoices->first();
+            $pdf     = Pdf::loadView('invoices.pdf', compact('invoice'));
+            return $pdf->download('invoice-' . $invoice->invoice_no . '.pdf');
+        }
+
+        // Multiple — ZIP
+        $zipName = 'invoices-' . now()->format('Y-m-d') . '.zip';
+        $zipPath = storage_path('app/temp/' . $zipName);
+
+        if (!file_exists(storage_path('app/temp'))) {
+            mkdir(storage_path('app/temp'), 0755, true);
+        }
+
+        $zip = new \ZipArchive();
+        $zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+
+        foreach ($invoices as $invoice) {
+            $pdf     = Pdf::loadView('invoices.pdf', compact('invoice'));
+            $pdfPath = storage_path('app/temp/' . $invoice->invoice_no . '.pdf');
+            $pdf->save($pdfPath);
+            $zip->addFile($pdfPath, $invoice->invoice_no . '.pdf');
+        }
+
+        $zip->close();
+
+        return response()->download($zipPath, $zipName)->deleteFileAfterSend(true);
     }
 
     /**

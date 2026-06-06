@@ -184,9 +184,9 @@ class BillingService
     }
 
     /**
-     * Void a payment. Only ISP Admin can void payments.
-     * The voided amount is added back to the customer's advance balance.
-     * The related invoice is reversed to its previous status.
+     * Void a payment.
+     * Only marks the payment as void and recalculates invoice status.
+     * Does NOT refund to advance balance — invoice remains unpaid for re-payment.
      */
     public function voidPayment(Payment $payment, string $reason): void
     {
@@ -220,18 +220,9 @@ class BillingService
 
             $invoice->update(['due_amount' => $due, 'status' => $status]);
 
-            // Refund void amount to customer's advance balance
-            $customer = $payment->customer;
-            $customer->increment('advance_balance', $payment->amount);
-
-            AdvanceTransaction::create([
-                'customer_id' => $customer->id,
-                'type'        => 'credit',
-                'amount'      => $payment->amount,
-                'description' => 'Refund from voided payment #' . $payment->id,
-                'payment_id'  => $payment->id,
-                'created_by'  => auth()->id(),
-            ]);
+            // NOTE: Advance balance is NOT refunded on void.
+            // Invoice is set to unpaid — customer will re-pay.
+            // If unpaid invoice is deleted (no payments), advance logic handles separately.
         });
     }
 

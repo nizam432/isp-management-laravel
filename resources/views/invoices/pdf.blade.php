@@ -149,6 +149,13 @@
                 <td class="right muted">- BDT {{ number_format($invoice->discount, 2) }}</td>
             </tr>
             @endif
+            @php $advancePaid = $invoice->payments->where('method', 'advance')->where('status', 'active')->sum('amount'); @endphp
+            @if($advancePaid > 0)
+            <tr>
+                <td class="muted">Advance Paid</td>
+                <td class="right muted">- BDT {{ number_format($advancePaid, 2) }}</td>
+            </tr>
+            @endif
         </tbody>
         <tfoot>
             <tr>

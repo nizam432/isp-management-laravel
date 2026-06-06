@@ -166,11 +166,11 @@
                         </div>
 
                         <div class="d-flex mb-3" style="gap:20px;">
-                            <div class="form-check">
+                            {{-- <div class="form-check">
                                 <input type="checkbox" name="set_next_billing_date" value="1"
                                     class="form-check-input" id="setNextBilling" checked>
                                 <label class="form-check-label" for="setNextBilling">Set next billing date</label>
-                            </div>
+                            </div> --}}
                             <div class="form-check">
                                 <input type="checkbox" name="send_sms" value="1"
                                     class="form-check-input" id="sendSms" checked>

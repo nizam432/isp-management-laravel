@@ -166,7 +166,21 @@
     </div>
 </div>
 
-{{-- Payments Table --}}
+{{-- Per Page + Payments Table --}}
+<div class="d-flex justify-content-end align-items-center mb-2">
+    <label class="mr-2 mb-0 text-muted" style="font-size:13px;">Show</label>
+    <select id="perPage" class="form-control form-control-sm" style="width:80px;">
+        <option value="10"    {{ request('per_page', 20) == 10    ? 'selected' : '' }}>10</option>
+        <option value="20"    {{ request('per_page', 20) == 20    ? 'selected' : '' }}>20</option>
+        <option value="50"    {{ request('per_page', 20) == 50    ? 'selected' : '' }}>50</option>
+        <option value="100"   {{ request('per_page', 20) == 100   ? 'selected' : '' }}>100</option>
+        <option value="500"   {{ request('per_page', 20) == 500   ? 'selected' : '' }}>500</option>
+        <option value="1000"  {{ request('per_page', 20) == 1000  ? 'selected' : '' }}>1000</option>
+        <option value="99999" {{ request('per_page', 20) == 99999 ? 'selected' : '' }}>All</option>
+    </select>
+    <label class="ml-2 mb-0 text-muted" style="font-size:13px;">records</label>
+</div>
+
 <div class="card">
     <div class="card-body p-0">
         <table class="table table-hover table-sm mb-0">
@@ -236,8 +250,8 @@
                         {{-- View Invoice --}}
                         @if($payment->invoice)
                             <a href="{{ route('invoices.show', $payment->invoice) }}"
-                               class="btn btn-xs btn-info" title="View Invoice">
-                                <i class="fas fa-eye"></i>
+                               class="btn btn-sm btn-info" title="View Invoice">
+                                <i class="fas fa-file-invoice mr-1"></i> Invoice
                             </a>
                         @endif
 
@@ -245,13 +259,13 @@
                         {{-- @if($payment->isActive() && auth()->user()->hasRole('isp-admin')) --}}
                         @if($payment->isActive())
                             <button type="button"
-                                class="btn btn-xs btn-danger void-btn"
+                                class="btn btn-sm btn-danger void-btn"
                                 title="Void Payment"
                                 data-payment-id="{{ $payment->id }}"
                                 data-amount="{{ $payment->amount }}"
                                 data-toggle="modal"
                                 data-target="#voidModal">
-                                <i class="fas fa-ban"></i>
+                                <i class="fas fa-ban mr-1"></i> Void
                             </button>
                         @endif
 
@@ -281,11 +295,12 @@
             @endif
         </table>
     </div>
-    @if($payments->hasPages())
-    <div class="card-footer">
-        {{ $payments->links() }}
+    <div class="card-footer d-flex justify-content-between align-items-center">
+        <small class="text-muted">
+            Showing {{ $payments->firstItem() ?? 0 }}–{{ $payments->lastItem() ?? 0 }} of {{ $payments->total() }} records
+        </small>
+        {{ $payments->appends(request()->query())->links() }}
     </div>
-    @endif
 </div>
 
 {{-- Void Modal --}}
@@ -299,14 +314,15 @@
             <form id="voidForm" method="POST">
                 @csrf
                 <div class="modal-body">
-                    <p>Amount: <strong class="text-danger" id="void_amount"></strong></p>
-                    <p class="text-muted" style="font-size:13px;">
-                        The payment will be voided and the amount will be added to the customer's advance balance.
-                    </p>
+                    <p class="mb-2">Payment Amount: <strong class="text-danger" id="void_amount"></strong></p>
+                    <div class="alert alert-warning py-2" style="font-size:13px;">
+                        <i class="fas fa-exclamation-triangle mr-1"></i>
+                        <strong>Warning!</strong> Voiding this payment will set the invoice back to <strong>Unpaid</strong>. The customer will need to pay again. This action cannot be undone.
+                    </div>
                     <div class="form-group mb-0">
-                        <label>Reason <span class="text-danger">*</span></label>
+                        <label>Void Reason <span class="text-danger">*</span></label>
                         <input type="text" name="reason" class="form-control form-control-sm"
-                            placeholder="Enter reason for void" required>
+                            placeholder="e.g. Wrong amount, Duplicate payment" required>
                     </div>
                 </div>
                 <div class="modal-footer">

@@ -12,12 +12,12 @@
             <button onclick="window.print()" class="btn btn-info btn-sm ml-1">
                 <i class="fas fa-print mr-1"></i> Print Receipt
             </button>
-            <a href="#" class="btn btn-warning btn-sm ml-1">
+            {{-- <a href="#" class="btn btn-warning btn-sm ml-1">
                 <i class="fas fa-sms mr-1"></i> Send SMS
-            </a>
-            <a href="#" class="btn btn-secondary btn-sm ml-1">
+            </a> --}}
+            {{-- <a href="#" class="btn btn-secondary btn-sm ml-1">
                 <i class="fas fa-envelope mr-1"></i> Send to Email
-            </a>
+            </a> --}}
             <a href="{{ route('invoices.pdf', $invoice) }}" class="btn btn-danger btn-sm ml-1">
                 <i class="fas fa-file-pdf mr-1"></i> Download PDF
             </a>
