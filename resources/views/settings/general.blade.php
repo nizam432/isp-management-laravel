@@ -22,6 +22,9 @@
                     <a class="nav-link rounded-0 border-bottom" data-toggle="pill" href="#tab-sms">
                         <i class="fas fa-sms mr-2"></i> SMS Notifications
                     </a>
+                    <a class="nav-link rounded-0 border-bottom" data-toggle="pill" href="#tab-email">
+                        <i class="fas fa-envelope mr-2"></i> Email Notifications
+                    </a>
                     <a class="nav-link rounded-0 border-bottom" data-toggle="pill" href="#tab-mikrotik">
                         <i class="fas fa-server mr-2"></i> MikroTik
                     </a>
@@ -289,63 +292,279 @@
                             <h3 class="card-title"><i class="fas fa-sms mr-1"></i> SMS Notifications</h3>
                         </div>
                         <div class="card-body">
-                            <div class="form-group">
-                                <label class="font-weight-bold">SMS Sender Name</label>
-                                <input type="text" name="sms_sender_name" class="form-control"
-                                       value="{{ $notification['sms_sender_name'] ?? '' }}"
-                                       placeholder="MyISP" maxlength="11">
-                                <small class="text-muted">Max 11 characters</small>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label class="font-weight-bold">Bill Due SMS Before</label>
-                                        <div class="input-group">
-                                            <input type="number" name="bill_due_sms_days_before" class="form-control"
-                                                   value="{{ $notification['bill_due_sms_days_before'] ?? 3 }}" min="0">
-                                            <div class="input-group-append">
-                                                <span class="input-group-text">days</span>
+                            <table class="table table-sm table-bordered">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th>Notification</th>
+                                        <th class="text-center" style="width:120px;">Enable</th>
+                                        <th style="width:220px;">Options</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><strong>Payment Confirmation</strong><small class="text-muted d-block">Send when payment is received</small></td>
+                                        <td class="text-center align-middle">
+                                            <div class="custom-control custom-switch d-inline-block">
+                                                <input type="checkbox" class="custom-control-input" id="payment_confirm_sms" name="payment_confirm_sms" {{ ($notification['payment_confirm_sms'] ?? '1') == '1' ? 'checked' : '' }}>
+                                                <label class="custom-control-label" for="payment_confirm_sms"></label>
                                             </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="form-group">
-                                        <label class="font-weight-bold">Expiry SMS Before</label>
-                                        <div class="input-group">
-                                            <input type="number" name="expiry_sms_days_before" class="form-control"
-                                                   value="{{ $notification['expiry_sms_days_before'] ?? 3 }}" min="0">
-                                            <div class="input-group-append">
-                                                <span class="input-group-text">days</span>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Account Created</strong><small class="text-muted d-block">Send when new customer is added</small></td>
+                                        <td class="text-center align-middle">
+                                            <div class="custom-control custom-switch d-inline-block">
+                                                <input type="checkbox" class="custom-control-input" id="account_created_sms" name="account_created_sms" {{ ($notification['account_created_sms'] ?? '1') == '1' ? 'checked' : '' }}>
+                                                <label class="custom-control-label" for="account_created_sms"></label>
                                             </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="custom-control custom-switch mb-3">
-                                <input type="checkbox" class="custom-control-input"
-                                       id="payment_confirm_sms" name="payment_confirm_sms"
-                                       {{ ($notification['payment_confirm_sms'] ?? '1') == '1' ? 'checked' : '' }}>
-                                <label class="custom-control-label" for="payment_confirm_sms">
-                                    Payment Confirmation SMS
-                                    <small class="text-muted d-block">Send SMS when payment is received</small>
-                                </label>
-                            </div>
-                            <div class="custom-control custom-switch">
-                                <input type="checkbox" class="custom-control-input"
-                                       id="suspension_sms" name="suspension_sms"
-                                       {{ ($notification['suspension_sms'] ?? '1') == '1' ? 'checked' : '' }}>
-                                <label class="custom-control-label" for="suspension_sms">
-                                    Suspension SMS
-                                    <small class="text-muted d-block">Send SMS when customer is suspended</small>
-                                </label>
-                            </div>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Invoice Generated</strong><small class="text-muted d-block">Send when new invoice is created</small></td>
+                                        <td class="text-center align-middle">
+                                            <div class="custom-control custom-switch d-inline-block">
+                                                <input type="checkbox" class="custom-control-input" id="invoice_generated_sms" name="invoice_generated_sms" {{ ($notification['invoice_generated_sms'] ?? '1') == '1' ? 'checked' : '' }}>
+                                                <label class="custom-control-label" for="invoice_generated_sms"></label>
+                                            </div>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Bill Due Reminder</strong><small class="text-muted d-block">Send before bill due date</small></td>
+                                        <td class="text-center align-middle">
+                                            <div class="custom-control custom-switch d-inline-block">
+                                                <input type="checkbox" class="custom-control-input sms-toggle" id="bill_due_sms" name="bill_due_sms" data-target="bill_due_days_wrap" {{ ($notification['bill_due_sms'] ?? '1') == '1' ? 'checked' : '' }}>
+                                                <label class="custom-control-label" for="bill_due_sms"></label>
+                                            </div>
+                                        </td>
+                                        <td class="align-middle">
+                                            <div id="bill_due_days_wrap" class="{{ ($notification['bill_due_sms'] ?? '1') == '1' ? '' : 'd-none' }}">
+                                                <div class="input-group input-group-sm">
+                                                    <input type="number" name="bill_due_sms_days_before" class="form-control" value="{{ $notification['bill_due_sms_days_before'] ?? 3 }}" min="1">
+                                                    <div class="input-group-append"><span class="input-group-text">days before</span></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Expiry Reminder</strong><small class="text-muted d-block">Send before account expires</small></td>
+                                        <td class="text-center align-middle">
+                                            <div class="custom-control custom-switch d-inline-block">
+                                                <input type="checkbox" class="custom-control-input sms-toggle" id="expiry_sms" name="expiry_sms" data-target="expiry_days_wrap" {{ ($notification['expiry_sms'] ?? '1') == '1' ? 'checked' : '' }}>
+                                                <label class="custom-control-label" for="expiry_sms"></label>
+                                            </div>
+                                        </td>
+                                        <td class="align-middle">
+                                            <div id="expiry_days_wrap" class="{{ ($notification['expiry_sms'] ?? '1') == '1' ? '' : 'd-none' }}">
+                                                <div class="input-group input-group-sm">
+                                                    <input type="number" name="expiry_sms_days_before" class="form-control" value="{{ $notification['expiry_sms_days_before'] ?? 3 }}" min="1">
+                                                    <div class="input-group-append"><span class="input-group-text">days before</span></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Payment Overdue</strong><small class="text-muted d-block">Send when invoice becomes overdue</small></td>
+                                        <td class="text-center align-middle">
+                                            <div class="custom-control custom-switch d-inline-block">
+                                                <input type="checkbox" class="custom-control-input" id="overdue_sms" name="overdue_sms" {{ ($notification['overdue_sms'] ?? '1') == '1' ? 'checked' : '' }}>
+                                                <label class="custom-control-label" for="overdue_sms"></label>
+                                            </div>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Suspension</strong><small class="text-muted d-block">Send when customer is suspended</small></td>
+                                        <td class="text-center align-middle">
+                                            <div class="custom-control custom-switch d-inline-block">
+                                                <input type="checkbox" class="custom-control-input" id="suspension_sms" name="suspension_sms" {{ ($notification['suspension_sms'] ?? '1') == '1' ? 'checked' : '' }}>
+                                                <label class="custom-control-label" for="suspension_sms"></label>
+                                            </div>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Connection Restored</strong><small class="text-muted d-block">Send when connection is restored after payment</small></td>
+                                        <td class="text-center align-middle">
+                                            <div class="custom-control custom-switch d-inline-block">
+                                                <input type="checkbox" class="custom-control-input" id="restore_sms" name="restore_sms" {{ ($notification['restore_sms'] ?? '1') == '1' ? 'checked' : '' }}>
+                                                <label class="custom-control-label" for="restore_sms"></label>
+                                            </div>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Package Changed</strong><small class="text-muted d-block">Send when customer package is changed</small></td>
+                                        <td class="text-center align-middle">
+                                            <div class="custom-control custom-switch d-inline-block">
+                                                <input type="checkbox" class="custom-control-input" id="package_changed_sms" name="package_changed_sms" {{ ($notification['package_changed_sms'] ?? '1') == '1' ? 'checked' : '' }}>
+                                                <label class="custom-control-label" for="package_changed_sms"></label>
+                                            </div>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Password Reset</strong><small class="text-muted d-block">Send when portal password is reset</small></td>
+                                        <td class="text-center align-middle">
+                                            <div class="custom-control custom-switch d-inline-block">
+                                                <input type="checkbox" class="custom-control-input" id="password_reset_sms" name="password_reset_sms" {{ ($notification['password_reset_sms'] ?? '1') == '1' ? 'checked' : '' }}>
+                                                <label class="custom-control-label" for="password_reset_sms"></label>
+                                            </div>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                         <div class="card-footer text-right">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save mr-1"></i> Save
-                            </button>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i> Save</button>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- ── Email Notifications ──────────────────── --}}
+                <div class="tab-pane fade" id="tab-email">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="fas fa-envelope mr-1"></i> Email Notifications</h3>
+                        </div>
+                        <div class="card-body">
+                            @if(empty(\App\Models\Setting::get('company_email')))
+                            <div class="alert alert-warning py-2 mb-3" style="font-size:13px;">
+                                <i class="fas fa-exclamation-triangle mr-1"></i>
+                                <strong>Email not configured.</strong> Go to <a href="#tab-company" data-toggle="pill">Company Settings</a> to set up your email. Email notifications will not be sent until configured.
+                            </div>
+                            @endif
+                            <table class="table table-sm table-bordered">
+                                <thead class="bg-light">
+                                    <tr>
+                                        <th>Notification</th>
+                                        <th class="text-center" style="width:120px;">Enable</th>
+                                        <th style="width:220px;">Options</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><strong>Payment Confirmation</strong><small class="text-muted d-block">Send when payment is received</small></td>
+                                        <td class="text-center align-middle">
+                                            <div class="custom-control custom-switch d-inline-block">
+                                                <input type="checkbox" class="custom-control-input" id="payment_confirm_email" name="payment_confirm_email" {{ ($notification['payment_confirm_email'] ?? '0') == '1' ? 'checked' : '' }}>
+                                                <label class="custom-control-label" for="payment_confirm_email"></label>
+                                            </div>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Account Created</strong><small class="text-muted d-block">Send when new customer is added</small></td>
+                                        <td class="text-center align-middle">
+                                            <div class="custom-control custom-switch d-inline-block">
+                                                <input type="checkbox" class="custom-control-input" id="account_created_email" name="account_created_email" {{ ($notification['account_created_email'] ?? '0') == '1' ? 'checked' : '' }}>
+                                                <label class="custom-control-label" for="account_created_email"></label>
+                                            </div>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Invoice Generated</strong><small class="text-muted d-block">Send when new invoice is created</small></td>
+                                        <td class="text-center align-middle">
+                                            <div class="custom-control custom-switch d-inline-block">
+                                                <input type="checkbox" class="custom-control-input" id="invoice_generated_email" name="invoice_generated_email" {{ ($notification['invoice_generated_email'] ?? '0') == '1' ? 'checked' : '' }}>
+                                                <label class="custom-control-label" for="invoice_generated_email"></label>
+                                            </div>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Bill Due Reminder</strong><small class="text-muted d-block">Send before bill due date</small></td>
+                                        <td class="text-center align-middle">
+                                            <div class="custom-control custom-switch d-inline-block">
+                                                <input type="checkbox" class="custom-control-input sms-toggle" id="bill_due_email" name="bill_due_email" data-target="bill_due_email_days_wrap" {{ ($notification['bill_due_email'] ?? '0') == '1' ? 'checked' : '' }}>
+                                                <label class="custom-control-label" for="bill_due_email"></label>
+                                            </div>
+                                        </td>
+                                        <td class="align-middle">
+                                            <div id="bill_due_email_days_wrap" class="{{ ($notification['bill_due_email'] ?? '0') == '1' ? '' : 'd-none' }}">
+                                                <div class="input-group input-group-sm">
+                                                    <input type="number" name="bill_due_email_days_before" class="form-control" value="{{ $notification['bill_due_email_days_before'] ?? 3 }}" min="1">
+                                                    <div class="input-group-append"><span class="input-group-text">days before</span></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Expiry Reminder</strong><small class="text-muted d-block">Send before account expires</small></td>
+                                        <td class="text-center align-middle">
+                                            <div class="custom-control custom-switch d-inline-block">
+                                                <input type="checkbox" class="custom-control-input sms-toggle" id="expiry_email" name="expiry_email" data-target="expiry_email_days_wrap" {{ ($notification['expiry_email'] ?? '0') == '1' ? 'checked' : '' }}>
+                                                <label class="custom-control-label" for="expiry_email"></label>
+                                            </div>
+                                        </td>
+                                        <td class="align-middle">
+                                            <div id="expiry_email_days_wrap" class="{{ ($notification['expiry_email'] ?? '0') == '1' ? '' : 'd-none' }}">
+                                                <div class="input-group input-group-sm">
+                                                    <input type="number" name="expiry_email_days_before" class="form-control" value="{{ $notification['expiry_email_days_before'] ?? 3 }}" min="1">
+                                                    <div class="input-group-append"><span class="input-group-text">days before</span></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Payment Overdue</strong><small class="text-muted d-block">Send when invoice becomes overdue</small></td>
+                                        <td class="text-center align-middle">
+                                            <div class="custom-control custom-switch d-inline-block">
+                                                <input type="checkbox" class="custom-control-input" id="overdue_email" name="overdue_email" {{ ($notification['overdue_email'] ?? '0') == '1' ? 'checked' : '' }}>
+                                                <label class="custom-control-label" for="overdue_email"></label>
+                                            </div>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Suspension</strong><small class="text-muted d-block">Send when customer is suspended</small></td>
+                                        <td class="text-center align-middle">
+                                            <div class="custom-control custom-switch d-inline-block">
+                                                <input type="checkbox" class="custom-control-input" id="suspension_email" name="suspension_email" {{ ($notification['suspension_email'] ?? '0') == '1' ? 'checked' : '' }}>
+                                                <label class="custom-control-label" for="suspension_email"></label>
+                                            </div>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Connection Restored</strong><small class="text-muted d-block">Send when connection is restored after payment</small></td>
+                                        <td class="text-center align-middle">
+                                            <div class="custom-control custom-switch d-inline-block">
+                                                <input type="checkbox" class="custom-control-input" id="restore_email" name="restore_email" {{ ($notification['restore_email'] ?? '0') == '1' ? 'checked' : '' }}>
+                                                <label class="custom-control-label" for="restore_email"></label>
+                                            </div>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Package Changed</strong><small class="text-muted d-block">Send when customer package is changed</small></td>
+                                        <td class="text-center align-middle">
+                                            <div class="custom-control custom-switch d-inline-block">
+                                                <input type="checkbox" class="custom-control-input" id="package_changed_email" name="package_changed_email" {{ ($notification['package_changed_email'] ?? '0') == '1' ? 'checked' : '' }}>
+                                                <label class="custom-control-label" for="package_changed_email"></label>
+                                            </div>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Password Reset</strong><small class="text-muted d-block">Send when portal password is reset</small></td>
+                                        <td class="text-center align-middle">
+                                            <div class="custom-control custom-switch d-inline-block">
+                                                <input type="checkbox" class="custom-control-input" id="password_reset_email" name="password_reset_email" {{ ($notification['password_reset_email'] ?? '0') == '1' ? 'checked' : '' }}>
+                                                <label class="custom-control-label" for="password_reset_email"></label>
+                                            </div>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="card-footer text-right">
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save mr-1"></i> Save</button>
                         </div>
                     </div>
                 </div>
@@ -639,6 +858,17 @@ document.querySelectorAll('.gateway-tab-link').forEach(function(link) {
                 this.classList.add(mode === 'sandbox' ? 'btn-warning' : 'btn-success');
             });
         });
+    });
+});
+
+// SMS toggle show/hide days input
+document.querySelectorAll('.sms-toggle').forEach(function(toggle) {
+    toggle.addEventListener('change', function() {
+        var targetId = this.getAttribute('data-target');
+        var target   = document.getElementById(targetId);
+        if (target) {
+            target.classList.toggle('d-none', !this.checked);
+        }
     });
 });
 </script>
