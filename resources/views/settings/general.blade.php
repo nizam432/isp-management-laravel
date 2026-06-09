@@ -19,20 +19,20 @@
                     <a class="nav-link rounded-0 border-bottom" data-toggle="pill" href="#tab-billing">
                         <i class="fas fa-file-invoice-dollar mr-2"></i> Billing
                     </a>
-                    <a class="nav-link rounded-0 border-bottom" data-toggle="pill" href="#tab-sms">
-                        <i class="fas fa-sms mr-2"></i> SMS Notifications
-                    </a>
-                    <a class="nav-link rounded-0 border-bottom" data-toggle="pill" href="#tab-email">
-                        <i class="fas fa-envelope mr-2"></i> Email Notifications
-                    </a>
                     <a class="nav-link rounded-0 border-bottom" data-toggle="pill" href="#tab-mikrotik">
                         <i class="fas fa-server mr-2"></i> MikroTik
+                    </a>
+                    <a class="nav-link rounded-0 border-bottom" data-toggle="pill" href="#tab-sms">
+                        <i class="fas fa-sms mr-2"></i> SMS Notifications
                     </a>
                     <a class="nav-link rounded-0 border-bottom" data-toggle="pill" href="#tab-customer">
                         <i class="fas fa-users mr-2"></i> Customer
                     </a>
-                    <a class="nav-link rounded-0" data-toggle="pill" href="#tab-payment">
+                    <a class="nav-link rounded-0 border-bottom" data-toggle="pill" href="#tab-payment">
                         <i class="fas fa-credit-card mr-2"></i> Payment Gateways
+                    </a>
+                    <a class="nav-link rounded-0" data-toggle="pill" href="#tab-email">
+                        <i class="fas fa-envelope mr-2"></i> Email Notifications
                     </a>
                 </div>
             </div>

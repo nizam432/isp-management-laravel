@@ -141,26 +141,33 @@
         <tbody>
             <tr>
                 <td>Monthly Internet Bill — {{ $invoice->package->name ?? 'Internet Service' }}</td>
-                <td class="right">BDT {{ number_format($invoice->amount, 2) }}</td>
+                <td class="right">{{ $currency }} {{ number_format($invoice->amount, 2) }}</td>
             </tr>
             @if($invoice->discount > 0)
             <tr>
                 <td class="muted">Discount</td>
-                <td class="right muted">- BDT {{ number_format($invoice->discount, 2) }}</td>
+                <td class="right muted">- {{ $currency }} {{ number_format($invoice->discount, 2) }}</td>
             </tr>
             @endif
             @php $advancePaid = $invoice->payments->where('method', 'advance')->where('status', 'active')->sum('amount'); @endphp
             @if($advancePaid > 0)
             <tr>
                 <td class="muted">Advance Paid</td>
-                <td class="right muted">- BDT {{ number_format($advancePaid, 2) }}</td>
+                <td class="right muted">- {{ $currency }} {{ number_format($advancePaid, 2) }}</td>
+            </tr>
+            @endif
+            @if($vatPercent > 0)
+            @php $vatAmount = ($invoice->amount - $invoice->discount) * ($vatPercent / 100); @endphp
+            <tr>
+                <td class="muted">VAT ({{ $vatPercent }}%)</td>
+                <td class="right muted">+ {{ $currency }} {{ number_format($vatAmount, 2) }}</td>
             </tr>
             @endif
         </tbody>
         <tfoot>
             <tr>
                 <td>Total Due</td>
-                <td class="total">BDT {{ number_format($invoice->due_amount, 2) }}</td>
+                <td class="total">{{ $currency }} {{ number_format($invoice->due_amount, 2) }}</td>
             </tr>
         </tfoot>
     </table>
@@ -188,7 +195,7 @@
                 <td>{{ strtoupper($pay->method) }}</td>
                 <td>{{ $pay->transaction_id ?? '-' }}</td>
                 <td>{{ $pay->receivedBy->name ?? '-' }}</td>
-                <td class="right">BDT {{ number_format($pay->amount, 2) }}</td>
+                <td class="right">{{ $currency }} {{ number_format($pay->amount, 2) }}</td>
             </tr>
             @endif
             @endforeach
@@ -205,7 +212,7 @@
 
 <!-- Footer -->
 <div class="footer">
-    <div class="footer-left">Thank you for your payment!</div>
+    <div class="footer-left">{{ $footerText }}</div>
     <div class="footer-right">Generated on {{ now()->format('d M Y h:i A') }}</div>
 </div>
 

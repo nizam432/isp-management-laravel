@@ -7,7 +7,10 @@ use App\Models\Payment;
 use App\Models\PaymentVoid;
 use App\Models\Customer;
 use App\Models\AdvanceTransaction;
+use App\Models\Setting;
+use App\Services\NotificationService;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class BillingService
 {
@@ -15,6 +18,7 @@ class BillingService
      * Collect payment using FIFO logic.
      * Regardless of which invoice is selected, the oldest unpaid invoice is paid first.
      * Any excess amount is added to the customer's advance balance.
+     * After payment, checks if MikroTik auto restore is needed.
      */
     public function collectPayment(Customer $customer, array $data): array
     {
@@ -56,11 +60,7 @@ class BillingService
                         'paid_at'               => now(),
                     ]);
 
-                    $invoice->update([
-                        'due_amount' => 0,
-                        'status'     => 'paid',
-                    ]);
-
+                    $invoice->update(['due_amount' => 0, 'status' => 'paid']);
                     $paidInvoices[] = $invoice->invoice_no;
 
                 } else {
@@ -93,10 +93,9 @@ class BillingService
                 }
             }
 
-            // Add any excess amount to the customer's advance balance
+            // Add any excess amount to advance balance
             if ($remaining > 0) {
                 $customer->increment('advance_balance', $remaining);
-
                 AdvanceTransaction::create([
                     'customer_id' => $customer->id,
                     'type'        => 'credit',
@@ -104,6 +103,16 @@ class BillingService
                     'description' => 'Advance from overpayment',
                     'created_by'  => auth()->id(),
                 ]);
+            }
+
+            // Auto restore MikroTik if setting enabled and all dues cleared
+            $this->checkAndRestoreMikrotik($customer);
+
+            // Send payment confirmation notification
+            try {
+                (new NotificationService())->paymentConfirm($customer, $totalPaid, $data['method']);
+            } catch (\Exception $e) {
+                \Log::error('Notification failed: ' . $e->getMessage());
             }
 
             return [
@@ -116,13 +125,11 @@ class BillingService
 
     /**
      * Auto-deduct from advance balance when a new invoice is generated.
-     * Uses lockForUpdate to get fresh data and prevent race conditions.
      */
     public function applyAdvanceToInvoice(Invoice $invoice): void
     {
         DB::transaction(function () use ($invoice) {
 
-            // Get fresh data from DB with lock to prevent race conditions
             $customer = Customer::lockForUpdate()->find($invoice->customer_id);
             $invoice  = Invoice::lockForUpdate()->find($invoice->id);
 
@@ -132,9 +139,7 @@ class BillingService
             if ($advance <= 0) return;
 
             if ($advance >= $due) {
-                // Advance covers the full invoice amount
                 $deduct = $due;
-
                 Payment::create([
                     'invoice_id'   => $invoice->id,
                     'customer_id'  => $customer->id,
@@ -145,14 +150,11 @@ class BillingService
                     'status'       => 'active',
                     'paid_at'      => now(),
                 ]);
-
                 $invoice->update(['due_amount' => 0, 'status' => 'paid']);
                 $customer->decrement('advance_balance', $deduct);
 
             } else {
-                // Advance partially covers the invoice
                 $deduct = $advance;
-
                 Payment::create([
                     'invoice_id'   => $invoice->id,
                     'customer_id'  => $customer->id,
@@ -163,13 +165,10 @@ class BillingService
                     'status'       => 'active',
                     'paid_at'      => now(),
                 ]);
-
                 $invoice->update([
                     'due_amount' => $due - $deduct,
                     'status'     => 'partial',
                 ]);
-
-                // Decrement instead of setting to 0 to avoid overwriting concurrent updates
                 $customer->decrement('advance_balance', $deduct);
             }
 
@@ -180,22 +179,23 @@ class BillingService
                 'description' => 'Auto-deducted for invoice ' . $invoice->invoice_no,
                 'invoice_id'  => $invoice->id,
             ]);
+
+            // Auto restore MikroTik if all dues cleared
+            $this->checkAndRestoreMikrotik($customer);
         });
     }
 
     /**
      * Void a payment.
      * Only marks the payment as void and recalculates invoice status.
-     * Does NOT refund to advance balance — invoice remains unpaid for re-payment.
+     * Does NOT refund to advance balance.
      */
     public function voidPayment(Payment $payment, string $reason): void
     {
         DB::transaction(function () use ($payment, $reason) {
 
-            // Mark payment as void
             $payment->update(['status' => 'void']);
 
-            // Log the void
             PaymentVoid::create([
                 'payment_id' => $payment->id,
                 'voided_by'  => auth()->id(),
@@ -204,7 +204,6 @@ class BillingService
                 'voided_at'  => now(),
             ]);
 
-            // Recalculate invoice status after void
             $invoice   = $payment->invoice;
             $totalPaid = $invoice->payments()->active()->sum('amount');
             $due       = $invoice->amount - $invoice->discount - $totalPaid;
@@ -219,10 +218,6 @@ class BillingService
             }
 
             $invoice->update(['due_amount' => $due, 'status' => $status]);
-
-            // NOTE: Advance balance is NOT refunded on void.
-            // Invoice is set to unpaid — customer will re-pay.
-            // If unpaid invoice is deleted (no payments), advance logic handles separately.
         });
     }
 
@@ -233,7 +228,6 @@ class BillingService
     {
         return DB::transaction(function () use ($customer, $data) {
 
-            // Create a payment record without an invoice
             $payment = Payment::create([
                 'invoice_id'     => null,
                 'customer_id'    => $customer->id,
@@ -263,6 +257,134 @@ class BillingService
     }
 
     /**
+     * Generate invoice for Date to Date billing.
+     * Period: connection_date → connection_date + 29 days (30 days total)
+     */
+    public function generateDateToDateInvoice(Customer $customer): ?Invoice
+    {
+        $connectionDate = $customer->connection_date;
+
+        if (!$connectionDate) return null;
+
+        // Find last invoice to determine next period start
+        $lastInvoice = Invoice::where('customer_id', $customer->id)
+            ->where('billing_type', 'date_to_date')
+            ->latest('period_start')
+            ->first();
+
+        if ($lastInvoice) {
+            $periodStart = Carbon::parse($lastInvoice->period_end)->addDay();
+        } else {
+            $periodStart = Carbon::parse($connectionDate);
+        }
+
+        $periodEnd = $periodStart->copy()->addDays(29); // 30 days total
+
+        // Check if already generated for this period
+        $exists = Invoice::where('customer_id', $customer->id)
+            ->where('period_start', $periodStart->toDateString())
+            ->exists();
+
+        if ($exists) return null;
+
+        $dueDays = intval(Setting::get('invoice_due_days', 7));
+        $dueDate = $periodStart->copy()->addDays($dueDays);
+
+        $invoice = Invoice::create([
+            'invoice_no'   => Invoice::generateNumber(),
+            'customer_id'  => $customer->id,
+            'package_id'   => $customer->package_id,
+            'month'        => $periodStart->format('Y-m'),
+            'period_start' => $periodStart->toDateString(),
+            'period_end'   => $periodEnd->toDateString(),
+            'billing_type' => 'date_to_date',
+            'amount'       => $customer->package->price ?? 0,
+            'due_amount'   => $customer->package->price ?? 0,
+            'due_date'     => $dueDate->toDateString(),
+            'status'       => 'unpaid',
+        ]);
+
+        // Auto-deduct advance if available
+        if ($customer->advance_balance > 0) {
+            $this->applyAdvanceToInvoice($invoice);
+        }
+
+        return $invoice;
+    }
+
+    /**
+     * Check overdue invoices based on grace period setting.
+     * Run via scheduler.
+     */
+    public function markOverdueInvoices(): int
+    {
+        $gracePeriod = intval(Setting::get('grace_period_days', 3));
+        $cutoffDate  = now()->subDays($gracePeriod)->toDateString();
+
+        $count = Invoice::whereIn('status', ['unpaid', 'partial'])
+            ->whereNotNull('due_date')
+            ->whereDate('due_date', '<', $cutoffDate)
+            ->update(['status' => 'overdue']);
+
+        return $count;
+    }
+
+    /**
+     * Apply late fee to overdue invoices.
+     * Run via scheduler.
+     */
+    public function applyLateFees(): int
+    {
+        $lateFeeAmount = floatval(Setting::get('late_fee_amount', 0));
+        $lateFeeAfter  = intval(Setting::get('late_fee_after_days', 7));
+
+        if ($lateFeeAmount <= 0) return 0;
+
+        $cutoffDate = now()->subDays($lateFeeAfter)->toDateString();
+        $count      = 0;
+
+        $overdueInvoices = Invoice::where('status', 'overdue')
+            ->whereDate('due_date', '<', $cutoffDate)
+            ->whereNull('late_fee_applied_at')
+            ->get();
+
+        foreach ($overdueInvoices as $invoice) {
+            $invoice->increment('due_amount', $lateFeeAmount);
+            $invoice->increment('amount', $lateFeeAmount);
+            $invoice->update(['late_fee_applied_at' => now()]);
+            $count++;
+        }
+
+        return $count;
+    }
+
+    /**
+     * Check if MikroTik auto restore is needed after payment.
+     */
+    public function checkAndRestoreMikrotik(Customer $customer): void
+    {
+        // Check if auto restore is enabled in settings
+        $autoRestore = Setting::get('mikrotik_auto_restore_on_payment', false);
+
+        if (!$autoRestore) return;
+
+        // Check if all invoices are paid
+        $hasDue = $customer->invoices()
+            ->whereIn('status', ['unpaid', 'partial', 'overdue'])
+            ->exists();
+
+        if (!$hasDue && $customer->router_id) {
+            // All dues cleared — restore MikroTik
+            try {
+                app(\App\Http\Controllers\MikrotikController::class)
+                    ->restoreCustomerById($customer->id);
+            } catch (\Exception $e) {
+                \Log::error('MikroTik restore failed for customer ' . $customer->id . ': ' . $e->getMessage());
+            }
+        }
+    }
+
+    /**
      * Get stats data for invoice list page cards.
      */
     public function getInvoiceStats(): array
@@ -287,8 +409,7 @@ class BillingService
         $generatedThis = Invoice::where('month', $thisMonth)->count();
         $generatedLast = Invoice::where('month', $lastMonth)->count();
 
-        $advanceTotal = Customer::sum('advance_balance');
-
+        $advanceTotal    = Customer::sum('advance_balance');
         $monthlyBillThis = Invoice::where('month', $thisMonth)->sum('amount');
         $monthlyBillLast = Invoice::where('month', $lastMonth)->sum('amount');
 

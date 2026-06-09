@@ -8,9 +8,11 @@ use App\Models\Package;
 use App\Models\MikrotikRouter;
 use App\Models\Zone;
 use App\Models\ActivityLog;
+use App\Models\Setting;
 use App\Services\BillingService;
 use Illuminate\Http\Request;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
@@ -18,9 +20,6 @@ class InvoiceController extends Controller
 {
     public function __construct(protected BillingService $billing) {}
 
-    /**
-     * Display invoice list with filters and stats cards.
-     */
     public function index(Request $request)
     {
         $invoices = Invoice::with(['customer', 'package'])
@@ -52,16 +51,14 @@ class InvoiceController extends Controller
         $zones           = Zone::all();
         $connectionTypes = \App\Models\ConnectionType::all();
         $clientTypes     = \App\Models\ClientType::all();
+        $billingType     = Setting::get('billing_type', 'monthly');
 
         return view('invoices.index', compact(
             'invoices', 'stats', 'packages', 'routers',
-            'zones', 'connectionTypes', 'clientTypes'
+            'zones', 'connectionTypes', 'clientTypes', 'billingType'
         ));
     }
 
-    /**
-     * Store a newly created invoice.
-     */
     public function store(Request $request)
     {
         $request->validate([
@@ -86,17 +83,21 @@ class InvoiceController extends Controller
 
         $customer = Customer::find($request->customer_id);
 
+        // Calculate due date from settings if not provided
+        $dueDate = $request->due_date ?? Invoice::calculateDueDate();
+
         $invoice = Invoice::create([
-            'invoice_no'  => Invoice::generateNumber(),
-            'customer_id' => $request->customer_id,
-            'package_id'  => $customer->package_id,
-            'month'       => $request->month,
-            'amount'      => $request->amount,
-            'discount'    => $request->discount ?? 0,
-            'due_amount'  => $request->amount - ($request->discount ?? 0),
-            'due_date'    => $request->due_date,
-            'notes'       => $request->notes,
-            'status'      => 'unpaid',
+            'invoice_no'   => Invoice::generateNumber(),
+            'customer_id'  => $request->customer_id,
+            'package_id'   => $customer->package_id,
+            'month'        => $request->month,
+            'billing_type' => 'monthly',
+            'amount'       => $request->amount,
+            'discount'     => $request->discount ?? 0,
+            'due_amount'   => $request->amount - ($request->discount ?? 0),
+            'due_date'     => $dueDate,
+            'notes'        => $request->notes,
+            'status'       => 'unpaid',
         ]);
 
         if ($customer->advance_balance > 0) {
@@ -112,18 +113,16 @@ class InvoiceController extends Controller
         return redirect()->route('invoices.index')->with('success', 'Invoice created successfully.');
     }
 
-    /**
-     * Display the invoice detail page with payment history.
-     */
     public function show(Invoice $invoice)
     {
         $invoice->load(['customer', 'package', 'payments.receivedBy', 'payments.voidLog.voidedBy']);
-        return view('invoices.show', compact('invoice'));
+        $footerText = Setting::get('invoice_footer_text', 'Thank you for your payment.');
+        $currency   = Setting::get('currency', 'BDT');
+        $vatPercent = floatval(Setting::get('vat_percentage', 0));
+
+        return view('invoices.show', compact('invoice', 'footerText', 'currency', 'vatPercent'));
     }
 
-    /**
-     * Delete an invoice.
-     */
     public function destroy(Invoice $invoice)
     {
         if ($invoice->status === 'paid') {
@@ -139,26 +138,36 @@ class InvoiceController extends Controller
         return redirect()->route('invoices.index')->with('success', 'Invoice deleted successfully.');
     }
 
-    /**
-     * Download invoice as PDF.
-     */
     public function pdf(Invoice $invoice)
     {
         $invoice->load(['customer', 'package', 'payments']);
-        $pdf = Pdf::loadView('invoices.pdf', compact('invoice'));
+        $footerText = Setting::get('invoice_footer_text', 'Thank you for your payment.');
+        $currency   = Setting::get('currency', 'BDT');
+        $vatPercent = floatval(Setting::get('vat_percentage', 0));
+
+        $pdf = Pdf::loadView('invoices.pdf', compact('invoice', 'footerText', 'currency', 'vatPercent'));
         return $pdf->download('invoice-' . $invoice->invoice_no . '.pdf');
     }
 
-    /**
-     * Bulk generate invoices for all active customers.
-     */
     public function bulkGenerate(Request $request)
     {
         $request->validate(['month' => 'required|date_format:Y-m']);
 
+        $billingType = Setting::get('billing_type', 'monthly');
+
+        // Date to Date billing — bulk generate not applicable
+        if ($billingType === 'date_to_date') {
+            return back()->with('error', 'Bulk generate is not available for Date to Date billing. Invoices are generated automatically via scheduler.');
+        }
+
         $customers = Customer::active()->with('package')->get();
         $created   = 0;
         $skipped   = 0;
+
+        // Due date from settings
+        $defaultBillingDate = intval(Setting::get('default_billing_date', 1));
+        $monthCarbon        = Carbon::createFromFormat('Y-m', $request->month);
+        $dueDate            = $monthCarbon->copy()->day($defaultBillingDate)->endOfMonth()->toDateString();
 
         foreach ($customers as $customer) {
             $exists = Invoice::where('customer_id', $customer->id)
@@ -168,14 +177,15 @@ class InvoiceController extends Controller
             if ($exists) { $skipped++; continue; }
 
             $invoice = Invoice::create([
-                'invoice_no'  => Invoice::generateNumber(),
-                'customer_id' => $customer->id,
-                'package_id'  => $customer->package_id,
-                'month'       => $request->month,
-                'amount'      => $customer->package->price ?? 0,
-                'due_amount'  => $customer->package->price ?? 0,
-                'due_date'    => now()->endOfMonth(),
-                'status'      => 'unpaid',
+                'invoice_no'   => Invoice::generateNumber(),
+                'customer_id'  => $customer->id,
+                'package_id'   => $customer->package_id,
+                'month'        => $request->month,
+                'billing_type' => 'monthly',
+                'amount'       => $customer->package->price ?? 0,
+                'due_amount'   => $customer->package->price ?? 0,
+                'due_date'     => $dueDate,
+                'status'       => 'unpaid',
             ]);
 
             if ($customer->advance_balance > 0) {
@@ -189,9 +199,6 @@ class InvoiceController extends Controller
         return back()->with('success', "{$created} invoice(s) created, {$skipped} skipped (already existed).");
     }
 
-    /**
-     * Bulk delete unpaid invoices.
-     */
     public function bulkDelete(Request $request)
     {
         $ids = $request->ids ?? [];
@@ -203,34 +210,29 @@ class InvoiceController extends Controller
         return response()->json(['message' => 'Deleted successfully.']);
     }
 
-    /**
-     * Bulk XLSX export.
-     */
     public function bulkXlsx(Request $request)
     {
         $ids      = explode(',', $request->ids ?? '');
         $invoices = Invoice::with(['customer', 'package'])->whereIn('id', $ids)->get();
+        $currency = Setting::get('currency', 'BDT');
 
         $spreadsheet = new Spreadsheet();
         $sheet       = $spreadsheet->getActiveSheet();
 
-        // Header row
         $headers = ['A' => 'Invoice No', 'B' => 'Customer', 'C' => 'Customer Code', 'D' => 'Phone',
-                    'E' => 'Package', 'F' => 'Month', 'G' => 'Amount', 'H' => 'Discount',
-                    'I' => 'Due', 'J' => 'Status', 'K' => 'Due Date'];
+                    'E' => 'Package', 'F' => 'Period', 'G' => 'Amount (' . $currency . ')',
+                    'H' => 'Discount', 'I' => 'Due', 'J' => 'Status', 'K' => 'Due Date'];
 
         foreach ($headers as $col => $header) {
             $sheet->setCellValue($col . '1', $header);
             $sheet->getColumnDimension($col)->setAutoSize(true);
         }
 
-        // Style header
         $sheet->getStyle('A1:K1')->getFont()->setBold(true);
         $sheet->getStyle('A1:K1')->getFill()
             ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
             ->getStartColor()->setARGB('FF3C8DBC');
 
-        // Data rows
         foreach ($invoices as $row => $inv) {
             $r = $row + 2;
             $sheet->setCellValue('A' . $r, $inv->invoice_no);
@@ -238,7 +240,7 @@ class InvoiceController extends Controller
             $sheet->setCellValue('C' . $r, $inv->customer->customer_code ?? '-');
             $sheet->setCellValue('D' . $r, $inv->customer->phone);
             $sheet->setCellValue('E' . $r, $inv->package->name ?? '-');
-            $sheet->setCellValue('F' . $r, $inv->month);
+            $sheet->setCellValue('F' . $r, $inv->period_label);
             $sheet->setCellValue('G' . $r, floatval($inv->amount));
             $sheet->setCellValue('H' . $r, floatval($inv->discount));
             $sheet->setCellValue('I' . $r, floatval($inv->due_amount));
@@ -261,9 +263,6 @@ class InvoiceController extends Controller
         ])->deleteFileAfterSend(true);
     }
 
-    /**
-     * Bulk PDF download.
-     */
     public function bulkPdf(Request $request)
     {
         $ids      = explode(',', $request->ids ?? '');
@@ -273,14 +272,16 @@ class InvoiceController extends Controller
             return back()->with('error', 'No invoices selected.');
         }
 
-        // Single invoice — direct download
+        $footerText = Setting::get('invoice_footer_text', 'Thank you for your payment.');
+        $currency   = Setting::get('currency', 'BDT');
+        $vatPercent = floatval(Setting::get('vat_percentage', 0));
+
         if ($invoices->count() === 1) {
             $invoice = $invoices->first();
-            $pdf     = Pdf::loadView('invoices.pdf', compact('invoice'));
+            $pdf     = Pdf::loadView('invoices.pdf', compact('invoice', 'footerText', 'currency', 'vatPercent'));
             return $pdf->download('invoice-' . $invoice->invoice_no . '.pdf');
         }
 
-        // Multiple — ZIP
         $zipName = 'invoices-' . now()->format('Y-m-d') . '.zip';
         $zipPath = storage_path('app/temp/' . $zipName);
 
@@ -292,7 +293,7 @@ class InvoiceController extends Controller
         $zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
 
         foreach ($invoices as $invoice) {
-            $pdf     = Pdf::loadView('invoices.pdf', compact('invoice'));
+            $pdf     = Pdf::loadView('invoices.pdf', compact('invoice', 'footerText', 'currency', 'vatPercent'));
             $pdfPath = storage_path('app/temp/' . $invoice->invoice_no . '.pdf');
             $pdf->save($pdfPath);
             $zip->addFile($pdfPath, $invoice->invoice_no . '.pdf');
@@ -303,13 +304,9 @@ class InvoiceController extends Controller
         return response()->download($zipPath, $zipName)->deleteFileAfterSend(true);
     }
 
-    /**
-     * Bulk SMS send.
-     */
     public function bulkSms(Request $request)
     {
         $ids = $request->ids ?? [];
-        // SMS service call here
         return response()->json(['message' => count($ids) . ' SMS queued successfully.']);
     }
 }

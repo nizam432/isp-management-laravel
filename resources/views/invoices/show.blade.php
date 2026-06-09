@@ -9,9 +9,9 @@
             <a href="{{ route('invoices.index') }}" class="btn btn-default btn-sm">
                 <i class="fas fa-arrow-left mr-1"></i> Go Back
             </a>
-            <button onclick="window.print()" class="btn btn-info btn-sm ml-1">
-                <i class="fas fa-print mr-1"></i> Print Receipt
-            </button>
+            <a href="{{ route('invoices.receipt', $invoice) }}" class="btn btn-info btn-sm ml-1">
+                <i class="fas fa-receipt mr-1"></i> Print Receipt
+            </a>
             {{-- <a href="#" class="btn btn-warning btn-sm ml-1">
                 <i class="fas fa-sms mr-1"></i> Send SMS
             </a> --}}
@@ -134,20 +134,34 @@
                     </thead>
                     <tbody>
                         <tr>
-                            <td class="pl-0">Monthly Internet Bill — {{ $invoice->package->name ?? 'Internet Service' }}</td>
-                            <td class="pr-0 text-right">BDT {{ number_format($invoice->amount, 2) }}</td>
+                            <td class="pl-0">Internet Bill — {{ $invoice->period_label }} — {{ $invoice->package->name ?? 'Internet Service' }}</td>
+                            <td class="pr-0 text-right">{{ $currency }} {{ number_format($invoice->amount, 2) }}</td>
                         </tr>
                         @if($invoice->discount > 0)
                         <tr>
                             <td class="pl-0 text-muted">Discount</td>
-                            <td class="pr-0 text-right text-muted">- BDT {{ number_format($invoice->discount, 2) }}</td>
+                            <td class="pr-0 text-right text-muted">- {{ $currency }} {{ number_format($invoice->discount, 2) }}</td>
+                        </tr>
+                        @endif
+                        @php $advancePaid = $invoice->payments->where('method', 'advance')->where('status', 'active')->sum('amount'); @endphp
+                        @if($advancePaid > 0)
+                        <tr>
+                            <td class="pl-0 text-muted">Advance Paid</td>
+                            <td class="pr-0 text-right text-muted">- {{ $currency }} {{ number_format($advancePaid, 2) }}</td>
+                        </tr>
+                        @endif
+                        @if($vatPercent > 0)
+                        @php $vatAmount = ($invoice->amount - $invoice->discount) * ($vatPercent / 100); @endphp
+                        <tr>
+                            <td class="pl-0 text-muted">VAT ({{ $vatPercent }}%)</td>
+                            <td class="pr-0 text-right text-muted">+ {{ $currency }} {{ number_format($vatAmount, 2) }}</td>
                         </tr>
                         @endif
                     </tbody>
                     <tfoot>
                         <tr>
                             <td class="pl-0 font-weight-bold">Total Due</td>
-                            <td class="pr-0 text-right invoice-total">BDT {{ number_format($invoice->due_amount, 2) }}</td>
+                            <td class="pr-0 text-right invoice-total">{{ $currency }} {{ number_format($invoice->due_amount, 2) }}</td>
                         </tr>
                     </tfoot>
                 </table>
@@ -196,7 +210,7 @@
 
             {{-- Footer --}}
             <div class="card-footer d-flex justify-content-between align-items-center" style="background: var(--color-background-secondary);">
-                <small class="text-muted">Thank you for your payment!</small>
+                <small class="text-muted">{{ $footerText }}</small>
                 <small class="text-muted">Support: {{ $companyPhone }}</small>
             </div>
 

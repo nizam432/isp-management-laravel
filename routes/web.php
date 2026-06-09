@@ -67,6 +67,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::resource('invoices', InvoiceController::class)->except(['edit', 'update']);
     Route::get('invoices/{invoice}/pdf',     [InvoiceController::class, 'pdf'])->name('invoices.pdf');
+    Route::get('invoices/{invoice}/receipt', [InvoiceController::class, 'receipt'])->name('invoices.receipt');
 
     // ── Payments ───────────────────────────────
     Route::get('payments',                          [PaymentController::class, 'index'])->name('payments.index');
