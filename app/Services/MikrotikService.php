@@ -170,6 +170,20 @@ class MikrotikService
     }
 
     /**
+     * নাম দিয়ে একটি PPPoE user খোঁজো
+     * Return করে user array অথবা null যদি না পাওয়া যায়
+     */
+    public function getPPPoEUserByName(string $username): ?array
+    {
+        $result = $this->api->query([
+            '/ppp/secret/print',
+            '?name=' . $username,
+        ]);
+
+        return $result[0] ?? null;
+    }
+
+    /**
      * PPPoE user এর .id বের করো
      */
     private function getPPPoEUserId(string $username): ?string

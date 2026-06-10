@@ -568,12 +568,6 @@ function previewImg(input, previewId, placeholderId) {
     reader.readAsDataURL(file);
 }
 
-// ── Package → bill amount ────────────────────────────────
-$('#packageSelect').on('change', function() {
-    var price = $(this).find(':selected').data('price');
-    if (price && !$('#billAmount').val()) $('#billAmount').val(price);
-});
-
 // ── Zone → SubZone AJAX ──────────────────────────────────
 var currentSubZone = '{{ $customer->sub_zone_id }}';
 

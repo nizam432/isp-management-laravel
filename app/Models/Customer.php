@@ -10,7 +10,7 @@ class Customer extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $fillable = ['occupation', 'gender','zone_id', 'sub_zone_id',
+    protected $fillable = ['mikrotik_status','occupation', 'gender','zone_id', 'sub_zone_id',
         'connection_type_id', 'client_type_id', 'protocol_type_id','router_id', 
         'billing_status', 'monthly_bill_amount', 'portal_password',
         'customer_code', 'name', 'phone', 'email', 'nid_number',

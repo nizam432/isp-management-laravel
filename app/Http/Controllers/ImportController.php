@@ -49,9 +49,10 @@ class ImportController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            return back()->with('error', 'MikroTik connect করতে সমস্যা: ' . $e->getMessage());
+            return back()->with('error', 'Failed to connect to MikroTik: ' . $e->getMessage());
         }
     }
+
     public function mikrotikSingleImport(Request $request)
     {
         $request->validate([
@@ -70,11 +71,11 @@ class ImportController extends Controller
             'customer_code'   => $this->generateUniqueCode(),
             'name'            => 'Imported - ' . $request->username,
             'phone'           => $this->generateUniquePhone(),
-           // 'phone'           => '00000000000',
             'pppoe_username'  => $request->username,
             'pppoe_password'  => $request->password,
             'package_id'      => $package?->id,
             'router_id'       => $request->router_id,
+            'connection_date' => today(),
             'billing_date'    => 1,
             'status'          => $disabled ? 'suspended' : 'active',
             'mikrotik_status' => $disabled ? 'suspended' : 'active',
@@ -83,20 +84,20 @@ class ImportController extends Controller
         ]);
 
         return redirect()->route('customers.edit', $customer)
-            ->with('success', "'{$request->username}' import হয়েছে। এখন বাকি তথ্য দিন।");
+            ->with('success', "'{$request->username}' imported successfully. Please fill in the remaining details.");
     }
+
     public function mikrotikImport(Request $request)
     {
-
         $request->validate([
-            'users' => 'required|array',
+            'users'     => 'required|array',
             'router_id' => 'required|integer',
         ]);
 
         $imported = 0;
         $skipped  = 0;
 
-        // Default package — profile match না হলে ব্যবহার হবে
+        // Default package — used when no profile match is found
         $defaultPackage = Package::active()->first();
 
         foreach ($request->users as $username) {
@@ -105,46 +106,45 @@ class ImportController extends Controller
                 continue;
             }
 
-            // Already আছে কিনা check
+            // Skip if already exists
             if (Customer::where('pppoe_username', $username)->exists()) {
                 $skipped++;
                 continue;
             }
 
-            $password   = $request->input("password_{$username}", 'pass' . rand(10000, 99999));
-            $profile    = $request->input("profile_{$username}");
-            $disabled   = $request->input("disabled_{$username}", 'false');
+            $password = $request->input("password_{$username}", 'pass' . rand(10000, 99999));
+            $profile  = $request->input("profile_{$username}");
+            $disabled = $request->input("disabled_{$username}", 'false');
 
-            // Profile দিয়ে package match করো
+            // Match package by MikroTik profile name
             $package = $profile
                 ? Package::where('mikrotik_profile', $profile)->first()
                 : null;
 
-            // Match না হলে default package
+            // Fall back to default package if no match
             $package = $package ?? $defaultPackage;
 
-            // MikroTik disabled status অনুযায়ী customer status
+            // Set customer status based on MikroTik disabled flag
             $status         = ($disabled === 'true') ? 'suspended' : 'active';
             $mikrotikStatus = ($disabled === 'true') ? 'suspended' : 'active';
 
-           
-                Customer::create([
-                    'customer_code'   => $this->generateUniqueCode(),
-                    'name'            => 'Imported - ' . $username,
-                    'phone'           => $this->generateUniquePhone(),
-                    //'phone'           => '00000000000',
-                    'pppoe_username'  => $username,
-                    'pppoe_password'  => $password,
-                    'package_id'      => $package?->id,
-                    'billing_date'    => 1,
-                    'router_id'       => $request->router_id,
-                    'status'          => $status,
-                    'mikrotik_status' => $mikrotikStatus,
-                    'created_by'      => auth()->id(),
-                    'remarks'         => 'Imported from MikroTik',
-                ]);
+            Customer::create([
+                'customer_code'   => $this->generateUniqueCode(),
+                'name'            => 'Imported - ' . $username,
+                'phone'           => $this->generateUniquePhone(),
+                'pppoe_username'  => $username,
+                'pppoe_password'  => $password,
+                'package_id'      => $package?->id,
+                'connection_date' => today(),
+                'billing_date'    => 1,
+                'router_id'       => $request->router_id,
+                'status'          => $status,
+                'mikrotik_status' => $mikrotikStatus,
+                'created_by'      => auth()->id(),
+                'remarks'         => 'Imported from MikroTik',
+            ]);
 
-                $imported++;
+            $imported++;
 
             try { } catch (\Exception $e) {
                 Log::warning("MikroTik Import failed for [{$username}]: " . $e->getMessage());
@@ -153,8 +153,10 @@ class ImportController extends Controller
         }
 
         return redirect()->route('customers.index')
-            ->with('success', "{$imported} জন customer import হয়েছে। {$skipped} টি skip হয়েছে।");
-    }    // ══════════════════════════════════════════════
+            ->with('success', "{$imported} customer(s) imported successfully. {$skipped} skipped.");
+    }
+
+    // ══════════════════════════════════════════════
     // CSV Import
     // ══════════════════════════════════════════════
 
@@ -221,22 +223,21 @@ class ImportController extends Controller
                 }
 
                 Customer::create([
-                    'customer_code'  => $this->generateUniqueCode(),
-                    'name'           => $row['name']           ?? ('User-' . ($row['pppoe_username'] ?? $index)),
-                    'phone'          => !empty($row['phone']) ? $row['phone'] : $this->generateUniquePhone(),
-                   
-                   'email'          => $row['email']          ?? null,
-                    'address'        => $row['address']        ?? null,
-                    'area'           => $row['area']           ?? null,
-                    'pppoe_username' => $row['pppoe_username'] ?? null,
-                    'pppoe_password' => $row['pppoe_password'] ?? null,
-                    'ip_address'     => $row['ip_address']     ?? null,
-                    'package_id'     => $request->package_id,
-                    'billing_date'   => $row['billing_date']   ?? 1,
-                    'status'         => 'active',
-                    'mikrotik_status'=> 'active',
-                    'created_by'     => auth()->id(),
-                    'remarks'        => 'CSV Import',
+                    'customer_code'   => $this->generateUniqueCode(),
+                    'name'            => $row['name']           ?? ('User-' . ($row['pppoe_username'] ?? $index)),
+                    'phone'           => !empty($row['phone']) ? $row['phone'] : $this->generateUniquePhone(),
+                    'email'           => $row['email']          ?? null,
+                    'address'         => $row['address']        ?? null,
+                    'area'            => $row['area']           ?? null,
+                    'pppoe_username'  => $row['pppoe_username'] ?? null,
+                    'pppoe_password'  => $row['pppoe_password'] ?? null,
+                    'ip_address'      => $row['ip_address']     ?? null,
+                    'package_id'      => $request->package_id,
+                    'billing_date'    => $row['billing_date']   ?? 1,
+                    'status'          => 'active',
+                    'mikrotik_status' => 'active',
+                    'created_by'      => auth()->id(),
+                    'remarks'         => 'CSV Import',
                 ]);
 
                 $imported++;
@@ -248,7 +249,7 @@ class ImportController extends Controller
         }
 
         return redirect()->route('customers.index')
-            ->with('success', "{$imported} জন customer import হয়েছে। {$skipped} টি skip।");
+            ->with('success', "{$imported} customer(s) imported successfully. {$skipped} skipped.");
     }
 
     public function downloadTemplate()

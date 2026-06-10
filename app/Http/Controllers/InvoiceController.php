@@ -176,14 +176,18 @@ class InvoiceController extends Controller
 
             if ($exists) { $skipped++; continue; }
 
+            $amount = $customer->monthly_bill_amount > 0
+                ? $customer->monthly_bill_amount
+                : ($customer->package->price ?? 0);
+
             $invoice = Invoice::create([
                 'invoice_no'   => Invoice::generateNumber(),
                 'customer_id'  => $customer->id,
                 'package_id'   => $customer->package_id,
                 'month'        => $request->month,
                 'billing_type' => 'monthly',
-                'amount'       => $customer->package->price ?? 0,
-                'due_amount'   => $customer->package->price ?? 0,
+                'amount'       => $amount,
+                'due_amount'   => $amount,
                 'due_date'     => $dueDate,
                 'status'       => 'unpaid',
             ]);

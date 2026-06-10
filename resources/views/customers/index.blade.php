@@ -2,6 +2,9 @@
 @extends('layouts.app')
 @section('page_title', 'Customers')
 @section('page_actions')
+    <button class="btn btn-info btn-sm" onclick="startSync()">
+        <i class="fas fa-sync-alt mr-1"></i> Sync M.Status
+    </button>
     <a href="{{ route('customers.create') }}" class="btn btn-primary btn-sm">
         <i class="fas fa-plus mr-1"></i> Add Customer
     </a>
@@ -270,6 +273,7 @@
                     <th>MikroTik</th>
                     <th>Billing</th>
                     <th>Status</th>
+                    <th>M.Status</th>
                     <th style="width:130px">Action</th>
                 </tr>
             </thead>
@@ -386,6 +390,28 @@
                             ($customer->status === 'suspended' ? 'warning' :
                             ($customer->status === 'expired'   ? 'danger'  : 'secondary'))
                         }}">{{ ucfirst($customer->status) }}</span>
+                    </td>
+
+                    {{-- M.Status --}}
+                    <td>
+                        @php
+                            $ms = $customer->mikrotik_status ?? 'pending';
+                            $msBadge = match($ms) {
+                                'active'    => 'success',
+                                'suspended' => 'warning',
+                                'removed'   => 'danger',
+                                default     => 'secondary',
+                            };
+                            $msIcon = match($ms) {
+                                'active'    => 'fa-check-circle',
+                                'suspended' => 'fa-ban',
+                                'removed'   => 'fa-times-circle',
+                                default     => 'fa-clock',
+                            };
+                        @endphp
+                        <span class="badge badge-{{ $msBadge }}" title="MikroTik: {{ ucfirst($ms) }}">
+                            <i class="fas {{ $msIcon }} mr-1"></i>{{ ucfirst($ms) }}
+                        </span>
                     </td>
 
                     {{-- Action --}}
@@ -550,6 +576,39 @@
                 <button type="button" class="btn btn-success btn-sm" onclick="sendSms()">
                     <i class="fas fa-paper-plane mr-1"></i> Send
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- ── Sync Progress Modal ──────────────────────────────── --}}
+<div class="modal fade" id="syncModal" tabindex="-1" data-backdrop="static" data-keyboard="false">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header py-2" style="background:#001f3f;color:#fff;">
+                <h6 class="modal-title mb-0"><i class="fas fa-sync-alt mr-1"></i> MikroTik Sync</h6>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div id="sync-spinner" class="mb-2">
+                    <i class="fas fa-spinner fa-spin fa-2x text-info"></i>
+                </div>
+                <div id="sync-progress-wrap" class="mb-2" style="display:none;">
+                    <div class="progress" style="height:8px;">
+                        <div class="progress-bar bg-info progress-bar-striped progress-bar-animated"
+                             id="sync-progress-bar" style="width:0%"></div>
+                    </div>
+                </div>
+                <p id="sync-message" class="mb-1 text-muted small">Starting sync...</p>
+                <p id="sync-counter" class="font-weight-bold mb-0 text-info"></p>
+            </div>
+            <div class="modal-footer py-2 d-none" id="sync-done-footer">
+                <div class="w-100 text-center">
+                    <div id="sync-result" class="mb-2 small"></div>
+                    <button class="btn btn-success btn-sm"
+                            onclick="$('#syncModal').modal('hide'); location.reload();">
+                        <i class="fas fa-check mr-1"></i> Done — Reload
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -720,5 +779,75 @@ function sendSms() {
         error:   function() { alert('Failed to send SMS.'); }
     });
 }
+
+// ── MikroTik Sync All ─────────────────────────────────
+var syncPollInterval = null;
+
+function startSync() {
+    if (!confirm('Sync all customers MikroTik status? This may take a few minutes.')) return;
+
+    // Reset modal
+    document.getElementById('sync-spinner').style.display    = '';
+    document.getElementById('sync-progress-wrap').style.display = 'none';
+    document.getElementById('sync-message').textContent      = 'Starting sync...';
+    document.getElementById('sync-counter').textContent      = '';
+    document.getElementById('sync-done-footer').classList.add('d-none');
+    $('#syncModal').modal('show');
+
+    fetch('{{ route("mikrotik.sync.all") }}', {
+        method: 'POST',
+        headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) {
+            document.getElementById('sync-message').textContent = data.message;
+            return;
+        }
+        // Start polling
+        syncPollInterval = setInterval(pollSyncStatus, 2000);
+    })
+    .catch(() => {
+        document.getElementById('sync-message').textContent = 'Failed to start sync.';
+    });
+}
+
+function pollSyncStatus() {
+    fetch('{{ route("mikrotik.sync.status") }}')
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'running') {
+            document.getElementById('sync-spinner').style.display       = 'none';
+            document.getElementById('sync-progress-wrap').style.display = '';
+            document.getElementById('sync-message').textContent         = data.message ?? 'Processing...';
+
+            if (data.total > 0) {
+                var pct = Math.round((data.done / data.total) * 100);
+                document.getElementById('sync-progress-bar').style.width = pct + '%';
+                document.getElementById('sync-counter').textContent      = data.done + ' / ' + data.total;
+            }
+
+        } else if (data.status === 'completed') {
+            clearInterval(syncPollInterval);
+            document.getElementById('sync-spinner').style.display       = 'none';
+            document.getElementById('sync-progress-wrap').style.display = '';
+            document.getElementById('sync-progress-bar').style.width    = '100%';
+            document.getElementById('sync-progress-bar').classList.remove('progress-bar-animated');
+            document.getElementById('sync-message').textContent         = 'Sync complete!';
+            document.getElementById('sync-counter').textContent         = '';
+            document.getElementById('sync-result').innerHTML =
+                '<span class="text-success"><i class="fas fa-check-circle mr-1"></i>Active: <strong>' + (data.active ?? 0) + '</strong></span> &nbsp; ' +
+                '<span class="text-secondary"><i class="fas fa-clock mr-1"></i>Pending: <strong>' + (data.pending ?? 0) + '</strong></span> &nbsp; ' +
+                '<span class="text-info"><i class="fas fa-network-wired mr-1"></i>IPs updated: <strong>' + (data.ip_updated ?? 0) + '</strong></span>';
+            document.getElementById('sync-done-footer').classList.remove('d-none');
+
+        } else if (data.status === 'failed') {
+            clearInterval(syncPollInterval);
+            document.getElementById('sync-message').textContent = 'Sync failed: ' + data.message;
+            document.getElementById('sync-done-footer').classList.remove('d-none');
+        }
+    });
+}
+
 </script>
 @endpush

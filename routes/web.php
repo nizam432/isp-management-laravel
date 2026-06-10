@@ -106,6 +106,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('kick-by-username',        [MikrotikController::class, 'kickByUsername'])->name('kick-by-username');
         Route::post('bulk-suspend',            [MikrotikController::class, 'bulkSuspend'])->name('bulk.suspend');
         Route::post('sync-all',                [MikrotikController::class, 'syncAll'])->name('sync.all');
+        Route::get('sync-status',              [MikrotikController::class, 'syncStatus'])->name('sync.status');
         Route::put('pool/{pool}',              [MikrotikController::class, 'updatePool'])->name('pool.update');
         Route::delete('pool/{pool}',           [MikrotikController::class, 'destroyPool'])->name('pool.destroy');
         Route::put('{mikrotikRouter}',         [MikrotikController::class, 'update'])->name('update');

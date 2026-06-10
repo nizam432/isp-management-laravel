@@ -76,49 +76,153 @@
                 @endif
             </div>
 
-            {{-- Quick Info --}}
+            {{-- Detailed Info --}}
             <div class="card-body p-0">
-                <table class="table table-sm mb-0">
+                <table class="table table-sm mb-0" style="font-size:13px;">
+
+                    {{-- Phone --}}
                     <tr>
-                        <td class="text-muted pl-3" style="width:35%"><i class="fas fa-phone fa-fw mr-1"></i></td>
+                        <td class="text-muted pl-3" style="width:36%;white-space:nowrap;">
+                            <i class="fas fa-phone fa-fw mr-1"></i>Phone
+                        </td>
                         <td>
                             <a href="tel:{{ $customer->phone }}">{{ $customer->phone }}</a>
                             @if($customer->phone)
                                 <a href="https://wa.me/88{{ ltrim($customer->phone,'0') }}"
-                                   target="_blank" class="text-success ml-1"><i class="fab fa-whatsapp"></i></a>
+                                   target="_blank" class="text-success ml-1">
+                                    <i class="fab fa-whatsapp"></i>
+                                </a>
                             @endif
                         </td>
                     </tr>
+
+                    {{-- Email --}}
                     @if($customer->email)
                     <tr>
-                        <td class="text-muted pl-3"><i class="fas fa-envelope fa-fw mr-1"></i></td>
+                        <td class="text-muted pl-3"><i class="fas fa-envelope fa-fw mr-1"></i>Email</td>
                         <td><small>{{ $customer->email }}</small></td>
                     </tr>
                     @endif
+
+                    {{-- Gender --}}
+                    @if($customer->gender)
                     <tr>
-                        <td class="text-muted pl-3"><i class="fas fa-map-marker-alt fa-fw mr-1"></i></td>
-                        <td><small>{{ $customer->zone->name ?? '—' }} {{ $customer->subZone ? '/ '.$customer->subZone->name : '' }}</small></td>
+                        <td class="text-muted pl-3"><i class="fas fa-venus-mars fa-fw mr-1"></i>Gender</td>
+                        <td><small>{{ ucfirst($customer->gender) }}</small></td>
                     </tr>
+                    @endif
+
+                    {{-- Occupation --}}
+                    @if($customer->occupation)
                     <tr>
-                        <td class="text-muted pl-3"><i class="fas fa-calendar fa-fw mr-1"></i></td>
-                        <td><small>Bill: <strong>{{ $customer->billing_date }}</strong> of month</small></td>
+                        <td class="text-muted pl-3"><i class="fas fa-briefcase fa-fw mr-1"></i>Occupation</td>
+                        <td><small>{{ $customer->occupation }}</small></td>
                     </tr>
+                    @endif
+
+                    {{-- Package --}}
                     <tr>
-                        <td class="text-muted pl-3"><i class="fas fa-plug fa-fw mr-1"></i></td>
+                        <td class="text-muted pl-3"><i class="fas fa-box fa-fw mr-1"></i>Package</td>
+                        <td><small><strong>{{ $customer->package->name ?? '—' }}</strong>
+                            @if($customer->package?->price)
+                                <span class="text-muted">/ ৳{{ number_format($customer->package->price) }}</span>
+                            @endif
+                        </small></td>
+                    </tr>
+
+                    {{-- Bill Amount --}}
+                    @if($customer->monthly_bill_amount)
+                    <tr>
+                        <td class="text-muted pl-3"><i class="fas fa-money-bill fa-fw mr-1"></i>Bill Amount</td>
+                        <td><small><strong class="text-success">৳{{ number_format($customer->monthly_bill_amount) }}</strong></small></td>
+                    </tr>
+                    @endif
+
+                    {{-- Billing Date --}}
+                    <tr>
+                        <td class="text-muted pl-3"><i class="fas fa-calendar fa-fw mr-1"></i>Billing Date</td>
+                        <td><small>{{ $customer->billing_date }} of month</small></td>
+                    </tr>
+
+                    {{-- Expire Date --}}
+                    @if($customer->expire_date)
+                    <tr>
+                        <td class="text-muted pl-3"><i class="fas fa-calendar-times fa-fw mr-1"></i>Expire Date</td>
+                        <td>
+                            <small class="{{ $customer->expire_date->isPast() ? 'text-danger font-weight-bold' : '' }}">
+                                {{ $customer->expire_date->format('d M Y') }}
+                            </small>
+                        </td>
+                    </tr>
+                    @endif
+
+                    {{-- Connection Date --}}
+                    <tr>
+                        <td class="text-muted pl-3"><i class="fas fa-plug fa-fw mr-1"></i>Connected</td>
                         <td><small>{{ $customer->connection_date?->format('d M Y') ?? '—' }}</small></td>
                     </tr>
+
+                    {{-- Bill Status --}}
+                    @if($customer->bill_status)
+                    <tr>
+                        <td class="text-muted pl-3"><i class="fas fa-file-invoice-dollar fa-fw mr-1"></i>Bill Status</td>
+                        <td>
+                            <span class="badge badge-{{ $customer->bill_status === 'paid' ? 'success' : ($customer->bill_status === 'overdue' ? 'danger' : 'warning') }}">
+                                {{ ucfirst($customer->bill_status) }}
+                            </span>
+                        </td>
+                    </tr>
+                    @endif
+
+                    {{-- Zone + Sub Zone --}}
+                    <tr>
+                        <td class="text-muted pl-3"><i class="fas fa-map-marker-alt fa-fw mr-1"></i>Zone</td>
+                        <td><small>
+                            {{ $customer->zone->name ?? '—' }}
+                            @if($customer->subZone), {{ $customer->subZone->name }}@endif
+                        </small></td>
+                    </tr>
+
+                    {{-- Connection Type --}}
+                    @if($customer->connectionType)
+                    <tr>
+                        <td class="text-muted pl-3"><i class="fas fa-network-wired fa-fw mr-1"></i>Connection</td>
+                        <td><small>{{ $customer->connectionType->name }}</small></td>
+                    </tr>
+                    @endif
+
+                    {{-- Protocol Type --}}
+                    @if($customer->protocolType)
+                    <tr>
+                        <td class="text-muted pl-3"><i class="fas fa-code-branch fa-fw mr-1"></i>Protocol</td>
+                        <td><small>{{ $customer->protocolType->name }}</small></td>
+                    </tr>
+                    @endif
+
+                    {{-- Client Type --}}
+                    @if($customer->clientType)
+                    <tr>
+                        <td class="text-muted pl-3"><i class="fas fa-users fa-fw mr-1"></i>Client Type</td>
+                        <td><small>{{ $customer->clientType->name }}</small></td>
+                    </tr>
+                    @endif
+
+                    {{-- Agent --}}
                     @if($customer->agent)
                     <tr>
-                        <td class="text-muted pl-3"><i class="fas fa-user-tie fa-fw mr-1"></i></td>
+                        <td class="text-muted pl-3"><i class="fas fa-user-tie fa-fw mr-1"></i>Agent</td>
                         <td><small>{{ $customer->agent->name }}</small></td>
                     </tr>
                     @endif
+
+                    {{-- NID --}}
                     @if($customer->nid_number)
                     <tr>
-                        <td class="text-muted pl-3"><i class="fas fa-id-card fa-fw mr-1"></i></td>
+                        <td class="text-muted pl-3"><i class="fas fa-id-card fa-fw mr-1"></i>NID</td>
                         <td><small>{{ $customer->nid_number }}</small></td>
                     </tr>
                     @endif
+
                 </table>
             </div>
         </div>
@@ -362,12 +466,17 @@
 </div>
 
 {{-- ══════════════════════════════════════════════════════ --}}
-{{-- ROW 2: Invoices + Tickets                            --}}
+{{-- ROW 2: Empty placeholder (col-4) | Invoices+Tickets+Payments (col-8) --}}
 {{-- ══════════════════════════════════════════════════════ --}}
 <div class="row">
 
-    {{-- Invoices --}}
-    <div class="col-lg-7">
+    {{-- Empty placeholder to match left profile column --}}
+    <div class="col-lg-4 d-none d-lg-block"></div>
+
+    {{-- ── RIGHT col-8: Invoices, Tickets, Payment History ── --}}
+    <div class="col-lg-8">
+
+        {{-- Invoices --}}
         <div class="card">
             <div class="card-header py-2 d-flex justify-content-between align-items-center">
                 <h6 class="mb-0"><i class="fas fa-file-invoice mr-1 text-success"></i> Invoices</h6>
@@ -425,10 +534,8 @@
                 </table>
             </div>
         </div>
-    </div>
 
-    {{-- Tickets --}}
-    <div class="col-lg-5">
+        {{-- Support Tickets --}}
         <div class="card">
             <div class="card-header py-2 d-flex justify-content-between align-items-center">
                 <h6 class="mb-0"><i class="fas fa-ticket-alt mr-1 text-warning"></i> Support Tickets</h6>
@@ -452,7 +559,7 @@
                         @forelse($customer->tickets->sortByDesc('created_at') as $ticket)
                         <tr>
                             <td><small><code>{{ $ticket->ticket_no }}</code></small></td>
-                            <td><small>{{ Str::limit($ticket->subject, 30) }}</small></td>
+                            <td><small>{{ Str::limit($ticket->subject, 40) }}</small></td>
                             <td>
                                 <span class="badge badge-{{ match($ticket->priority) { 'urgent'=>'danger','high'=>'warning','medium'=>'info',default=>'secondary' } }}">
                                     {{ ucfirst($ticket->priority) }}
@@ -481,6 +588,44 @@
                 </table>
             </div>
         </div>
+
+        {{-- Payment History --}}
+        <div class="card">
+            <div class="card-header py-2">
+                <h6 class="mb-0"><i class="fas fa-money-bill-wave mr-1 text-success"></i> Payment History</h6>
+            </div>
+            <div class="card-body p-0">
+                @php $payments = $customer->payments->where('status','active')->sortByDesc('paid_at'); @endphp
+                @if($payments->isEmpty())
+                    <div class="text-center text-muted py-3">
+                        <i class="fas fa-money-bill-wave fa-lg d-block mb-1"></i>
+                        No payments yet.
+                    </div>
+                @else
+                <table class="table table-sm table-hover mb-0">
+                    <thead style="background:#f8f9fa;">
+                        <tr>
+                            <th>Date</th>
+                            <th>Amount</th>
+                            <th>Method</th>
+                            <th>Note</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($payments->take(10) as $pay)
+                        <tr>
+                            <td><small>{{ $pay->paid_at?->format('d M Y') }}</small></td>
+                            <td><small class="text-success font-weight-bold">৳{{ number_format($pay->amount) }}</small></td>
+                            <td><span class="badge badge-secondary">{{ ucfirst($pay->method ?? '—') }}</span></td>
+                            <td><small class="text-muted">{{ Str::limit($pay->note ?? '', 25) }}</small></td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+                @endif
+            </div>
+        </div>
+
     </div>
 
 </div>

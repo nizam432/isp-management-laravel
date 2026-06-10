@@ -41,8 +41,7 @@ class CustomerController extends Controller
             ->when($request->connection_type_id, fn($q) => $q->where('connection_type_id', $request->connection_type_id))
             ->when($request->agent_id,           fn($q) => $q->where('agent_id',           $request->agent_id))
             ->latest()
-            ->paginate($request->get('per_page', 20))
-            ->withQueryString();
+            ->paginate(20);
 
         $totalCustomers     = Customer::count();
         $activeCustomers    = Customer::where('status', 'active')->count();
@@ -251,11 +250,27 @@ class CustomerController extends Controller
                     default => null,
                 };
 
-                $customer->update(['mikrotik_status' => match ($newStatus) {
-                    'active'                           => 'active',
-                    'suspended', 'expired', 'inactive' => 'suspended',
-                    default                            => $oldMkStatus,
-                }]);
+                // Router থেকে actual status check করে mikrotik_status set করো
+                try {
+                    $mikrotik->withRouter($router, function ($m) use ($customer) {
+                        $user = $m->getPPPoEUserByName($customer->pppoe_username);
+
+                        if (!$user) {
+                            $customer->update(['mikrotik_status' => 'removed']);
+                        } elseif (isset($user['disabled']) && $user['disabled'] === 'true') {
+                            $customer->update(['mikrotik_status' => 'suspended']);
+                        } else {
+                            $customer->update(['mikrotik_status' => 'active']);
+                        }
+                    });
+                } catch (\Exception $e) {
+                    // Check fail হলে assumed status দিয়ে রাখো
+                    $customer->update(['mikrotik_status' => match ($newStatus) {
+                        'active'                           => 'active',
+                        'suspended', 'expired', 'inactive' => 'suspended',
+                        default                            => $oldMkStatus,
+                    }]);
+                }
 
                 if ($oldPackage !== $customer->package_id && $newStatus === 'active') {
                     $mikrotik->withRouter($router, fn($m) => $m->changeCustomerPackage($customer));

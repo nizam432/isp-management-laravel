@@ -10,6 +10,7 @@ use App\Jobs\MikrotikSyncJob;
 use App\Models\Package;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class MikrotikController extends Controller
@@ -417,59 +418,24 @@ class MikrotikController extends Controller
     /**
      * GET /customers/{customer}/mikrotik/session
      * Customer এর live session info
-     *
-     * Fix: !trap error gracefully handle করা হয়েছে।
-     * !trap = PPPoE user router এ নেই (not provisioned)।
-     * এই ক্ষেত্রে success=true, online=false, not_found=true return করবে।
      */
     public function customerSession(Customer $customer): JsonResponse
     {
         try {
-            $router = $this->getCustomerRouter($customer);
-
-            if (!$customer->pppoe_username) {
-                return response()->json([
-                    'success'   => true,
-                    'online'    => false,
-                    'session'   => null,
-                    'not_found' => true,
-                    'message'   => 'No PPPoE username set.',
-                ]);
-            }
-
-            $mikrotik  = new MikrotikService();
-            $session   = null;
-            $notFound  = false;
-
-            try {
-                $session = $mikrotik->withRouter(
-                    $router,
-                    fn($m) => $m->getCustomerSession($customer->pppoe_username)
-                );
-            } catch (\Exception $e) {
-                $msg = $e->getMessage();
-                // !trap বা no such item = router এ user নেই — treat as not provisioned
-                if (str_contains($msg, '!trap') || str_contains($msg, 'no such item')) {
-                    $notFound = true;
-                } else {
-                    throw $e; // real connection error — re-throw
-                }
-            }
+            $router   = $this->getCustomerRouter($customer);
+            $mikrotik = new MikrotikService();
+            $session  = $mikrotik->withRouter(
+                $router,
+                fn($m) => $m->getCustomerSession($customer->pppoe_username)
+            );
 
             return response()->json([
-                'success'   => true,
-                'online'    => !is_null($session) && !$notFound,
-                'session'   => $session,
-                'not_found' => $notFound,
+                'success' => true,
+                'online'  => !is_null($session),
+                'session' => $session,
             ]);
-
         } catch (\Exception $e) {
-            return response()->json([
-                'success'   => false,
-                'online'    => false,
-                'not_found' => false,
-                'message'   => $e->getMessage(),
-            ], 500);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 
@@ -498,12 +464,42 @@ class MikrotikController extends Controller
      */
     public function syncAll(): JsonResponse
     {
+        // Already running check
+        $current = Cache::get('mikrotik_sync_status');
+        if ($current && $current['status'] === 'running') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sync already running. Please wait.',
+            ]);
+        }
+
+        Cache::put('mikrotik_sync_status', [
+            'status'  => 'running',
+            'total'   => 0,
+            'done'    => 0,
+            'message' => 'Starting sync...',
+        ], 3600);
+
         MikrotikSyncJob::dispatch('sync_all', []);
 
         return response()->json([
             'success' => true,
-            'message' => 'Sync শুরু হয়েছে। Background এ চলছে।',
+            'message' => 'Sync started. Running in background.',
         ]);
+    }
+
+    /**
+     * GET /mikrotik/sync-status
+     * Sync progress check (polling)
+     */
+    public function syncStatus(): JsonResponse
+    {
+        $status = Cache::get('mikrotik_sync_status', [
+            'status'  => 'idle',
+            'message' => 'No sync running.',
+        ]);
+
+        return response()->json($status);
     }
 
     // ══════════════════════════════════════════════
