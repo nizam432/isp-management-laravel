@@ -37,6 +37,9 @@
     </div>
     @endif
 
+    {{-- Quick Add Category Modal (shared for Income & Expense) --}}
+    @include('accounting._quick_add_category_modal')
+
     @yield('page_content')
 
 @stop
@@ -68,6 +71,7 @@
         
     </style>
     @yield('extra_css')
+    @stack('css')
 @stop
 
 @section('js')
@@ -106,5 +110,6 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     @yield('extra_js')
-    
+    @stack('js')
+
 @stop

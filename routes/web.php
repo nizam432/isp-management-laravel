@@ -30,6 +30,9 @@ use App\Http\Controllers\HR\SalaryHeadController;
 use App\Http\Controllers\HR\PayrollController;
 use App\Http\Controllers\HR\LeaveController;
 use App\Http\Controllers\HR\SalaryAdvanceController;
+use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\IncomeController;
+use App\Http\Controllers\AccountingController;
 
 // ─────────────────────────────────────────────
 // Public Routes
@@ -293,6 +296,66 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/',                  [SalaryAdvanceController::class, 'index'])->name('index');
         Route::post('/',                 [SalaryAdvanceController::class, 'store'])->name('store');
         Route::post('/{advance}/deduct', [SalaryAdvanceController::class, 'deduct'])->name('deduct');
+    });
+
+    // ── Financial Module ───────────────────────
+    Route::prefix('expenses')->name('expenses.')->group(function () {
+
+        // P&L Report — static routes BEFORE resource-style {expense} routes
+        Route::get('reports/profit-loss',     [ExpenseController::class, 'profitLoss'])    ->name('profit-loss');
+        Route::get('reports/profit-loss/pdf', [ExpenseController::class, 'profitLossPdf']) ->name('profit-loss.pdf');
+        Route::get('api/chart-data',          [ExpenseController::class, 'chartData'])     ->name('chart-data');
+
+        // CRUD
+        Route::get('/',               [ExpenseController::class, 'index'])  ->name('index');
+        Route::get('/create',         [ExpenseController::class, 'create']) ->name('create');
+        Route::post('/',              [ExpenseController::class, 'store'])  ->name('store');
+        Route::get('/{expense}',      [ExpenseController::class, 'show'])   ->name('show');
+        Route::get('/{expense}/edit-data', [ExpenseController::class, 'editData']) ->name('edit-data');
+        Route::get('/{expense}/edit', [ExpenseController::class, 'edit'])   ->name('edit');
+        Route::put('/{expense}',      [ExpenseController::class, 'update']) ->name('update');
+
+        // Void & hard delete
+        Route::post('/{expense}/void', [ExpenseController::class, 'void'])    ->name('void');
+        Route::delete('/{expense}',    [ExpenseController::class, 'destroy']) ->name('destroy');
+    });
+
+    Route::prefix('expense-categories')->name('expense-categories.')->group(function () {
+        Route::get('/',                    [ExpenseController::class, 'categoriesIndex'])  ->name('index');
+        Route::post('/',                   [ExpenseController::class, 'categoryStore'])    ->name('store');
+        Route::post('/quick-add',          [ExpenseController::class, 'quickAddCategory']) ->name('quick-add');
+        Route::put('/{expenseCategory}',   [ExpenseController::class, 'categoryUpdate'])   ->name('update');
+        Route::delete('/{expenseCategory}',[ExpenseController::class, 'categoryDestroy'])  ->name('destroy');
+    });
+
+    // ── Income Module ────────────────────────
+    Route::prefix('incomes')->name('incomes.')->group(function () {
+
+        // Static routes BEFORE {income} to avoid route collision
+        Route::get('/',                   [IncomeController::class, 'index'])           ->name('index');
+        Route::post('/',                  [IncomeController::class, 'store'])           ->name('store');
+        Route::get('/{income}/edit-data', [IncomeController::class, 'editData'])        ->name('edit-data');
+        Route::get('/{income}',           [IncomeController::class, 'show'])            ->name('show');
+        Route::put('/{income}',           [IncomeController::class, 'update'])          ->name('update');
+        Route::post('/{income}/void',     [IncomeController::class, 'void'])            ->name('void');
+        Route::delete('/{income}',        [IncomeController::class, 'destroy'])         ->name('destroy');
+    });
+
+    // ── Accounting Quick Add Categories ────────────
+    Route::prefix('accounting')->name('accounting.')->group(function () {
+        Route::post('income-categories/quick-add',  [IncomeController::class,  'quickAddCategory']) ->name('income-categories.quick-add');
+        Route::post('expense-categories/quick-add', [ExpenseController::class, 'quickAddCategory']) ->name('expense-categories.quick-add');
+    });
+
+    // ── Accounting Dashboard ───────────────────────
+    Route::get('accounting/dashboard', [AccountingController::class, 'dashboard'])->name('accounting.dashboard');
+
+    // ── Income Categories ──────────────────────────
+    Route::prefix('income-categories')->name('income-categories.')->group(function () {
+        Route::get('/',                     [IncomeController::class, 'categoriesIndex'])  ->name('index');
+        Route::post('/',                    [IncomeController::class, 'categoryStore'])    ->name('store');
+        Route::put('/{incomeCategory}',     [IncomeController::class, 'categoryUpdate'])   ->name('update');
+        Route::delete('/{incomeCategory}',  [IncomeController::class, 'categoryDestroy'])  ->name('destroy');
     });
 
 }); // end auth

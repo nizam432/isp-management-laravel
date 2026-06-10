@@ -395,7 +395,7 @@ return [
                 'icon' => 'fas fa-fw fa-file-invoice',
             ],
             [
-                'text' => 'Collect Payment', 
+                'text' => 'Collect Payment',
                 'url'  => 'payments/collect',
                 'icon' => 'fas fa-fw fa-hand-holding-usd',
             ],
@@ -405,7 +405,48 @@ return [
                 'icon' => 'fas fa-fw fa-money-bill-wave',
             ],
         ],
-    ],     
+    ],
+
+    // ── Accounting Module ─────────────────────
+    [
+        'text'       => 'Accounting',
+        'icon'       => 'fas fa-fw fa-book',
+        'icon_color' => 'teal',
+        'can'        => 'isp-admin',
+        'submenu'    => [
+            [
+                'text' => 'Dashboard',
+                'url'  => 'accounting/dashboard',
+                'icon' => 'fas fa-fw fa-tachometer-alt',
+            ],
+            [
+                'text' => 'Income',
+                'url'  => 'incomes',
+                'icon' => 'fas fa-fw fa-arrow-circle-up',
+            ],
+            [
+                'text' => 'Expense',
+                'url'  => 'expenses',
+                'icon' => 'fas fa-fw fa-arrow-circle-down',
+            ],
+            [
+                'text' => 'Profit & Loss',
+                'url'  => 'expenses/reports/profit-loss',
+                'icon' => 'fas fa-fw fa-chart-pie',
+            ],
+            [
+                'text' => 'Income Categories',
+                'url'  => 'income-categories',
+                'icon' => 'fas fa-fw fa-tags',
+            ],
+            [
+                'text' => 'Expense Categories',
+                'url'  => 'expense-categories',
+                'icon' => 'fas fa-fw fa-tags',
+            ],
+        ],
+    ],
+
     [
         'text'       => 'Reports',
         'icon'       => 'fas fa-fw fa-chart-bar',
