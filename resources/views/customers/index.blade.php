@@ -9,29 +9,72 @@
 @section('page_content')
 
 {{-- Stats --}}
+<style>
+.cust-stat-card {
+    border-radius: 4px;
+    color: #fff;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    overflow: hidden;
+}
+.cust-stat-card .sc-left .sc-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: rgba(255,255,255,.85);
+    margin-bottom: 4px;
+}
+.cust-stat-card .sc-left .sc-value {
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+}
+.cust-stat-card .sc-icon {
+    font-size: 52px;
+    color: rgba(255,255,255,.18);
+}
+</style>
 <div class="row mb-3">
-    <div class="col-md-3">
-        <div class="small-box bg-info">
-            <div class="inner"><h3>{{ $totalCustomers }}</h3><p>Total Customers</p></div>
-            <div class="icon"><i class="fas fa-users"></i></div>
+    <div class="col-md-3 col-6">
+        <div class="cust-stat-card" style="background:#17a2b8;">
+            <div class="sc-left">
+                <div class="sc-label"><i class="fas fa-users mr-1"></i> Total Customers</div>
+                <div class="sc-value">{{ $totalCustomers }}</div>
+            </div>
+            <div class="sc-icon"><i class="fas fa-users"></i></div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="small-box bg-success">
-            <div class="inner"><h3>{{ $activeCustomers }}</h3><p>Active</p></div>
-            <div class="icon"><i class="fas fa-user-check"></i></div>
+    <div class="col-md-3 col-6">
+        <div class="cust-stat-card" style="background:#00a65a;">
+            <div class="sc-left">
+                <div class="sc-label"><i class="fas fa-user-check mr-1"></i> Active</div>
+                <div class="sc-value">{{ $activeCustomers }}</div>
+            </div>
+            <div class="sc-icon"><i class="fas fa-user-check"></i></div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="small-box bg-warning">
-            <div class="inner"><h3>{{ $suspendedCustomers }}</h3><p>Suspended</p></div>
-            <div class="icon"><i class="fas fa-user-slash"></i></div>
+    <div class="col-md-3 col-6">
+        <div class="cust-stat-card" style="background:#f39c12;">
+            <div class="sc-left">
+                <div class="sc-label"><i class="fas fa-user-slash mr-1"></i> Suspended</div>
+                <div class="sc-value">{{ $suspendedCustomers }}</div>
+            </div>
+            <div class="sc-icon"><i class="fas fa-user-slash"></i></div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="small-box bg-danger">
-            <div class="inner"><h3>{{ $expiredCustomers }}</h3><p>Expired</p></div>
-            <div class="icon"><i class="fas fa-user-times"></i></div>
+    <div class="col-md-3 col-6">
+        <div class="cust-stat-card" style="background:#dd4b39;">
+            <div class="sc-left">
+                <div class="sc-label"><i class="fas fa-user-times mr-1"></i> Expired</div>
+                <div class="sc-value">{{ $expiredCustomers }}</div>
+            </div>
+            <div class="sc-icon"><i class="fas fa-user-times"></i></div>
         </div>
     </div>
 </div>
@@ -227,7 +270,7 @@
                     <th>MikroTik</th>
                     <th>Billing</th>
                     <th>Status</th>
-                    <th style="width:110px">Action</th>
+                    <th style="width:130px">Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -346,7 +389,7 @@
                     </td>
 
                     {{-- Action --}}
-                    <td>
+                    <td style="white-space:nowrap;">
                         <a href="{{ route('customers.show', $customer) }}"
                            class="btn btn-xs btn-info mb-1" title="View">
                             <i class="fas fa-eye"></i>
@@ -387,11 +430,58 @@
             </tbody>
         </table>
     </div>
-    <div class="card-footer d-flex justify-content-between align-items-center">
-        <small class="text-muted">
-            Total {{ $customers->total() }} customers — page {{ $customers->currentPage() }}/{{ $customers->lastPage() }}
-        </small>
-        {{ $customers->withQueryString()->links('pagination::bootstrap-4') }}
+    <div class="card-footer">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+
+            {{-- Left: row info + per page --}}
+            <div class="d-flex align-items-center">
+                <small class="text-muted mr-3">
+                    Showing <strong>{{ $customers->firstItem() ?? 0 }}</strong>–<strong>{{ $customers->lastItem() ?? 0 }}</strong>
+                    of <strong>{{ $customers->total() }}</strong> customers
+                </small>
+                <form method="GET" class="d-inline-flex align-items-center" id="perPageForm">
+                    @foreach(request()->except('page', 'per_page') as $k => $v)
+                        <input type="hidden" name="{{ $k }}" value="{{ $v }}">
+                    @endforeach
+                    <select name="per_page" class="form-control form-control-sm" style="width:75px;"
+                            onchange="document.getElementById('perPageForm').submit()">
+                        @foreach([20, 50, 100] as $pp)
+                            <option value="{{ $pp }}" {{ request('per_page', 20) == $pp ? 'selected' : '' }}>{{ $pp }}</option>
+                        @endforeach
+                    </select>
+                    <small class="text-muted ml-1">/ page</small>
+                </form>
+            </div>
+
+            {{-- Right: pagination (always visible) --}}
+            @if($customers->lastPage() > 1)
+                <nav>
+                    <ul class="pagination pagination-sm mb-0">
+                        {{-- Previous --}}
+                        <li class="page-item {{ $customers->onFirstPage() ? 'disabled' : '' }}">
+                            <a class="page-link" href="{{ $customers->withQueryString()->previousPageUrl() ?? '#' }}">«</a>
+                        </li>
+                        {{-- Pages --}}
+                        @for($p = 1; $p <= $customers->lastPage(); $p++)
+                            @if($p == 1 || $p == $customers->lastPage() || abs($p - $customers->currentPage()) <= 2)
+                                <li class="page-item {{ $p == $customers->currentPage() ? 'active' : '' }}">
+                                    <a class="page-link" href="{{ $customers->withQueryString()->url($p) }}">{{ $p }}</a>
+                                </li>
+                            @elseif(abs($p - $customers->currentPage()) == 3)
+                                <li class="page-item disabled"><span class="page-link">…</span></li>
+                            @endif
+                        @endfor
+                        {{-- Next --}}
+                        <li class="page-item {{ !$customers->hasMorePages() ? 'disabled' : '' }}">
+                            <a class="page-link" href="{{ $customers->withQueryString()->nextPageUrl() ?? '#' }}">»</a>
+                        </li>
+                    </ul>
+                </nav>
+            @else
+                <small class="text-muted">Page 1 of 1</small>
+            @endif
+
+        </div>
     </div>
 </div>
 

@@ -417,24 +417,59 @@ class MikrotikController extends Controller
     /**
      * GET /customers/{customer}/mikrotik/session
      * Customer এর live session info
+     *
+     * Fix: !trap error gracefully handle করা হয়েছে।
+     * !trap = PPPoE user router এ নেই (not provisioned)।
+     * এই ক্ষেত্রে success=true, online=false, not_found=true return করবে।
      */
     public function customerSession(Customer $customer): JsonResponse
     {
         try {
-            $router   = $this->getCustomerRouter($customer);
-            $mikrotik = new MikrotikService();
-            $session  = $mikrotik->withRouter(
-                $router,
-                fn($m) => $m->getCustomerSession($customer->pppoe_username)
-            );
+            $router = $this->getCustomerRouter($customer);
+
+            if (!$customer->pppoe_username) {
+                return response()->json([
+                    'success'   => true,
+                    'online'    => false,
+                    'session'   => null,
+                    'not_found' => true,
+                    'message'   => 'No PPPoE username set.',
+                ]);
+            }
+
+            $mikrotik  = new MikrotikService();
+            $session   = null;
+            $notFound  = false;
+
+            try {
+                $session = $mikrotik->withRouter(
+                    $router,
+                    fn($m) => $m->getCustomerSession($customer->pppoe_username)
+                );
+            } catch (\Exception $e) {
+                $msg = $e->getMessage();
+                // !trap বা no such item = router এ user নেই — treat as not provisioned
+                if (str_contains($msg, '!trap') || str_contains($msg, 'no such item')) {
+                    $notFound = true;
+                } else {
+                    throw $e; // real connection error — re-throw
+                }
+            }
 
             return response()->json([
-                'success' => true,
-                'online'  => !is_null($session),
-                'session' => $session,
+                'success'   => true,
+                'online'    => !is_null($session) && !$notFound,
+                'session'   => $session,
+                'not_found' => $notFound,
             ]);
+
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            return response()->json([
+                'success'   => false,
+                'online'    => false,
+                'not_found' => false,
+                'message'   => $e->getMessage(),
+            ], 500);
         }
     }
 

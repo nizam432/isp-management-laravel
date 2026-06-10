@@ -41,7 +41,8 @@ class CustomerController extends Controller
             ->when($request->connection_type_id, fn($q) => $q->where('connection_type_id', $request->connection_type_id))
             ->when($request->agent_id,           fn($q) => $q->where('agent_id',           $request->agent_id))
             ->latest()
-            ->paginate(20);
+            ->paginate($request->get('per_page', 20))
+            ->withQueryString();
 
         $totalCustomers     = Customer::count();
         $activeCustomers    = Customer::where('status', 'active')->count();

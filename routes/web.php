@@ -23,6 +23,8 @@ use App\Http\Controllers\Settings\SubZoneController;
 use App\Http\Controllers\Settings\ConnectionTypeController;
 use App\Http\Controllers\Settings\ClientTypeController;
 use App\Http\Controllers\Settings\ProtocolTypeController;
+use App\Http\Controllers\OltController;
+use App\Http\Controllers\Settings\OltTypeController;
 use App\Http\Controllers\HR\EmployeeController;
 use App\Http\Controllers\HR\DepartmentController;
 use App\Http\Controllers\HR\PositionController;
@@ -50,6 +52,14 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // ── Customers ──────────────────────────────
+    // ⚠️ Static/AJAX routes MUST come before resource() — otherwise {customer} catches them
+    Route::get ('customers/sub-zones',                    [CustomerController::class, 'getSubZones'])           ->name('customers.sub-zones');
+    Route::get ('customers/package-price',                [CustomerController::class, 'getPackagePrice'])        ->name('customers.package-price');
+    Route::post('customers/quick-add/zone',               [CustomerController::class, 'quickAddZone'])           ->name('customers.quick-add.zone');
+    Route::post('customers/quick-add/connection-type',    [CustomerController::class, 'quickAddConnectionType']) ->name('customers.quick-add.connection-type');
+    Route::post('customers/quick-add/client-type',        [CustomerController::class, 'quickAddClientType'])     ->name('customers.quick-add.client-type');
+    Route::post('customers/quick-add/protocol-type',      [CustomerController::class, 'quickAddProtocolType'])   ->name('customers.quick-add.protocol-type');
+
     Route::resource('customers', CustomerController::class);
     Route::patch('customers/{customer}/status', [CustomerController::class, 'updateStatus'])->name('customers.status');
     Route::get('customers/{customer}/mikrotik-info', [CustomerController::class, 'mikrotikInfo'])->name('customers.mikrotik-info');
@@ -108,7 +118,20 @@ Route::middleware(['auth'])->group(function () {
         Route::get('{router}/profiles',        [MikrotikController::class, 'profiles'])->name('profiles');
     });
 
-    // ── Customer MikroTik ──────────────────────
+    // ── OLT Management ─────────────────────────────────────────────
+    Route::prefix('olt')->name('olt.')->group(function () {
+        // static routes আগে
+        Route::get ('users',         [OltController::class, 'users'])     ->name('users');
+        Route::get ('users/data',    [OltController::class, 'usersData']) ->name('users.data');
+        Route::post('sync-all',      [OltController::class, 'syncAll'])   ->name('sync-all');
+        // CRUD
+        Route::get   ('/',           [OltController::class, 'index'])     ->name('index');
+        Route::post  ('/',           [OltController::class, 'store'])     ->name('store');
+        Route::get   ('/{olt}',      [OltController::class, 'show'])      ->name('show');
+        Route::put   ('/{olt}',      [OltController::class, 'update'])    ->name('update');
+        Route::delete('/{olt}',      [OltController::class, 'destroy'])   ->name('destroy');
+        Route::post  ('/{olt}/sync', [OltController::class, 'sync'])      ->name('sync');
+    });
     Route::prefix('customers/{customer}/mikrotik')->name('customers.mikrotik.')->group(function () {
         Route::get('session',         [MikrotikController::class, 'customerSession'])->name('session');
         Route::post('provision',      [MikrotikController::class, 'provisionCustomer'])->name('provision');
@@ -258,6 +281,14 @@ Route::middleware(['auth'])->group(function () {
         Route::put   ('protocol-types/{protocolType}',         [ProtocolTypeController::class, 'update']) ->name('protocol-types.update');
         Route::post  ('protocol-types/{protocolType}/toggle',  [ProtocolTypeController::class, 'toggle']) ->name('protocol-types.toggle');
         Route::delete('protocol-types/{protocolType}',         [ProtocolTypeController::class, 'destroy'])->name('protocol-types.destroy');
+
+        // OLT Types
+        Route::get   ('olt-types',                  [OltTypeController::class, 'index'])  ->name('olt-types.index');
+        Route::get   ('olt-types/data',             [OltTypeController::class, 'data'])   ->name('olt-types.data');
+        Route::post  ('olt-types',                  [OltTypeController::class, 'store'])  ->name('olt-types.store');
+        Route::put   ('olt-types/{oltType}',        [OltTypeController::class, 'update']) ->name('olt-types.update');
+        Route::post  ('olt-types/{oltType}/toggle', [OltTypeController::class, 'toggle']) ->name('olt-types.toggle');
+        Route::delete('olt-types/{oltType}',        [OltTypeController::class, 'destroy'])->name('olt-types.destroy');
 
     }); // end settings
 

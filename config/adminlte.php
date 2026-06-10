@@ -335,6 +335,18 @@ return [
                 ['text' => 'Active Sessions','url' => 'mikrotik/active-sessions',       'icon' => 'fas fa-fw fa-circle text-success'],
                 ['text' => 'Import',         'url' => 'import',                'icon' => 'fas fa-fw fa-file-import'],
             ],
+        ],
+
+        // ── OLT Management ────────────────────────
+        [
+            'text'       => 'OLT Management',
+            'icon'       => 'fas fa-fw fa-network-wired',
+            'icon_color' => 'cyan',
+            'can'        => 'isp-admin',
+            'submenu'    => [
+                ['text' => 'OLT',       'url' => 'olt',       'icon' => 'fas fa-fw fa-server'],
+                ['text' => 'OLT Users', 'url' => 'olt/users', 'icon' => 'fas fa-fw fa-users'],
+            ],
         ],        
        // ['header' => 'SETTINGS', 'can' => 'isp-admin'],
 
@@ -535,6 +547,7 @@ return [
                 ['text' => 'Connection Type', 'url' => 'settings/connection-types', 'icon' => 'fas fa-fw fa-plug'],
                 ['text' => 'Client Type',     'url' => 'settings/client-types',     'icon' => 'fas fa-fw fa-user-tag'],           
                 ['text' => 'Protocol Type', 'url' => 'settings/protocol-types', 'icon' => 'fas fa-fw fa-network-wired'],
+                ['text' => 'OLT Type',      'url' => 'settings/olt-types',      'icon' => 'fas fa-fw fa-server'],
           ],
         ],
 
