@@ -35,6 +35,13 @@ use App\Http\Controllers\HR\SalaryAdvanceController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\IncomeController;
 use App\Http\Controllers\AccountingController;
+use App\Http\Controllers\SupportCategoryController;
+use App\Http\Controllers\ClientSupportController;
+use App\Http\Controllers\SupportHistoryController;
+use App\Http\Controllers\BandwidthBuy\BandwidthProviderController;
+use App\Http\Controllers\BandwidthBuy\BandwidthServiceController;
+use App\Http\Controllers\BandwidthBuy\BandwidthPurchaseController;
+use App\Http\Controllers\BandwidthBuy\BandwidthReportController;
 
 // ─────────────────────────────────────────────
 // Public Routes
@@ -90,9 +97,41 @@ Route::middleware(['auth'])->group(function () {
     Route::get('payments/customer-due/{customer}',  [PaymentController::class, 'customerDue'])->name('payments.customer-due');
     Route::post('payments/{payment}/void',          [PaymentController::class, 'void'])->name('payments.void');
 
-    // ── Tickets ────────────────────────────────
+    // ── Tickets (legacy — dashboard & customers/show reference) ───
     Route::resource('tickets', TicketController::class)->except(['edit']);
     Route::post('tickets/{ticket}/reply', [TicketController::class, 'reply'])->name('tickets.reply');
+
+    // ── Support & Ticketing ────────────────────
+
+    // Support Categories (AJAX)
+    Route::prefix('support-categories')->name('support-categories.')->group(function () {
+        Route::get('/',                              [SupportCategoryController::class, 'index'])  ->name('index');
+        Route::post('/',                             [SupportCategoryController::class, 'store'])  ->name('store');
+        Route::get('/{supportCategory}/edit',        [SupportCategoryController::class, 'edit'])   ->name('edit');
+        Route::put('/{supportCategory}',             [SupportCategoryController::class, 'update']) ->name('update');
+        Route::delete('/{supportCategory}',          [SupportCategoryController::class, 'destroy'])->name('destroy');
+    });
+
+    // Client Support (Tickets) (AJAX)
+    Route::prefix('client-support')->name('client-support.')->group(function () {
+        Route::get('/',                              [ClientSupportController::class, 'index'])        ->name('index');
+        Route::get('/customer-info',                 [ClientSupportController::class, 'customerInfo']) ->name('customer-info');
+        Route::post('/',                             [ClientSupportController::class, 'store'])        ->name('store');
+        Route::get('/{ticket}/edit',                 [ClientSupportController::class, 'edit'])         ->name('edit');
+        Route::put('/{ticket}',                      [ClientSupportController::class, 'update'])       ->name('update');
+        Route::delete('/{ticket}',                   [ClientSupportController::class, 'destroy'])      ->name('destroy');
+        Route::post('/{ticket}/solve',               [ClientSupportController::class, 'solve'])        ->name('solve');
+        Route::get('/{ticket}/mikrotik-status',      [ClientSupportController::class, 'mikrotikStatus'])->name('mikrotik-status');
+        Route::post('/{ticket}/reassign',            [ClientSupportController::class, 'reassign'])     ->name('reassign');
+        Route::get('/departments/{department}/employees', [ClientSupportController::class, 'getEmployees'])->name('employees');
+    });
+
+    // Support History
+    Route::prefix('support-history')->name('support-history.')->group(function () {
+        Route::get('/',        [SupportHistoryController::class, 'index'])     ->name('index');
+        Route::get('/pdf',     [SupportHistoryController::class, 'exportPdf']) ->name('pdf');
+        Route::get('/csv',     [SupportHistoryController::class, 'exportCsv']) ->name('csv');
+    });
 
     // ── Agents ─────────────────────────────────
     Route::resource('agents', AgentController::class)->except(['edit']);
@@ -389,5 +428,40 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/{incomeCategory}',     [IncomeController::class, 'categoryUpdate'])   ->name('update');
         Route::delete('/{incomeCategory}',  [IncomeController::class, 'categoryDestroy'])  ->name('destroy');
     });
+
+    // ── Bandwidth Buy Module ───────────────────────
+    Route::prefix('bandwidth-buy')->name('bandwidth-buy.')->middleware('can:isp-admin')->group(function () {
+
+        // Provider
+        Route::prefix('provider')->name('provider.')->group(function () {
+            Route::get('/',                    [BandwidthProviderController::class, 'index'])  ->name('index');
+            Route::get('/create',              [BandwidthProviderController::class, 'create']) ->name('create');
+            Route::post('/',                   [BandwidthProviderController::class, 'store'])  ->name('store');
+            Route::get('/{provider}/edit',     [BandwidthProviderController::class, 'edit'])   ->name('edit');
+            Route::put('/{provider}',          [BandwidthProviderController::class, 'update']) ->name('update');
+        });
+
+        // Service
+        Route::prefix('service')->name('service.')->group(function () {
+            Route::get('/',                    [BandwidthServiceController::class, 'index'])  ->name('index');
+            Route::get('/create',              [BandwidthServiceController::class, 'create']) ->name('create');
+            Route::post('/',                   [BandwidthServiceController::class, 'store'])  ->name('store');
+            Route::get('/{service}/edit',      [BandwidthServiceController::class, 'edit'])   ->name('edit');
+            Route::put('/{service}',           [BandwidthServiceController::class, 'update']) ->name('update');
+        });
+
+        // Purchase Bill
+        Route::prefix('purchase')->name('purchase.')->group(function () {
+            Route::get('/',                    [BandwidthPurchaseController::class, 'index'])  ->name('index');
+            Route::get('/create',              [BandwidthPurchaseController::class, 'create']) ->name('create');
+            Route::post('/',                   [BandwidthPurchaseController::class, 'store'])  ->name('store');
+            Route::get('/{purchase}/edit',     [BandwidthPurchaseController::class, 'edit'])   ->name('edit');
+            Route::put('/{purchase}',          [BandwidthPurchaseController::class, 'update']) ->name('update');
+        });
+
+        // Purchase Report
+        Route::get('report', [BandwidthReportController::class, 'index'])->name('report');
+
+    }); // end bandwidth-buy
 
 }); // end auth

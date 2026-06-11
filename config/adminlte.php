@@ -513,29 +513,28 @@ return [
     
 
         [
-            'text'       => 'Support Tickets',
+            'text'       => 'Support & Ticketing',
             'icon'       => 'fas fa-fw fa-headset',
             'icon_color' => 'red',
             'can'        => 'isp-admin',
             'submenu'    => [
                 [
-                    'text' => 'All Tickets',
-                    'url'  => 'tickets',
-                    'icon' => 'fas fa-fw fa-list',
+                    'text' => 'Support Category',
+                    'url'  => 'support-categories',
+                    'icon' => 'fas fa-fw fa-tags',
                 ],
                 [
-                    'text' => 'Open Tickets',
-                    'url'  => 'tickets?status=open',
-                    'icon' => 'fas fa-fw fa-envelope-open',
+                    'text' => 'Client Support',
+                    'url'  => 'client-support',
+                    'icon' => 'fas fa-fw fa-ticket-alt',
                 ],
                 [
-                    'text' => 'Urgent Tickets',
-                    'url'  => 'tickets?priority=urgent',
-                    'icon' => 'fas fa-fw fa-exclamation-triangle',
+                    'text' => 'Support History',
+                    'url'  => 'support-history',
+                    'icon' => 'fas fa-fw fa-history',
                 ],
             ],
-        ],        
-        ['text' => 'Tickets', 'url' => 'tickets', 'icon' => 'fas fa-fw fa-ticket-alt', 'icon_color' => 'red', 'can' => 'isp-admin'],
+        ],
         [
             'text' => 'System Settings',
             'icon' => 'fas fa-fw fa-cog',
@@ -611,7 +610,36 @@ return [
             'icon'       => 'fas fa-fw fa-sitemap',
             'icon_color' => 'orange',
             'can'        => 'create-reseller',
-        ],       
+        ],   
+
+        [
+            'text'       => 'Bandwidth Buy',
+            'icon'       => 'fas fa-fw fa-wifi',
+            'icon_color' => 'blue',
+            'can'        => 'isp-admin',
+            'submenu'    => [
+                [
+                    'text' => 'Provider',
+                    'url'  => 'bandwidth-buy/provider',
+                    'icon' => 'fas fa-fw fa-building',
+                ],
+                [
+                    'text' => 'Service',
+                    'url'  => 'bandwidth-buy/service',
+                    'icon' => 'fas fa-fw fa-network-wired',
+                ],
+                [
+                    'text' => 'Purchase Bill',
+                    'url'  => 'bandwidth-buy/purchase',
+                    'icon' => 'fas fa-fw fa-file-invoice-dollar',
+                ],
+                [
+                    'text' => 'Purchase Report',
+                    'url'  => 'bandwidth-buy/report',
+                    'icon' => 'fas fa-fw fa-chart-bar',
+                ],
+            ],
+        ],        
         ['header' => 'MANAGEMENT', 'can' => 'isp-admin'],
         ['text' => 'Agents',    'url' => 'agents',    'icon' => 'fas fa-fw fa-user-tie', 'icon_color' => 'yellow', 'can' => 'isp-admin'],
         ['text' => 'Inventory', 'url' => 'inventory', 'icon' => 'fas fa-fw fa-boxes',    'icon_color' => 'brown',  'can' => 'isp-admin'],
