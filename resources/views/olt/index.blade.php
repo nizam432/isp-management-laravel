@@ -36,8 +36,8 @@
             </div>
         </div>
 
-        <div class="card-body p-0">
-            <table id="oltTable" class="table table-bordered table-striped table-hover mb-0">
+        <div class="card-body p-0">{{--oltTable--}}
+            <table id="" class="table table-bordered table-striped table-hover mb-0">
                 <thead class="bg-dark text-white">
                     <tr>
                         <th width="60" class="text-center">Serial</th>

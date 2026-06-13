@@ -640,6 +640,47 @@ return [
                 ],
             ],
         ],        
+
+        // ── Bandwidth Sale Module ─────────────────
+        [
+            'text'       => 'Bandwidth Sale',
+            'icon'       => 'fas fa-fw fa-satellite-dish',
+            'icon_color' => 'cyan',
+            'can'        => 'isp-admin',
+            'submenu'    => [
+                [
+                    'text' => 'Dashboard',
+                    'url'  => 'bandwidth-sale/dashboard',
+                    'icon' => 'fas fa-fw fa-tachometer-alt',
+                ],
+                [
+                    'text' => 'Customers',
+                    'url'  => 'bandwidth-sale/customers',
+                    'icon' => 'fas fa-fw fa-users',
+                ],
+                [
+                    'text' => 'Invoices',
+                    'url'  => 'bandwidth-sale/invoices',
+                    'icon' => 'fas fa-fw fa-file-invoice',
+                ],
+                [
+                    'text' => 'Create Invoice',
+                    'url'  => 'bandwidth-sale/invoices/create',
+                    'icon' => 'fas fa-fw fa-plus-circle',
+                ],
+                [
+                    'text' => 'Daily Bill',
+                    'url'  => 'bandwidth-sale/daily-bill',
+                    'icon' => 'fas fa-fw fa-calendar-day',
+                ],
+                [
+                    'text' => 'Recurring Invoice',
+                    'url'  => 'bandwidth-sale/recurring',
+                    'icon' => 'fas fa-fw fa-redo-alt',
+                ],
+            ],
+        ],
+
         ['header' => 'MANAGEMENT', 'can' => 'isp-admin'],
         ['text' => 'Agents',    'url' => 'agents',    'icon' => 'fas fa-fw fa-user-tie', 'icon_color' => 'yellow', 'can' => 'isp-admin'],
         ['text' => 'Inventory', 'url' => 'inventory', 'icon' => 'fas fa-fw fa-boxes',    'icon_color' => 'brown',  'can' => 'isp-admin'],

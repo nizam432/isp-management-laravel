@@ -294,6 +294,7 @@ $(function () {
                     .html(id
                         ? '<i class="fas fa-save mr-1"></i> Update Service'
                         : '<i class="fas fa-save mr-1"></i> Save Service');
+                        toastr.success('Successfully Save Provider');
             }
         });
     });

@@ -42,6 +42,8 @@ use App\Http\Controllers\BandwidthBuy\BandwidthProviderController;
 use App\Http\Controllers\BandwidthBuy\BandwidthServiceController;
 use App\Http\Controllers\BandwidthBuy\BandwidthPurchaseController;
 use App\Http\Controllers\BandwidthBuy\BandwidthReportController;
+use App\Http\Controllers\BandwidthSale\BwsCustomerController;
+use App\Http\Controllers\BandwidthSale\BwsInvoiceController;
 
 // ─────────────────────────────────────────────
 // Public Routes
@@ -457,11 +459,59 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/',                   [BandwidthPurchaseController::class, 'store'])  ->name('store');
             Route::get('/{purchase}/edit',     [BandwidthPurchaseController::class, 'edit'])   ->name('edit');
             Route::put('/{purchase}',          [BandwidthPurchaseController::class, 'update']) ->name('update');
+            Route::post('/{purchase}/void',    [BandwidthPurchaseController::class, 'void'])   ->name('void');
         });
 
         // Purchase Report
         Route::get('report', [BandwidthReportController::class, 'index'])->name('report');
 
     }); // end bandwidth-buy
+
+    // ── Bandwidth Sale Module ──────────────────
+    Route::prefix('bandwidth-sale')->name('bandwidth-sale.')->middleware('can:isp-admin')->group(function () {
+
+        // Dashboard — redirect to customers index for now
+        Route::get('dashboard', fn() => redirect()->route('bandwidth-sale.customers.index'))->name('dashboard');
+
+        // ── Customers ──────────────────────────
+        Route::get ('customers/data',         [BwsCustomerController::class, 'data'])    ->name('customers.data');
+        Route::get ('customers',              [BwsCustomerController::class, 'index'])   ->name('customers.index');
+        Route::post('customers',              [BwsCustomerController::class, 'store'])   ->name('customers.store');
+        Route::get ('customers/{customer}',   [BwsCustomerController::class, 'show'])    ->name('customers.show');
+        Route::put ('customers/{customer}',   [BwsCustomerController::class, 'update'])  ->name('customers.update');
+        Route::delete('customers/{customer}', [BwsCustomerController::class, 'destroy']) ->name('customers.destroy');
+
+        // ── Invoices — static routes BEFORE {bwsInvoice} ──
+        Route::get('invoices/next-no',                     [BwsInvoiceController::class, 'nextNo'])         ->name('invoices.next-no');
+        Route::get('invoices/due-for-customer/{customer}', [BwsInvoiceController::class, 'dueForCustomer']) ->name('invoices.due-for-customer');
+
+        Route::get   ('invoices',                    [BwsInvoiceController::class, 'index'])   ->name('invoices.index');
+        Route::get   ('invoices/create',             [BwsInvoiceController::class, 'create'])  ->name('invoices.create');
+        Route::post  ('invoices',                    [BwsInvoiceController::class, 'store'])   ->name('invoices.store');
+        Route::get   ('invoices/{bwsInvoice}',       [BwsInvoiceController::class, 'show'])    ->name('invoices.show');
+        Route::get   ('invoices/{bwsInvoice}/edit',  [BwsInvoiceController::class, 'edit'])    ->name('invoices.edit');
+        Route::put   ('invoices/{bwsInvoice}',       [BwsInvoiceController::class, 'update'])  ->name('invoices.update');
+        Route::delete('invoices/{bwsInvoice}',       [BwsInvoiceController::class, 'destroy']) ->name('invoices.destroy');
+        Route::get   ('invoices/{bwsInvoice}/pdf',   [BwsInvoiceController::class, 'pdf'])     ->name('invoices.pdf');
+
+        // ── Bill Receive ───────────────────────
+        Route::get ('invoices/{bwsInvoice}/receive', [BwsInvoiceController::class, 'receiveData'])  ->name('invoices.receive-data');
+        Route::post('invoices/{bwsInvoice}/receive', [BwsInvoiceController::class, 'receiveStore']) ->name('invoices.receive');
+
+        // ── Payment Void ───────────────────────
+        Route::post('payments/{payment}/void', [BwsInvoiceController::class, 'voidPayment']) ->name('payments.void');
+
+        // ── Daily Bill ─────────────────────────
+        Route::get('daily-bill', [BwsInvoiceController::class, 'dailyBill']) ->name('daily-bill.index');
+
+        // ── Recurring Invoice ──────────────────
+        Route::get   ('recurring',                   [BwsInvoiceController::class, 'recurringIndex'])  ->name('recurring.index');
+        Route::get   ('recurring/create',            [BwsInvoiceController::class, 'recurringCreate']) ->name('recurring.create');
+        Route::post  ('recurring',                   [BwsInvoiceController::class, 'recurringStore'])  ->name('recurring.store');
+        Route::get   ('recurring/{bwsInvoice}/edit', [BwsInvoiceController::class, 'recurringEdit'])   ->name('recurring.edit');
+        Route::put   ('recurring/{bwsInvoice}',      [BwsInvoiceController::class, 'recurringUpdate']) ->name('recurring.update');
+        Route::delete('recurring/{bwsInvoice}',      [BwsInvoiceController::class, 'recurringDestroy'])->name('recurring.destroy');
+
+    }); // end bandwidth-sale
 
 }); // end auth

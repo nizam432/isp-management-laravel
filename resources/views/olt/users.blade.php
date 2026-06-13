@@ -36,7 +36,7 @@
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="info-box bg-gradient-green mb-3">
+            <div class="info-box bg-gradient-red mb-3">
                 <span class="info-box-icon"><i class="fas fa-user-slash"></i></span>
                 <div class="info-box-content">
                     <span class="info-box-text">Offline</span>
@@ -46,12 +46,12 @@
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="info-box bg-gradient-purple mb-3">
+            <div class="info-box bg-gradient-orange mb-3">
                 <span class="info-box-icon"><i class="fas fa-signal"></i></span>
                 <div class="info-box-content">
-                    <span class="info-box-text">dBm 24+</span>
+                    <span class="info-box-text">Weak Signal</span>
                     <span class="info-box-number">{{ $stats['weak_signal'] }}</span>
-                    <span class="progress-description">Very weak signal</span>
+                    <span class="progress-description">Signal &lt; -27 dBm</span>
                 </div>
             </div>
         </div>
@@ -73,7 +73,7 @@
             <h3 class="card-title"><i class="fas fa-filter mr-1"></i> Filter</h3>
             <button class="btn btn-sm btn-light" id="btnToggleFilter">
                 Hide <i class="fas fa-chevron-up ml-1"></i>
-            </button>
+
         </div>
         <div class="card-body pb-1" id="filterBody">
             <div class="row align-items-end">
@@ -93,13 +93,13 @@
                         <option value="excellent">Excellent (≥ -20 dBm)</option>
                         <option value="good">Good (-20 ~ -24 dBm)</option>
                         <option value="weak">Weak (-24 ~ -27 dBm)</option>
-                        <option value="very_weak">Very Weak (< -27 dBm)</option>
+                        <option value="very_weak">Very Weak (&lt; -27 dBm)</option>
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label class="small font-weight-bold">FILTER BY IP:</label>
+                    <label class="small font-weight-bold">FILTER BY OLT:</label>
                     <select id="filterOlt" class="form-control form-control-sm">
-                        <option value="">Select</option>
+                        <option value="">All</option>
                         @foreach($oltList as $olt)
                             <option value="{{ $olt->id }}">{{ $olt->ip_address }}</option>
                         @endforeach
@@ -107,11 +107,11 @@
                 </div>
                 <div class="col-md-3">
                     <button class="btn btn-primary btn-sm mr-1" id="btnApply">
-                        <i class="fas fa-search mr-1"></i> Apply Filter
-                    </button>
+                        <i class="fas fa-search mr-1"></i> Apply
+
                     <button class="btn btn-danger btn-sm" id="btnClear">
-                        <i class="fas fa-times mr-1"></i> Clear Filter
-                    </button>
+                        <i class="fas fa-times mr-1"></i> Clear
+
                 </div>
             </div>
         </div>
@@ -133,25 +133,21 @@
                             <th>Client Code</th>
                             <th>UserName</th>
                             <th>Client Name</th>
-                            <th>MacAddress</th>
-                            <th>IpAddress</th>
-                            <th>OLTName</th>
-                            <th>OpticalPower</th>
-                            <th>OnuMacAddress</th>
-                            <th>OLTPort</th>
-                            <th>OnuStatus</th>
-                            <th>Description</th>
-                            <th>LastDeregisterTime</th>
-                            <th>Distance</th>
-                            <th>DeregisterReason</th>
-                            <th>Last Synced Time</th>
-                            <th>Previous Snapshot</th>
-                            <th>Action</th>
+                            <th>MAC Address</th>
+                            <th>OLT Name</th>
+                            <th>Optical Power</th>
+                            <th>OLT Port</th>
+                            <th>Status</th>
+                            <th>Last Deregister Time</th>
+                            <th>Distance (m)</th>
+                            <th>Deregister Reason</th>
+                            <th>Last Synced</th>
+
                         </tr>
                     </thead>
                     <tbody id="usersBody">
                         <tr>
-                            <td colspan="18" class="text-center py-3 text-muted">
+                            <td colspan="13" class="text-center py-3 text-muted">
                                 <i class="fas fa-spinner fa-spin mr-1"></i> Loading...
                             </td>
                         </tr>
@@ -168,17 +164,14 @@
 <script>
 const DATA_URL = '{{ route("olt.users.data") }}';
 
-// ── Initial load ──────────────────────────────────────────────
 loadData();
 
-// ── Filter ────────────────────────────────────────────────────
 $('#btnApply').on('click', loadData);
 $('#btnClear').on('click', function () {
     $('#filterStatus, #filterDbm, #filterOlt').val('');
     loadData();
 });
 
-// ── Toggle filter panel ───────────────────────────────────────
 $('#btnToggleFilter').on('click', function () {
     $('#filterBody').toggle();
     const hidden = !$('#filterBody').is(':visible');
@@ -188,7 +181,7 @@ $('#btnToggleFilter').on('click', function () {
 });
 
 function loadData() {
-    $('#usersBody').html('<tr><td colspan="18" class="text-center py-3"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>');
+    $('#usersBody').html('<tr><td colspan="13" class="text-center py-3"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>');
     $('#rowCount').text('Loading...');
 
     $.get(DATA_URL, {
@@ -199,13 +192,13 @@ function loadData() {
         renderRows(res.data ?? []);
         $('#rowCount').text((res.count ?? 0) + ' records');
     }).fail(() => {
-        $('#usersBody').html('<tr><td colspan="18" class="text-center text-danger">Data লোড হয়নি।</td></tr>');
+        $('#usersBody').html('<tr><td colspan="13" class="text-center text-danger">Data লোড হয়নি।</td></tr>');
     });
 }
 
 function renderRows(rows) {
     if (!rows.length) {
-        $('#usersBody').html('<tr><td colspan="18" class="text-center text-muted py-3">No data available in table</td></tr>');
+        $('#usersBody').html('<tr><td colspan="13" class="text-center text-muted py-3">No data available</td></tr>');
         return;
     }
 
@@ -225,27 +218,18 @@ function renderRows(rows) {
             <td>${u.username}</td>
             <td>${u.client_name}</td>
             <td><small>${u.mac_address}</small></td>
-            <td>${u.ip_address}</td>
             <td><small>${u.olt_name}</small></td>
             <td>${power}</td>
-            <td><small>${u.onu_mac_address}</small></td>
             <td>${u.olt_port}</td>
             <td>${statusBadge}</td>
-            <td>${u.description}</td>
             <td><small>${u.last_deregister_time}</small></td>
             <td>${u.distance}</td>
             <td>${u.deregister_reason}</td>
             <td><small>${u.last_synced_at}</small></td>
-            <td class="text-center">
-                <button class="btn btn-xs btn-secondary btn-snapshot"
-                    data-id="${u.id}" title="Previous Snapshot">
-                    <i class="fas fa-history"></i>
-                </button>
-            </td>
-            <td class="text-center">
-                <button class="btn btn-xs btn-info" title="View">
-                    <i class="fas fa-eye"></i>
-                </button>
+
+
+
+
             </td>
         </tr>`;
     }).join('');

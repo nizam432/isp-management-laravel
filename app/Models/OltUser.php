@@ -44,12 +44,12 @@ class OltUser extends Model
     }
 
     /**
-     * dBm 24+ মানে optical_power > -24 (weak signal)
+     * Very Weak signal — optical_power < -27 dBm
      */
     public function scopeWeakSignal($query)
     {
         return $query->whereNotNull('optical_power')
-                     ->where('optical_power', '>', -24);
+                     ->where('optical_power', '<', -27);
     }
 
     // ── Accessors ─────────────────────────────────

@@ -1,6 +1,6 @@
 <?php
-
 namespace App\Http\Controllers;
+use App\Services\Olt\OltSyncService;
 
 use App\Models\Olt;
 use App\Models\OltType;
@@ -93,36 +93,108 @@ class OltController extends Controller
     /** POST /olt/{olt}/sync */
     public function sync(Olt $olt): JsonResponse
     {
+        // ── আগে reachable কিনা check ──
+        if (! $this->pingHost($olt->ip_address)) {
+            Log::warning("OLT ping failed [{$olt->ip_address}]");
+            return response()->json([
+                'success' => false,
+                'message' => "OLT [{$olt->ip_address}] reachable নয় — ping failed।",
+            ], 422);
+        }
+
         try {
-            // TODO: SNMP / Telnet দিয়ে OLT থেকে ONU data fetch করার logic এখানে
-            $olt->update(['last_synced_at' => now()]);
+            $result = (new OltSyncService())->sync($olt);
+
+            $methodLabel = $result['method'] === 'snmp' ? 'SNMP' : 'Web Scraping';
 
             return response()->json([
                 'success' => true,
-                'message' => "OLT [{$olt->ip_address}] sync সম্পন্ন।",
+                'message' => "OLT [{$olt->ip_address}] sync সম্পন্ন ({$methodLabel}) — "
+                           . "মোট {$result['total']} ONU | নতুন: {$result['saved']} | আপডেট: {$result['updated']}",
             ]);
+
         } catch (\Exception $e) {
             Log::error("OLT sync failed [{$olt->ip_address}]: " . $e->getMessage());
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            return response()->json([
+                'success' => false,
+                'message' => "Sync ব্যর্থ: " . $e->getMessage(),
+            ], 500);
         }
     }
 
     /** POST /olt/sync-all */
     public function syncAll(): JsonResponse
     {
-        $olts  = Olt::active()->get();
-        $count = 0;
+        $olts    = Olt::active()->get();
+        $success = 0;
+        $failed  = [];
 
         foreach ($olts as $olt) {
+            if (! $this->pingHost($olt->ip_address)) {
+                $failed[] = $olt->ip_address . ' (unreachable)';
+                continue;
+            }
+
             try {
-                $olt->update(['last_synced_at' => now()]);
-                $count++;
+                (new OltSyncService())->sync($olt);
+                $success++;
             } catch (\Exception $e) {
-                Log::error("OLT sync failed [{$olt->ip_address}]: " . $e->getMessage());
+                $failed[] = $olt->ip_address . ' (' . $e->getMessage() . ')';
+                Log::error("OLT sync-all failed [{$olt->ip_address}]: " . $e->getMessage());
             }
         }
 
-        return response()->json(['success' => true, 'message' => "{$count}টি OLT sync হয়েছে।"]);
+        $msg = "{$success}টি OLT sync হয়েছে।";
+        if (count($failed)) {
+            $msg .= ' ব্যর্থ: ' . implode(', ', $failed);
+        }
+
+        return response()->json(['success' => true, 'message' => $msg]);
+    }
+
+    // ══════════════════════════════════════════
+    // PRIVATE HELPERS
+    // ══════════════════════════════════════════
+
+    /**
+     * Host টি reachable কিনা check করে।
+     * IP:Port format হলে → fsockopen দিয়ে check
+     * শুধু IP হলে → ping দিয়ে check
+     */
+    private function pingHost(string $input): bool
+    {
+        // IP:Port আলাদা করা
+        if (str_contains($input, ':')) {
+            [$ip, $port] = explode(':', $input, 2);
+            $port = (int) $port;
+        } else {
+            $ip   = $input;
+            $port = null;
+        }
+
+        // IP validate করা
+        if (! filter_var($ip, FILTER_VALIDATE_IP)) {
+            return false;
+        }
+
+        // Port থাকলে fsockopen দিয়ে check
+        if ($port) {
+            $conn = @fsockopen($ip, $port, $errno, $errstr, 3);
+            if ($conn) {
+                fclose($conn);
+                return true;
+            }
+            return false;
+        }
+
+        // Port না থাকলে ping দিয়ে check
+        $cmd = str_starts_with(strtolower(PHP_OS), 'win')
+            ? 'ping -n 1 -w 2000 ' . escapeshellarg($ip)
+            : 'ping -c 1 -W 2 '    . escapeshellarg($ip);
+
+        exec($cmd, $output, $exitCode);
+
+        return $exitCode === 0;
     }
 
     // ══════════════════════════════════════════

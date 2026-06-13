@@ -153,6 +153,13 @@
                                class="btn btn-sm btn-warning px-2" title="Edit">
                                 <i class="fas fa-edit"></i>
                             </a>
+                            {{-- Void Button --}}
+                            <button class="btn btn-sm btn-danger btn-void px-2"
+                                    data-id="{{ $p->id }}"
+                                    data-invoice="{{ $p->invoice_no }}"
+                                    title="Void Purchase">
+                                <i class="fas fa-ban"></i>
+                            </button>
                         </td>
                     </tr>
                     @empty
@@ -176,8 +183,67 @@
 
 
 {{-- ══════════════════════════════════════════════════════════════════════════ --}}
-{{-- LINE ITEMS VIEW MODAL                                                      --}}
+{{-- VOID PURCHASE MODAL                                                        --}}
 {{-- ══════════════════════════════════════════════════════════════════════════ --}}
+<div class="modal fade" id="voidModal" tabindex="-1" data-backdrop="static">
+    <div class="modal-dialog modal-md">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:10px; overflow:hidden;">
+            <div class="modal-header border-0 py-3"
+                 style="background:linear-gradient(135deg,#b71c1c,#c62828);">
+                <h5 class="modal-title text-white font-weight-bold">
+                    <i class="fas fa-ban mr-2"></i>Void Purchase
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body px-4 py-3">
+
+                {{-- Warning box --}}
+                <div class="alert border-0 mb-3 py-2 px-3"
+                     style="background:#fff3e0; border-left:4px solid #f57c00 !important; border-radius:6px;">
+                    <i class="fas fa-exclamation-triangle text-warning mr-2"></i>
+                    <strong>Invoice: <span id="voidInvoiceLabel" class="text-danger"></span></strong>
+                    <div class="mt-1 text-muted" style="font-size:13px;">
+                        এই purchase void করলে Accounting এ এর সব linked expense গুলোও
+                        <strong>automatically void</strong> হয়ে যাবে।
+                        এই action টা <strong>undo করা যাবে না।</strong>
+                    </div>
+                </div>
+
+                {{-- Reason --}}
+                <div class="form-group mb-0">
+                    <label class="font-weight-bold text-dark" style="font-size:13px;">
+                        Void Reason <span class="text-danger">*</span>
+                    </label>
+                    <textarea id="voidReason" class="form-control" rows="3"
+                              placeholder="e.g. Duplicate entry, wrong invoice, cancelled order..."
+                              style="border-radius:8px; font-size:13px; resize:none;"></textarea>
+                    <small class="text-danger d-none" id="voidReasonError">
+                        <i class="fas fa-exclamation-circle mr-1"></i>কারণ লিখতে হবে।
+                    </small>
+                </div>
+
+            </div>
+            <div class="modal-footer border-0 bg-light px-4 py-3">
+                <button type="button" class="btn btn-light border px-4" data-dismiss="modal">
+                    <i class="fas fa-times mr-1"></i>Cancel
+                </button>
+                <button type="button" class="btn btn-danger px-4" id="btnConfirmVoid">
+                    <i class="fas fa-ban mr-1"></i>Confirm Void
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- Hidden void forms (one per purchase) --}}
+@foreach($purchases as $p)
+<form id="voidForm{{ $p->id }}"
+      action="{{ route('bandwidth-buy.purchase.void', $p) }}"
+      method="POST" style="display:none;">
+    @csrf
+    <input type="hidden" name="reason" id="voidReasonInput{{ $p->id }}">
+</form>
+@endforeach
 <div class="modal fade" id="linesModal" tabindex="-1">
     <div class="modal-dialog modal-xl">
         <div class="modal-content border-0 shadow-lg">
@@ -372,7 +438,34 @@ $(function () {
         });
     });
 
-    // ── Open Line Items Modal ─────────────────────────────────────────────────
+    // ── Void purchase ─────────────────────────────────────────────────────────
+    let currentVoidId = null;
+
+    $(document).on('click', '.btn-void', function () {
+        currentVoidId = $(this).data('id');
+        const invoice = $(this).data('invoice');
+        $('#voidInvoiceLabel').text(invoice);
+        $('#voidReason').val('');
+        $('#voidReasonError').addClass('d-none');
+        $('#voidModal').modal('show');
+    });
+
+    $('#btnConfirmVoid').on('click', function () {
+        const reason = $('#voidReason').val().trim();
+        if (!reason) {
+            $('#voidReasonError').removeClass('d-none');
+            $('#voidReason').focus();
+            return;
+        }
+
+        $('#voidReasonError').addClass('d-none');
+        $(`#voidReasonInput${currentVoidId}`).val(reason);
+
+        $(this).prop('disabled', true)
+               .html('<i class="fas fa-spinner fa-spin mr-1"></i>Processing...');
+
+        $(`#voidForm${currentVoidId}`).submit();
+    });
     $(document).on('click', '.btn-view-lines', function () {
         const $btn    = $(this);
         const id      = $btn.data('id');
