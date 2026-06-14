@@ -17,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
             'superadmin'         => \App\Http\Middleware\SuperAdminMiddleware::class,
             'reseller'           => \App\Http\Middleware\ResellerMiddleware::class,
+            'client.auth' => \App\Http\Middleware\ClientAuthenticate::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

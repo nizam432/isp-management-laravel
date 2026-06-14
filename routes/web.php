@@ -513,5 +513,10 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('recurring/{bwsInvoice}',      [BwsInvoiceController::class, 'recurringDestroy'])->name('recurring.destroy');
 
     }); // end bandwidth-sale
-
+   
 }); // end auth
+
+// ─────────────────────────────────────────────
+// Client Portal Routes (নিজস্ব guard — auth এর বাইরে)
+// ─────────────────────────────────────────────
+require __DIR__ . '/client.php';
