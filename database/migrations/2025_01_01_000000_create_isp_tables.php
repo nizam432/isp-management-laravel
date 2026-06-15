@@ -160,18 +160,6 @@ return new class extends Migration
         // ─────────────────────────────────────────────
         // 9. payments
         // ─────────────────────────────────────────────
-        Schema::create('payments', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('invoice_id')->constrained('invoices')->onDelete('cascade');
-            $table->foreignId('customer_id')->constrained('customers')->onDelete('cascade');
-            $table->decimal('amount', 10, 2);
-            $table->enum('method', ['cash', 'bkash', 'nagad', 'rocket', 'card', 'bank'])->default('cash');
-            $table->string('transaction_id', 100)->nullable()->comment('bKash/Nagad TrxID');
-            $table->dateTime('paid_at');
-            $table->foreignId('received_by')->nullable()->constrained('users')->onDelete('set null');
-            $table->string('remarks', 255)->nullable();
-            $table->timestamps();
-        });
 
         // ─────────────────────────────────────────────
         // 10. agent_commissions
@@ -219,7 +207,7 @@ return new class extends Migration
         // ─────────────────────────────────────────────
         // 13. tickets
         // ─────────────────────────────────────────────
-        Schema::create('tickets', function (Blueprint $table) {
+   /*      Schema::create('tickets', function (Blueprint $table) {
             $table->id();
             $table->string('ticket_no', 20)->unique()->comment('e.g. TKT-2025-0001');
             $table->foreignId('customer_id')->constrained('customers')->onDelete('cascade');
@@ -235,17 +223,17 @@ return new class extends Migration
             $table->index('status');
             $table->index('priority');
         });
-
+ */
         // ─────────────────────────────────────────────
         // 14. ticket_replies
         // ─────────────────────────────────────────────
-        Schema::create('ticket_replies', function (Blueprint $table) {
+/*         Schema::create('ticket_replies', function (Blueprint $table) {
             $table->id();
             $table->foreignId('ticket_id')->constrained('tickets')->onDelete('cascade');
             $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('set null');
             $table->text('message');
             $table->timestamps();
-        });
+        }); */
 
         // ─────────────────────────────────────────────
         // 15. sms_logs

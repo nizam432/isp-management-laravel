@@ -32,8 +32,10 @@ Route::prefix('client')->name('client.')->group(function () {
         Route::get('invoices/{invoice}', [ClientPortalController::class, 'invoiceShow'])->name('invoices.show');
 
         // Support Tickets
-        Route::get ('tickets',       [ClientPortalController::class, 'tickets'])->name('tickets');
-        Route::post('tickets',       [ClientPortalController::class, 'ticketStore'])->name('tickets.store');
+        Route::get ('tickets',                    [ClientPortalController::class, 'tickets'])->name('tickets');
+        Route::post('tickets',                    [ClientPortalController::class, 'ticketStore'])->name('tickets.store');
+        Route::get ('tickets/{ticket}',           [ClientPortalController::class, 'ticketShow'])->name('tickets.show');
+        Route::post('tickets/{ticket}/reply',     [ClientPortalController::class, 'ticketReply'])->name('tickets.reply');
 
         // Profile & Password
         Route::get ('profile',          [ClientPortalController::class, 'profile'])->name('profile');

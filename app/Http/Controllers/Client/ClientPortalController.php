@@ -7,6 +7,7 @@ use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\ClientSupportTicket;
+use App\Models\ClientTicketReply;
 use App\Models\SupportCategory;
 use App\Models\Setting;
 use Illuminate\Http\Request;
@@ -32,8 +33,8 @@ class ClientPortalController extends Controller
 
     /**
      * Login process করো
-     * PPPoE username + pppoe_password দিয়ে login হবে
-     * pppoe_password plain text — সরাসরি compare করা হবে
+     * Login via PPPoE username + pppoe_password
+     * pppoe_password is stored as plain text — direct comparison
      */
     public function login(Request $request)
     {
@@ -41,8 +42,8 @@ class ClientPortalController extends Controller
             'pppoe_username' => 'required|string',
             'password'       => 'required|string',
         ], [
-            'pppoe_username.required' => 'PPPoE Username দিন।',
-            'password.required'       => 'পাসওয়ার্ড দিন।',
+            'pppoe_username.required' => 'PPPoE Username is required.',
+            'password.required'       => 'Password is required.',
         ]);
 
         $username = trim($request->pppoe_username);
@@ -51,21 +52,21 @@ class ClientPortalController extends Controller
         // pppoe_username দিয়ে customer খুঁজব
         $customer = Customer::where('pppoe_username', $username)->first();
 
-        // pppoe_password plain text — সরাসরি compare
+        // pppoe_password is plain text — direct comparison
         if ($customer && $customer->pppoe_password === $password) {
 
-            // Laravel guard এ manually login করাব
+            // Manually login via customer guard
             Auth::guard('customer')->login($customer, $request->boolean('remember'));
 
             $request->session()->regenerate();
 
             return redirect()->route('client.dashboard')
-                ->with('success', 'স্বাগতম, ' . $customer->name . '!');
+                ->with('success', 'Welcome, ' . $customer->name . '!');
         }
 
         return back()
             ->withInput($request->only('pppoe_username'))
-            ->withErrors(['pppoe_username' => 'PPPoE Username বা পাসওয়ার্ড সঠিক নয়।']);
+            ->withErrors(['pppoe_username' => 'Invalid PPPoE username or password.']);
     }
 
     /**
@@ -76,7 +77,7 @@ class ClientPortalController extends Controller
         Auth::guard('customer')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
-        return redirect()->route('client.login')->with('success', 'সফলভাবে লগআউট হয়েছেন।');
+        return redirect()->route('client.login')->with('success', 'You have been logged out successfully.');
     }
 
     // ══════════════════════════════════════════════════════
@@ -88,18 +89,18 @@ class ClientPortalController extends Controller
         $customer = Auth::guard('customer')->user();
         $customer->load(['package', 'zone', 'invoices', 'payments']);
 
-        // এই মাসের invoice
+        // Current month invoice
         $currentInvoice = Invoice::where('customer_id', $customer->id)
             ->where('month', now()->format('Y-m'))
             ->first();
 
-        // সব বকেয়া invoice
+        // All unpaid invoices
         $unpaidInvoices = Invoice::where('customer_id', $customer->id)
             ->whereIn('status', ['unpaid', 'overdue', 'partial'])
             ->orderBy('due_date')
             ->get();
 
-        // মোট বকেয়া
+        // Total due amount
         $totalDue = $unpaidInvoices->sum('due_amount');
 
         // সর্বশেষ ৫টি পেমেন্ট
@@ -110,12 +111,12 @@ class ClientPortalController extends Controller
             ->take(5)
             ->get();
 
-        // Open টিকেট সংখ্যা
+        // Open ticket count
         $openTickets = ClientSupportTicket::where('customer_id', $customer->id)
             ->whereIn('status', ['pending', 'processing'])
             ->count();
 
-        // Closed টিকেট সংখ্যা
+        // Closed ticket count
         $closedTickets = ClientSupportTicket::where('customer_id', $customer->id)
             ->whereIn('status', ['solved', 'closed'])
             ->count();
@@ -168,7 +169,7 @@ class ClientPortalController extends Controller
 
         // অন্য customer এর invoice দেখতে পারবে না
         if ($invoice->customer_id !== $customer->id) {
-            abort(403, 'এই invoice দেখার অনুমতি নেই।');
+            abort(403, 'You are not authorized to view this invoice.');
         }
 
         $invoice->load(['package', 'payments']);
@@ -186,11 +187,17 @@ class ClientPortalController extends Controller
     {
         $customer = Auth::guard('customer')->user();
 
+        $perPage = in_array($request->per_page, [10, 25, 50]) ? $request->per_page : 10;
+
         $tickets = ClientSupportTicket::where('customer_id', $customer->id)
             ->when($request->status, fn($q) => $q->where('status', $request->status))
-            ->with('category')
+            ->when($request->search, fn($q) => $q->whereHas('category', fn($c) =>
+                $c->where('name', 'like', "%{$request->search}%"))
+                ->orWhere('remarks', 'like', "%{$request->search}%")
+            )
+            ->with(['category', 'assignees'])
             ->latest()
-            ->paginate(10);
+            ->paginate($perPage);
 
         $categories = SupportCategory::active()->orderBy('name')->get();
 
@@ -202,6 +209,7 @@ class ClientPortalController extends Controller
         ];
 
         return view('client.tickets', compact('customer', 'tickets', 'categories', 'stats'));
+        
     }
 
     /**
@@ -214,15 +222,14 @@ class ClientPortalController extends Controller
         $request->validate([
             'support_category_id' => 'required|exists:support_categories,id',
             'priority'            => 'required|in:low,medium,high,urgent',
-            'remarks'             => 'required|string|min:10|max:1000',
+            'remarks'             => 'required|string|min:5|max:2000',
         ], [
-            'support_category_id.required' => 'সমস্যার ধরন বেছে নিন।',
-            'priority.required'            => 'অগ্রাধিকার বেছে নিন।',
-            'remarks.required'             => 'সমস্যার বিবরণ লিখুন।',
-            'remarks.min'                  => 'কমপক্ষে ১০ অক্ষর লিখুন।',
+            'support_category_id.required' => 'Please select a category.',
+            'priority.required'            => 'Please select a priority.',
+            'remarks.required'             => 'Description is required.',
         ]);
 
-        $ticket = ClientSupportTicket::create([
+        $data = [
             'ticket_no'           => ClientSupportTicket::generateNumber(),
             'customer_id'         => $customer->id,
             'support_category_id' => $request->support_category_id,
@@ -230,12 +237,72 @@ class ClientPortalController extends Controller
             'complained_no'       => $customer->phone,
             'remarks'             => $request->remarks,
             'status'              => 'pending',
-            'created_from'        => 'client_portal',
+            'created_from'        => 'client',
             'send_sms'            => false,
-        ]);
+        ];
+
+        if ($request->hasFile('attachment')) {
+            $data['attachment'] = $request->file('attachment')->store('tickets/attachments', 'public');
+        }
+
+        $ticket = ClientSupportTicket::create($data);
 
         return redirect()->route('client.tickets')
             ->with('success', 'টিকেট সফলভাবে জমা হয়েছে। টিকেট নং: ' . $ticket->ticket_no);
+    }
+
+    /**
+     * Single ticket detail + discussion
+     */
+    public function ticketShow(ClientSupportTicket $ticket)
+    {
+        $customer = Auth::guard('customer')->user();
+
+        if ($ticket->customer_id !== $customer->id) {
+            abort(403);
+        }
+
+        $ticket->load(['category', 'replies.customer', 'replies.user', 'assignees']);
+
+        return view('client.ticket-detail', compact('customer', 'ticket'));
+    }
+
+    /**
+     * Customer reply to a ticket
+     */
+    public function ticketReply(Request $request, ClientSupportTicket $ticket)
+    {
+        $customer = Auth::guard('customer')->user();
+
+        if ($ticket->customer_id !== $customer->id) {
+            abort(403);
+        }
+
+        $request->validate([
+            'message' => 'required|string|min:2|max:2000',
+        ], [
+            'message.required' => 'Message is required.',
+        ]);
+
+        $data = [
+            'ticket_id'   => $ticket->id,
+            'customer_id' => $customer->id,
+            'message'     => $request->message,
+            'sender_type' => 'customer',
+        ];
+
+        if ($request->hasFile('attachment')) {
+            $data['attachment'] = $request->file('attachment')->store('ticket-replies', 'public');
+        }
+
+        ClientTicketReply::create($data);
+
+        // Move ticket to processing if still pending
+        if ($ticket->status === 'pending') {
+            $ticket->update(['status' => 'processing']);
+        }
+
+        return back()->with('success', 'Message পাঠানো হয়েছে।');
     }
 
     // ══════════════════════════════════════════════════════
@@ -250,7 +317,7 @@ class ClientPortalController extends Controller
     }
 
     /**
-     * পাসওয়ার্ড পরিবর্তন
+     * Change portal password
      */
     public function changePassword(Request $request)
     {
@@ -260,21 +327,21 @@ class ClientPortalController extends Controller
             'current_password' => 'required|string',
             'password'         => 'required|string|min:6|confirmed',
         ], [
-            'current_password.required' => 'বর্তমান পাসওয়ার্ড দিন।',
-            'password.required'         => 'নতুন পাসওয়ার্ড দিন।',
-            'password.min'              => 'পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।',
-            'password.confirmed'        => 'নতুন পাসওয়ার্ড মিলছে না।',
+            'current_password.required' => 'Current password is required.',
+            'password.required'         => 'New password is required.',
+            'password.min'              => 'Password must be at least 6 characters.',
+            'password.confirmed'        => 'Password confirmation does not match.',
         ]);
 
-        // বর্তমান পাসওয়ার্ড চেক করো
+        // Verify current password
         if (!Hash::check($request->current_password, $customer->portal_password)) {
-            return back()->withErrors(['current_password' => 'বর্তমান পাসওয়ার্ড সঠিক নয়।']);
+            return back()->withErrors(['current_password' => 'Current password is incorrect.']);
         }
 
         $customer->update([
             'portal_password' => Hash::make($request->password),
         ]);
 
-        return back()->with('success', 'পাসওয়ার্ড সফলভাবে পরিবর্তন হয়েছে।');
+        return back()->with('success', 'Password updated successfully.');
     }
 }

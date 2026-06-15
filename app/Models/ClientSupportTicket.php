@@ -14,7 +14,7 @@ class ClientSupportTicket extends Model
 
     protected $fillable = [
         'ticket_no', 'customer_id', 'support_category_id', 'priority',
-        'status', 'complained_no', 'remarks', 'attachment',
+        'status', 'complained_no', 'subject', 'remarks', 'attachment',
         'send_sms', 'created_from', 'created_by', 'solved_by', 'solved_at',
     ];
 
@@ -51,6 +51,12 @@ class ClientSupportTicket extends Model
                     ->withTimestamps();
     }
 
+    // ── Client portal discussion replies ──────
+    public function replies()
+    {
+        return $this->hasMany(ClientTicketReply::class, 'ticket_id')->orderBy('created_at');
+    }
+
     // ── Scopes ────────────────────────────────
 
     public function scopePending($query)    { return $query->where('status', 'pending'); }
@@ -64,18 +70,6 @@ class ClientSupportTicket extends Model
         $last   = self::latest()->first();
         $number = $last ? (intval(substr($last->ticket_no, -4)) + 1) : 1;
         return 'TKT-' . date('Y') . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
-    }
-
-    public function getDurationAttribute(): string
-    {
-        $end   = $this->solved_at ?? now();
-        $start = $this->created_at;
-        $diff  = $start->diff($end);
-
-        return sprintf('%dd:%dh:%dm:%ds',
-            $diff->d + ($diff->days > 0 ? ($diff->days - $diff->d) : 0),
-            $diff->h, $diff->i, $diff->s
-        );
     }
 
     public function getPriorityBadgeAttribute(): string
