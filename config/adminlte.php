@@ -320,6 +320,13 @@ return [
             'can'        => 'super-admin',
         ],
         ['text' => 'SMS Gateways', 'url' => 'super-admin/sms', 'icon' => 'fas fa-fw fa-sms', 'icon_color' => 'green', 'can' => 'super-admin'],
+        [
+            'text'       => 'Permissions',
+            'url'        => 'super-admin/permissions',
+            'icon'       => 'fas fa-fw fa-key',
+            'icon_color' => 'orange',
+            'can'        => 'super-admin',
+        ],
         
         
          // ISP Admin menu তে
@@ -690,6 +697,16 @@ return [
             'submenu'    => [
                 ['text' => 'All Users', 'url' => 'users',        'icon' => 'fas fa-fw fa-list'],
                 ['text' => 'Add User',  'url' => 'users/create', 'icon' => 'fas fa-fw fa-user-plus'],
+            ],
+        ],
+        [
+            'text'       => 'Role Management',
+            'icon'       => 'fas fa-fw fa-user-tag',
+            'icon_color' => 'orange',
+            'can'        => 'isp-admin',
+            'submenu'    => [
+                ['text' => 'All Roles', 'url' => 'roles',        'icon' => 'fas fa-fw fa-list'],
+                ['text' => 'New Role',  'url' => 'roles/create', 'icon' => 'fas fa-fw fa-plus'],
             ],
         ],
         ['text' => 'Agents',    'url' => 'agents',    'icon' => 'fas fa-fw fa-user-tie', 'icon_color' => 'yellow', 'can' => 'isp-admin'],

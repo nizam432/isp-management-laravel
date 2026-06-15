@@ -19,6 +19,8 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\SuperAdmin\TenantController as SuperAdminTenantController;
 use App\Http\Controllers\SuperAdmin\PlanController as SuperAdminPlanController;
 use App\Http\Controllers\SuperAdmin\SmsGatewayController as SuperAdminSmsGatewayController;
+use App\Http\Controllers\SuperAdmin\PermissionController as SuperAdminPermissionController;
+use App\Http\Controllers\RoleController;
 use App\Http\Controllers\Settings\ZoneController;
 use App\Http\Controllers\Settings\SubZoneController;
 use App\Http\Controllers\Settings\ConnectionTypeController;
@@ -252,6 +254,16 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/{user}',      [UserController::class, 'destroy']) ->name('destroy');
     });
 
+    // ── Role Management (ISP Admin) ────────────
+    Route::prefix('roles')->name('roles.')->group(function () {
+        Route::get('/',            [RoleController::class, 'index'])  ->name('index');
+        Route::get('/create',      [RoleController::class, 'create']) ->name('create');
+        Route::post('/',           [RoleController::class, 'store'])  ->name('store');
+        Route::get('/{role}/edit', [RoleController::class, 'edit'])   ->name('edit');
+        Route::put('/{role}',      [RoleController::class, 'update']) ->name('update');
+        Route::delete('/{role}',   [RoleController::class, 'destroy'])->name('destroy');
+    });
+
     // ── My Resellers (Master Reseller only) ────
     Route::prefix('my-resellers')->name('my-resellers.')->middleware(['can:create-reseller'])->group(function () {
         Route::get('/',             [MyResellerController::class, 'index'])->name('index');
@@ -291,6 +303,14 @@ Route::middleware(['auth'])->group(function () {
         Route::prefix('sms')->name('sms.')->group(function () {
             Route::get('/',                  [SuperAdminSmsGatewayController::class, 'index'])->name('index');
             Route::post('/{gateway}/toggle', [SuperAdminSmsGatewayController::class, 'toggle'])->name('toggle');
+        });
+
+        // Permissions
+        Route::prefix('permissions')->name('permissions.')->group(function () {
+            Route::get('/',                [SuperAdminPermissionController::class, 'index'])  ->name('index');
+            Route::post('/',               [SuperAdminPermissionController::class, 'store'])  ->name('store');
+            Route::put('/{permission}',    [SuperAdminPermissionController::class, 'update']) ->name('update');
+            Route::delete('/{permission}', [SuperAdminPermissionController::class, 'destroy'])->name('destroy');
         });
 
     }); // end super-admin

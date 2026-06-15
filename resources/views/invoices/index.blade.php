@@ -1,624 +1,625 @@
-{{-- resources/views/invoices/index.blade.php --}}
+@push('css')
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+@endpush
+
 @extends('layouts.app')
-@section('page_title', 'Invoices')
 
-@section('page_actions')
-    {{-- Bulk Generate (monthly only) --}}
-    @if($billingType !== 'date_to_date')
-    <button class="btn btn-success btn-sm mr-1" data-toggle="modal" data-target="#bulkGenerateModal">
-        <i class="fas fa-magic mr-1"></i> Bulk Generate
-    </button>
-    @endif
+@section('title', 'Invoices')
 
-    <button class="btn btn-primary btn-sm mr-1" data-toggle="modal" data-target="#createInvoiceModal">
-        <i class="fas fa-plus mr-1"></i> New Invoice
-    </button>
-
-    <div class="btn-group">
-        <button type="button" class="btn btn-secondary btn-sm dropdown-toggle" data-toggle="dropdown">
-            <i class="fas fa-download mr-1"></i> Export
-        </button>
-        <div class="dropdown-menu dropdown-menu-right">
-            <a class="dropdown-item" href="{{ route('invoices.bulk-xlsx') }}{{ request()->getQueryString() ? '?'.request()->getQueryString() : '' }}">
-                <i class="fas fa-file-excel mr-1 text-success"></i> Excel (XLSX)
-            </a>
-            <a class="dropdown-item" href="{{ route('invoices.bulk-pdf') }}{{ request()->getQueryString() ? '?'.request()->getQueryString() : '' }}">
-                <i class="fas fa-file-pdf mr-1 text-danger"></i> PDF
-            </a>
+@section('content_header')
+    <div class="d-flex justify-content-between align-items-center">
+        <h1 class="m-0">Invoices</h1>
+        <div>
+            <button type="button" class="btn btn-primary btn-sm" data-toggle="modal" data-target="#newInvoiceModal">
+                <i class="fas fa-plus"></i> New Invoice
+            </button>
+            <button type="button" class="btn btn-success btn-sm ml-1" data-toggle="modal" data-target="#bulkGenerateModal">
+                <i class="fas fa-cogs"></i> Bulk Generate
+            </button>
         </div>
     </div>
 @endsection
 
-@section('page_content')
+@section('content')
 
-{{-- ══ STAT CARDS ══════════════════════════════════════════════════════════ --}}
-<div class="row mb-3">
+{{-- ── Stats Cards ─────────────────────────────── --}}
+@php
+    $paidChange     = $stats['paid_clients']['last'] > 0    ? round((($stats['paid_clients']['current']    - $stats['paid_clients']['last'])    / $stats['paid_clients']['last'])    * 100) : 0;
+    $unpaidChange   = $stats['unpaid_clients']['last'] > 0  ? round((($stats['unpaid_clients']['current']  - $stats['unpaid_clients']['last'])  / $stats['unpaid_clients']['last'])  * 100) : 0;
+    $receivedChange = $stats['received_bill']['last'] > 0   ? round((($stats['received_bill']['current']   - $stats['received_bill']['last'])   / $stats['received_bill']['last'])   * 100) : 0;
+    $genChange      = $stats['generated_bill']['last'] > 0  ? round((($stats['generated_bill']['current']  - $stats['generated_bill']['last'])  / $stats['generated_bill']['last'])  * 100) : 0;
+    $billChange     = $stats['monthly_bill']['last'] > 0    ? round((($stats['monthly_bill']['current']    - $stats['monthly_bill']['last'])    / $stats['monthly_bill']['last'])    * 100) : 0;
+    $rateChange     = $stats['collection_rate']['current']  - $stats['collection_rate']['last'];
+@endphp
+
+<style>
+.stat-card { border-radius:6px; color:#fff; overflow:hidden; margin-bottom:12px; }
+.stat-card .sc-top { padding:10px 14px 6px; }
+.stat-card .sc-label { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-bottom:3px; color:#fff; }
+.stat-card .sc-value { font-size:28px; font-weight:700; line-height:1.2; color:#fff; }
+.stat-card .sc-sub { font-size:10px; font-weight:600; margin-top:1px; color:rgba(255,255,255,.85); }
+.stat-card .sc-bottom { padding:3px 12px 5px; background:rgba(0,0,0,.12); }
+.sc-bars { display:flex; align-items:flex-end; gap:3px; height:16px; }
+.sc-bar { flex:1; border-radius:2px 2px 0 0; background:rgba(255,255,255,.3); }
+.sc-bar.now { background:rgba(255,255,255,.9); }
+.sc-badge { font-size:10px; padding:2px 7px; border-radius:20px; background:rgba(255,255,255,.25); font-weight:500; }
+</style>
+
+<div class="row">
 
     {{-- Paid Clients --}}
-    <div class="col-6 col-md-3 mb-2">
-        <div class="small-box bg-success mb-0">
-            <div class="inner">
-                <h4>{{ $stats['paid_clients']['current'] }}</h4>
-                <p>Paid Clients
-                    @if($stats['paid_clients']['last'] > 0)
-                        <small class="opacity-75">/ {{ $stats['paid_clients']['last'] }} last mo.</small>
-                    @endif
-                </p>
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card" style="background:#00a65a;">
+            <div class="sc-top">
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                    <div class="sc-label"><i class="fas fa-user-check mr-1"></i> Paid Clients</div>
+                    <span class="sc-badge">{{ $paidChange >= 0 ? '+' : '' }}{{ $paidChange }}%</span>
+                </div>
+                <div class="sc-value">{{ $stats['paid_clients']['current'] }}</div>
+                <div class="sc-sub">{{-- vs {{ $stats['paid_clients']['last'] }} last month --}}</div>
             </div>
-            <div class="icon"><i class="fas fa-check-circle"></i></div>
-            <a href="{{ route('invoices.index', array_merge(request()->query(), ['status'=>'paid','month'=>now()->format('Y-m')])) }}" class="small-box-footer">
-                View <i class="fas fa-arrow-circle-right"></i>
-            </a>
+            {{-- <div class="sc-bottom">
+                <div class="sc-bars">
+                    <div class="sc-bar" style="height:40%"></div>
+                    <div class="sc-bar" style="height:55%"></div>
+                    <div class="sc-bar" style="height:50%"></div>
+                    <div class="sc-bar" style="height:65%"></div>
+                    <div class="sc-bar" style="height:80%"></div>
+                    <div class="sc-bar now" style="height:100%"></div>
+                </div>
+            </div> --}}
         </div>
     </div>
 
     {{-- Unpaid Clients --}}
-    <div class="col-6 col-md-3 mb-2">
-        <div class="small-box bg-warning mb-0">
-            <div class="inner">
-                <h4>{{ $stats['unpaid_clients']['current'] }}</h4>
-                <p>Unpaid / Overdue
-                    @if($stats['unpaid_clients']['last'] > 0)
-                        <small class="opacity-75">/ {{ $stats['unpaid_clients']['last'] }} last mo.</small>
-                    @endif
-                </p>
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card" style="background:#dd4b39;">
+            <div class="sc-top">
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                    <div class="sc-label"><i class="fas fa-user-times mr-1"></i> Unpaid Clients</div>
+                    <span class="sc-badge">{{ $unpaidChange >= 0 ? '+' : '' }}{{ $unpaidChange }}%</span>
+                </div>
+                <div class="sc-value">{{ $stats['unpaid_clients']['current'] }}</div>
+                <div class="sc-sub">{{-- vs {{ $stats['unpaid_clients']['last'] }} last month --}}</div>
             </div>
-            <div class="icon"><i class="fas fa-exclamation-circle"></i></div>
-            <a href="{{ route('invoices.index', array_merge(request()->query(), ['status'=>'unpaid'])) }}" class="small-box-footer">
-                View <i class="fas fa-arrow-circle-right"></i>
-            </a>
+            {{-- <div class="sc-bottom">
+                <div class="sc-bars">
+                    <div class="sc-bar" style="height:60%"></div>
+                    <div class="sc-bar" style="height:65%"></div>
+                    <div class="sc-bar" style="height:70%"></div>
+                    <div class="sc-bar" style="height:75%"></div>
+                    <div class="sc-bar" style="height:85%"></div>
+                    <div class="sc-bar now" style="height:100%"></div>
+                </div>
+            </div> --}}
         </div>
     </div>
 
-    {{-- Received Bill --}}
-    <div class="col-6 col-md-3 mb-2">
-        <div class="small-box bg-info mb-0">
-            <div class="inner">
-                <h4>৳ {{ number_format($stats['received_bill']['current']) }}</h4>
-                <p>Received This Month
-                    @if($stats['received_bill']['last'] > 0)
-                        <small class="opacity-75">/ ৳{{ number_format($stats['received_bill']['last']) }} last</small>
-                    @endif
-                </p>
+    {{-- Received Invoice --}}
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card" style="background:#0073b7;">
+            <div class="sc-top">
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                    <div class="sc-label"><i class="fas fa-money-bill-wave mr-1"></i> Received Invoice</div>
+                    <span class="sc-badge">{{ $receivedChange >= 0 ? '+' : '' }}{{ $receivedChange }}%</span>
+                </div>
+                <div class="sc-value">&#2547;{{ number_format($stats['received_bill']['current'], 0) }}</div>
+                <div class="sc-sub">{{-- vs &#2547;{{ number_format($stats['received_bill']['last'], 0) }} last month --}}</div>
             </div>
-            <div class="icon"><i class="fas fa-hand-holding-usd"></i></div>
-            <a href="{{ route('payments.index') }}" class="small-box-footer">
-                Payments <i class="fas fa-arrow-circle-right"></i>
-            </a>
+            {{-- <div class="sc-bottom">
+                <div class="sc-bars">
+                    <div class="sc-bar" style="height:50%"></div>
+                    <div class="sc-bar" style="height:60%"></div>
+                    <div class="sc-bar" style="height:55%"></div>
+                    <div class="sc-bar" style="height:70%"></div>
+                    <div class="sc-bar" style="height:80%"></div>
+                    <div class="sc-bar now" style="height:100%"></div>
+                </div>
+            </div> --}}
         </div>
     </div>
 
     {{-- Total Due --}}
-    <div class="col-6 col-md-3 mb-2">
-        <div class="small-box bg-danger mb-0">
-            <div class="inner">
-                <h4>৳ {{ number_format($stats['total_due']) }}</h4>
-                <p>Total Outstanding Due</p>
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card" style="background:#f39c12;">
+            <div class="sc-top">
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                    <div class="sc-label"><i class="fas fa-exclamation-circle mr-1"></i> Total Due</div>
+                    <span class="sc-badge">All time</span>
+                </div>
+                <div class="sc-value">&#2547;{{ number_format($stats['total_due'], 0) }}</div>
+                <div class="sc-sub">{{-- All time outstanding --}}</div>
             </div>
-            <div class="icon"><i class="fas fa-money-bill-wave"></i></div>
-            <a href="{{ route('invoices.index', ['status'=>'overdue']) }}" class="small-box-footer">
-                Overdue <i class="fas fa-arrow-circle-right"></i>
-            </a>
+            {{-- <div class="sc-bottom">
+                <div class="sc-bars">
+                    <div class="sc-bar" style="height:45%"></div>
+                    <div class="sc-bar" style="height:55%"></div>
+                    <div class="sc-bar" style="height:65%"></div>
+                    <div class="sc-bar" style="height:75%"></div>
+                    <div class="sc-bar" style="height:85%"></div>
+                    <div class="sc-bar now" style="height:100%"></div>
+                </div>
+            </div> --}}
         </div>
     </div>
 
-    {{-- Generated Invoices --}}
-    <div class="col-6 col-md-3 mb-2">
-        <div class="small-box bg-secondary mb-0">
-            <div class="inner">
-                <h4>{{ $stats['generated_bill']['current'] }}</h4>
-                <p>Generated This Month</p>
+    {{-- Generated Invoice --}}
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card" style="background:#00a65a;">
+            <div class="sc-top">
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                    <div class="sc-label"><i class="fas fa-file-invoice mr-1"></i> Generated Invoice</div>
+                    <span class="sc-badge">{{ $genChange >= 0 ? '+' : '' }}{{ $genChange }}%</span>
+                </div>
+                <div class="sc-value">{{ $stats['generated_bill']['current'] }}</div>
+                <div class="sc-sub">{{-- vs {{ $stats['generated_bill']['last'] }} last month --}}</div>
             </div>
-            <div class="icon"><i class="fas fa-file-invoice"></i></div>
-            <a href="{{ route('invoices.index', ['month'=>now()->format('Y-m')]) }}" class="small-box-footer">
-                View <i class="fas fa-arrow-circle-right"></i>
-            </a>
+            {{-- <div class="sc-bottom">
+                <div class="sc-bars">
+                    <div class="sc-bar" style="height:55%"></div>
+                    <div class="sc-bar" style="height:60%"></div>
+                    <div class="sc-bar" style="height:65%"></div>
+                    <div class="sc-bar" style="height:75%"></div>
+                    <div class="sc-bar" style="height:85%"></div>
+                    <div class="sc-bar now" style="height:100%"></div>
+                </div>
+            </div> --}}
         </div>
     </div>
 
-    {{-- Advance Balance --}}
-    <div class="col-6 col-md-3 mb-2">
-        <div class="small-box mb-0" style="background:#6f42c1;color:#fff;">
-            <div class="inner">
-                <h4>৳ {{ number_format($stats['advance_amount']) }}</h4>
-                <p>Total Advance Balance</p>
+    {{-- Advance Amount --}}
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card" style="background:#dd4b39;">
+            <div class="sc-top">
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                    <div class="sc-label"><i class="fas fa-wallet mr-1"></i> Advance Amount</div>
+                    <span class="sc-badge">Total</span>
+                </div>
+                <div class="sc-value">&#2547;{{ number_format($stats['advance_amount'], 0) }}</div>
+                <div class="sc-sub">{{-- Total advance balance --}}</div>
             </div>
-            <div class="icon"><i class="fas fa-piggy-bank"></i></div>
-            <a href="#" class="small-box-footer" style="background:rgba(0,0,0,.1);">
-                All Customers <i class="fas fa-arrow-circle-right"></i>
-            </a>
+            {{-- <div class="sc-bottom">
+                <div class="sc-bars">
+                    <div class="sc-bar" style="height:35%"></div>
+                    <div class="sc-bar" style="height:45%"></div>
+                    <div class="sc-bar" style="height:55%"></div>
+                    <div class="sc-bar" style="height:70%"></div>
+                    <div class="sc-bar" style="height:80%"></div>
+                    <div class="sc-bar now" style="height:100%"></div>
+                </div>
+            </div> --}}
         </div>
     </div>
 
-    {{-- Monthly Bill --}}
-    <div class="col-6 col-md-3 mb-2">
-        <div class="small-box mb-0" style="background:#17a2b8;color:#fff;">
-            <div class="inner">
-                <h4>৳ {{ number_format($stats['monthly_bill']['current']) }}</h4>
-                <p>Monthly Bill Amount</p>
+    {{-- Monthly Invoice --}}
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card" style="background:#0073b7;">
+            <div class="sc-top">
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                    <div class="sc-label"><i class="fas fa-chart-bar mr-1"></i> Monthly Invoice</div>
+                    <span class="sc-badge">{{ $billChange >= 0 ? '+' : '' }}{{ $billChange }}%</span>
+                </div>
+                <div class="sc-value">&#2547;{{ number_format($stats['monthly_bill']['current'], 0) }}</div>
+                <div class="sc-sub">{{-- vs &#2547;{{ number_format($stats['monthly_bill']['last'], 0) }} last month --}}</div>
             </div>
-            <div class="icon"><i class="fas fa-calendar-check"></i></div>
-            <a href="#" class="small-box-footer" style="background:rgba(0,0,0,.1);">
-                This Month <i class="fas fa-arrow-circle-right"></i>
-            </a>
+            {{-- <div class="sc-bottom">
+                <div class="sc-bars">
+                    <div class="sc-bar" style="height:50%"></div>
+                    <div class="sc-bar" style="height:60%"></div>
+                    <div class="sc-bar" style="height:65%"></div>
+                    <div class="sc-bar" style="height:75%"></div>
+                    <div class="sc-bar" style="height:85%"></div>
+                    <div class="sc-bar now" style="height:100%"></div>
+                </div>
+            </div> --}}
         </div>
     </div>
 
     {{-- Collection Rate --}}
-    <div class="col-6 col-md-3 mb-2">
-        <div class="small-box mb-0" style="background:#20c997;color:#fff;">
-            <div class="inner">
-                <h4>{{ $stats['collection_rate']['current'] }}%</h4>
-                <p>Collection Rate
-                    @if($stats['collection_rate']['last'] > 0)
-                        <small class="opacity-75">/ {{ $stats['collection_rate']['last'] }}% last mo.</small>
-                    @endif
-                </p>
+    <div class="col-xl-3 col-md-6">
+        <div class="stat-card" style="background:#f39c12;">
+            <div class="sc-top">
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                    <div class="sc-label"><i class="fas fa-percentage mr-1"></i> Collection Rate</div>
+                    <span class="sc-badge">{{ $rateChange >= 0 ? '+' : '' }}{{ $rateChange }}%</span>
+                </div>
+                <div class="sc-value">{{ $stats['collection_rate']['current'] }}%</div>
+                <div class="sc-sub">{{-- {{ $stats['paid_clients']['current'] }} of {{ $stats['paid_clients']['current'] + $stats['unpaid_clients']['current'] }} clients paid --}}</div>
             </div>
-            <div class="icon"><i class="fas fa-chart-pie"></i></div>
-            <a href="{{ route('reports.revenue') }}" class="small-box-footer" style="background:rgba(0,0,0,.1);">
-                Revenue Report <i class="fas fa-arrow-circle-right"></i>
-            </a>
+            {{-- <div class="sc-bottom">
+                <div style="background:rgba(255,255,255,.25); border-radius:3px; height:6px; margin-top:4px;">
+                    <div style="width:{{ $stats['collection_rate']['current'] }}%; height:6px; background:rgba(255,255,255,.9); border-radius:3px;"></div>
+                </div>
+            </div> --}}
         </div>
     </div>
 
 </div>
 
-{{-- ══ FILTER ═══════════════════════════════════════════════════════════ --}}
-<div class="card card-outline card-secondary mb-3">
-    <div class="card-header py-2" id="filterToggle" style="cursor:pointer;">
+{{-- ── Filter ───────────────────────────────────── --}}
+<div class="card mb-3">
+    <div class="card-header py-2" style="cursor:pointer;" id="filterToggle">
         <div class="d-flex justify-content-between align-items-center">
-            <h6 class="mb-0 font-weight-bold">
-                <i class="fas fa-filter mr-1 text-info"></i> Filter & Search
-                @if(request()->hasAny(['status','month','package_id','router_id','zone_id','sub_zone_id','connection_type_id','client_type_id','search','date_from','date_to']))
-                    <span class="badge badge-info ml-1">Active</span>
-                @endif
-            </h6>
-            <i class="fas fa-chevron-up text-muted" id="filterChevron"></i>
+            <h6 class="mb-0"><i class="fas fa-filter mr-1"></i> Search & Filter</h6>
+            <button type="button" class="btn btn-tool">
+                <i class="fas fa-minus" id="filterIcon"></i>
+            </button>
         </div>
     </div>
-    <div class="card-body pt-3 pb-2" id="filterBody">
+    <div class="card-body pt-3" id="filterBody">
         <form method="GET" action="{{ route('invoices.index') }}" id="filterForm">
+
+            {{-- Row 1 --}}
+            <div class="row mb-3">
+                <div class="col-md-3">
+                    <label class="col-form-label-sm font-weight-bold mb-1">Search</label>
+                    <div class="input-group input-group-sm">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        </div>
+                        <input type="text" name="search" class="form-control"
+                            placeholder="Name / Phone / Code" value="{{ request('search') }}">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <label class="col-form-label-sm font-weight-bold mb-1">Month</label>
+                    <input type="month" name="month" class="form-control form-control-sm"
+                        value="{{ request('month') }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="col-form-label-sm font-weight-bold mb-1">Status</label>
+                    <select name="status" class="form-control form-control-sm select2">
+                        <option value="">All Status</option>
+                        <option value="paid"    {{ request('status') == 'paid'    ? 'selected' : '' }}>Paid</option>
+                        <option value="unpaid"  {{ request('status') == 'unpaid'  ? 'selected' : '' }}>Unpaid</option>
+                        <option value="partial" {{ request('status') == 'partial' ? 'selected' : '' }}>Partial</option>
+                        <option value="overdue" {{ request('status') == 'overdue' ? 'selected' : '' }}>Overdue</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="col-form-label-sm font-weight-bold mb-1">Package</label>
+                    <select name="package_id" class="form-control form-control-sm select2">
+                        <option value="">All Packages</option>
+                        @foreach($packages as $package)
+                            <option value="{{ $package->id }}" {{ request('package_id') == $package->id ? 'selected' : '' }}>
+                                {{ $package->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="col-form-label-sm font-weight-bold mb-1">Router</label>
+                    <select name="router_id" class="form-control form-control-sm select2">
+                        <option value="">All Routers</option>
+                        @foreach($routers as $router)
+                            <option value="{{ $router->id }}" {{ request('router_id') == $router->id ? 'selected' : '' }}>
+                                {{ $router->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+
+            {{-- Row 2 --}}
             <div class="row">
-
-                <div class="col-md-2 col-6">
-                    <div class="form-group mb-2">
-                        <label class="small font-weight-bold">Month</label>
-                        <input type="month" name="month" class="form-control form-control-sm"
-                               value="{{ request('month') }}" autocomplete="off">
-                    </div>
+                <div class="col-md-2">
+                    <label class="col-form-label-sm font-weight-bold mb-1">Bill From Date</label>
+                    <input type="date" name="date_from" class="form-control form-control-sm"
+                        value="{{ request('date_from') }}">
                 </div>
-
-                <div class="col-md-2 col-6">
-                    <div class="form-group mb-2">
-                        <label class="small font-weight-bold">Status</label>
-                        <select name="status" class="form-control form-control-sm">
-                            <option value="">All Status</option>
-                            @foreach(['paid'=>'Paid','unpaid'=>'Unpaid','partial'=>'Partial','overdue'=>'Overdue'] as $v=>$l)
-                                <option value="{{ $v }}" {{ request('status')==$v?'selected':'' }}>{{ $l }}</option>
-                            @endforeach
-                        </select>
-                    </div>
+                <div class="col-md-2">
+                    <label class="col-form-label-sm font-weight-bold mb-1">Bill To Date</label>
+                    <input type="date" name="date_to" class="form-control form-control-sm"
+                        value="{{ request('date_to') }}">
                 </div>
-
-                <div class="col-md-2 col-6">
-                    <div class="form-group mb-2">
-                        <label class="small font-weight-bold">Package</label>
-                        <select name="package_id" class="form-control form-control-sm">
-                            <option value="">All Packages</option>
-                            @foreach($packages as $pkg)
-                                <option value="{{ $pkg->id }}" {{ request('package_id')==$pkg->id?'selected':'' }}>
-                                    {{ $pkg->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
+                <div class="col-md-2">
+                    <label class="col-form-label-sm font-weight-bold mb-1">Zone</label>
+                    <select name="zone_id" class="form-control form-control-sm select2">
+                        <option value="">All Zones</option>
+                        @foreach($zones as $zone)
+                            <option value="{{ $zone->id }}" {{ request('zone_id') == $zone->id ? 'selected' : '' }}>
+                                {{ $zone->name }}
+                            </option>
+                        @endforeach
+                    </select>
                 </div>
-
-                <div class="col-md-2 col-6">
-                    <div class="form-group mb-2">
-                        <label class="small font-weight-bold">Zone</label>
-                        <select name="zone_id" class="form-control form-control-sm">
-                            <option value="">All Zones</option>
-                            @foreach($zones as $z)
-                                <option value="{{ $z->id }}" {{ request('zone_id')==$z->id?'selected':'' }}>
-                                    {{ $z->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
+                <div class="col-md-2">
+                    <label class="col-form-label-sm font-weight-bold mb-1">Connection Type</label>
+                    <select name="connection_type_id" class="form-control form-control-sm select2">
+                        <option value="">All Connections</option>
+                        @foreach($connectionTypes as $ct)
+                            <option value="{{ $ct->id }}" {{ request('connection_type_id') == $ct->id ? 'selected' : '' }}>
+                                {{ $ct->name }}
+                            </option>
+                        @endforeach
+                    </select>
                 </div>
-
-                <div class="col-md-2 col-6">
-                    <div class="form-group mb-2">
-                        <label class="small font-weight-bold">Router</label>
-                        <select name="router_id" class="form-control form-control-sm">
-                            <option value="">All Routers</option>
-                            @foreach($routers as $r)
-                                <option value="{{ $r->id }}" {{ request('router_id')==$r->id?'selected':'' }}>
-                                    {{ $r->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
+                <div class="col-md-2">
+                    <label class="col-form-label-sm font-weight-bold mb-1">Client Type</label>
+                    <select name="client_type_id" class="form-control form-control-sm select2">
+                        <option value="">All Types</option>
+                        @foreach($clientTypes as $ct)
+                            <option value="{{ $ct->id }}" {{ request('client_type_id') == $ct->id ? 'selected' : '' }}>
+                                {{ $ct->name }}
+                            </option>
+                        @endforeach
+                    </select>
                 </div>
-
-                <div class="col-md-2 col-6">
-                    <div class="form-group mb-2">
-                        <label class="small font-weight-bold">Connection Type</label>
-                        <select name="connection_type_id" class="form-control form-control-sm">
-                            <option value="">All Types</option>
-                            @foreach($connectionTypes as $ct)
-                                <option value="{{ $ct->id }}" {{ request('connection_type_id')==$ct->id?'selected':'' }}>
-                                    {{ $ct->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary btn-sm mr-1">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                    <a href="{{ route('invoices.index') }}" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-redo"></i> Reset
+                    </a>
                 </div>
-
-                <div class="col-md-2 col-6">
-                    <div class="form-group mb-2">
-                        <label class="small font-weight-bold">Client Type</label>
-                        <select name="client_type_id" class="form-control form-control-sm">
-                            <option value="">All</option>
-                            @foreach($clientTypes as $cl)
-                                <option value="{{ $cl->id }}" {{ request('client_type_id')==$cl->id?'selected':'' }}>
-                                    {{ $cl->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                </div>
-
-                <div class="col-md-2 col-6">
-                    <div class="form-group mb-2">
-                        <label class="small font-weight-bold">Date From</label>
-                        <input type="date" name="date_from" class="form-control form-control-sm"
-                               value="{{ request('date_from') }}">
-                    </div>
-                </div>
-
-                <div class="col-md-2 col-6">
-                    <div class="form-group mb-2">
-                        <label class="small font-weight-bold">Date To</label>
-                        <input type="date" name="date_to" class="form-control form-control-sm"
-                               value="{{ request('date_to') }}">
-                    </div>
-                </div>
-
-                <div class="col-md-4 col-12">
-                    <div class="form-group mb-2">
-                        <label class="small font-weight-bold">Search</label>
-                        <input type="text" name="search" class="form-control form-control-sm"
-                               placeholder="Name / Phone..." value="{{ request('search') }}">
-                    </div>
-                </div>
-
             </div>
 
-            <div class="mt-1 d-flex align-items-center">
-                <button type="submit" class="btn btn-sm btn-primary mr-1">
-                    <i class="fas fa-search mr-1"></i> Search
-                </button>
-                <a href="{{ route('invoices.index') }}" class="btn btn-sm btn-secondary mr-1">
-                    <i class="fas fa-redo mr-1"></i> Reset
-                </a>
-
-                {{-- Bulk SMS --}}
-                <button type="button" class="btn btn-sm btn-warning mr-1" id="btnBulkSms">
-                    <i class="fas fa-sms mr-1"></i> Bulk SMS
-                </button>
-
-                {{-- Bulk Delete --}}
-                <button type="button" class="btn btn-sm btn-danger" id="btnBulkDelete">
-                    <i class="fas fa-trash mr-1"></i> Delete Selected
-                </button>
-            </div>
         </form>
     </div>
 </div>
 
-{{-- ══ TABLE ═══════════════════════════════════════════════════════════ --}}
+{{-- ── Invoice Table ────────────────────────────── --}}
+
+{{-- Bulk Actions + Per Page --}}
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <div id="bulkActions" class="d-none">
+        <button type="button" class="btn btn-danger btn-sm mr-1" id="bulkDelete">
+            <i class="fas fa-trash mr-1"></i> Delete Selected
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm mr-1" id="bulkPdf">
+            <i class="fas fa-file-pdf mr-1"></i> PDF
+        </button>
+        <button type="button" class="btn btn-success btn-sm mr-1" id="bulkXlsx">
+            <i class="fas fa-file-excel mr-1"></i> XLSX
+        </button>
+        {{-- <button type="button" class="btn btn-info btn-sm" id="bulkSms">
+            <i class="fas fa-sms mr-1"></i> Send SMS
+        </button> --}}
+    </div>
+    <div class="ml-auto d-flex align-items-center">
+        <label class="mr-2 mb-0 text-muted" style="font-size:13px;">Show</label>
+        <select id="perPage" class="form-control form-control-sm" style="width:80px;">
+            <option value="10"    {{ request('per_page', 20) == 10    ? 'selected' : '' }}>10</option>
+            <option value="20"    {{ request('per_page', 20) == 20    ? 'selected' : '' }}>20</option>
+            <option value="50"    {{ request('per_page', 20) == 50    ? 'selected' : '' }}>50</option>
+            <option value="100"   {{ request('per_page', 20) == 100   ? 'selected' : '' }}>100</option>
+            <option value="500"   {{ request('per_page', 20) == 500   ? 'selected' : '' }}>500</option>
+            <option value="1000"  {{ request('per_page', 20) == 1000  ? 'selected' : '' }}>1000</option>
+            <option value="99999" {{ request('per_page', 20) == 99999 ? 'selected' : '' }}>All</option>
+        </select>
+        <label class="ml-2 mb-0 text-muted" style="font-size:13px;">records</label>
+    </div>
+</div>
+
 <div class="card">
-    <div class="card-header d-flex justify-content-between align-items-center py-2">
-        <h6 class="mb-0 font-weight-bold">
-            <i class="fas fa-file-invoice mr-1 text-orange"></i> Invoice List
-            <span class="badge badge-info ml-1">{{ $invoices->total() }}</span>
-        </h6>
-        <div class="d-flex align-items-center">
-            <input type="text" id="tableSearch" class="form-control form-control-sm mr-2"
-                   placeholder="Quick search..." style="width:180px;" autocomplete="off">
-            <select id="perPage" class="form-control form-control-sm" style="width:70px;">
-                @foreach([20,50,100,200] as $pp)
-                    <option value="{{ $pp }}" {{ request('per_page',20)==$pp?'selected':'' }}>{{ $pp }}</option>
-                @endforeach
-            </select>
-        </div>
-    </div>
-
     <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-sm table-hover mb-0" id="invTable">
-                <thead class="thead-light">
-                    <tr>
-                        <th style="width:32px;">
-                            <input type="checkbox" id="checkAll" title="Select All">
-                        </th>
-                        <th>#</th>
-                        <th>Invoice No</th>
-                        <th>Customer</th>
-                        <th>Package</th>
-                        <th>Month</th>
-                        <th class="text-right">Amount</th>
-                        <th class="text-right">Due</th>
-                        <th>Due Date</th>
-                        <th>Status</th>
-                        <th class="text-center" style="width:130px;">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($invoices as $i => $invoice)
-                    <tr>
-                        <td>
-                            <input type="checkbox" class="rowCheck" value="{{ $invoice->id }}">
-                        </td>
-                        <td class="text-muted small">{{ $invoices->firstItem() + $i }}</td>
-                        <td>
-                            <a href="{{ route('invoices.show', $invoice) }}" class="font-weight-bold text-dark">
-                                {{ $invoice->invoice_no }}
-                            </a>
-                            @if($invoice->billing_type === 'date_to_date')
-                                <br><small class="text-muted">
-                                    {{ $invoice->period_start?->format('d M') ?? '' }}
-                                    — {{ $invoice->period_end?->format('d M Y') ?? '' }}
-                                </small>
-                            @endif
-                        </td>
-                        <td>
-                            <a href="{{ route('customers.show', $invoice->customer_id) }}" class="text-dark">
-                                {{ $invoice->customer->name ?? '—' }}
-                            </a>
-                            <br><small class="text-muted">{{ $invoice->customer->phone ?? '' }}</small>
-                        </td>
-                        <td>
-                            <small>{{ $invoice->package->name ?? '—' }}</small>
-                        </td>
-                        <td>{{ $invoice->month }}</td>
-                        <td class="text-right">৳ {{ number_format($invoice->amount) }}</td>
-                        <td class="text-right {{ $invoice->due_amount > 0 ? 'text-danger font-weight-bold' : 'text-success' }}">
-                            ৳ {{ number_format($invoice->due_amount) }}
-                        </td>
-                        <td>
-                            @if($invoice->due_date)
-                                <span class="{{ $invoice->due_date->isPast() && $invoice->status !== 'paid' ? 'text-danger' : '' }}">
-                                    {{ $invoice->due_date->format('d M Y') }}
-                                </span>
-                            @else
-                                <span class="text-muted">—</span>
-                            @endif
-                        </td>
-                        <td>
-                            @php
-                                $badgeMap = [
-                                    'paid'    => 'success',
-                                    'partial' => 'info',
-                                    'unpaid'  => 'warning',
-                                    'overdue' => 'danger',
-                                ];
-                                $badge = $badgeMap[$invoice->status] ?? 'secondary';
-                            @endphp
-                            <span class="badge badge-{{ $badge }}">
-                                {{ ucfirst($invoice->status) }}
-                            </span>
-                        </td>
-                        <td class="text-center" style="white-space:nowrap;">
-                            {{-- View --}}
-                            <a href="{{ route('invoices.show', $invoice) }}"
-                               class="btn btn-xs btn-info" title="View">
-                                <i class="fas fa-eye"></i>
-                            </a>
-
-                            {{-- Pay --}}
-                            @if($invoice->status !== 'paid')
-                            <button class="btn btn-xs btn-success btnPay"
-                                    data-id="{{ $invoice->id }}"
-                                    data-no="{{ $invoice->invoice_no }}"
-                                    data-due="{{ $invoice->due_amount }}"
-                                    data-customer="{{ $invoice->customer->name ?? '' }}"
-                                    title="Collect Payment">
-                                <i class="fas fa-hand-holding-usd"></i>
+        <table class="table table-hover table-sm mb-0">
+            <thead class="bg-light">
+                <tr>
+                    <th style="width:30px;">
+                        <input type="checkbox" id="selectAll">
+                    </th>
+                    <th>Invoice No</th>
+                    <th>Customer</th>
+                    <th>Package / Month</th>
+                    <th>Amount</th>
+                    <th>Discount</th>
+                    <th>Due</th>
+                    <th>Status</th>
+                    <th>Due Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($invoices as $invoice)
+                <tr>
+                    <td>
+                        <input type="checkbox" class="invoice-check"
+                            value="{{ $invoice->id }}"
+                            data-status="{{ $invoice->status }}">
+                    </td>
+                    <td>
+                        <a href="{{ route('invoices.show', $invoice) }}" class="text-danger font-weight-bold">
+                            {{ $invoice->invoice_no }}
+                        </a>
+                    </td>
+                    <td>
+                        <a href="{{ route('customers.show', $invoice->customer) }}">
+                            {{ $invoice->customer->name }}
+                        </a>
+                        <br>
+                        <small class="text-muted">{{ $invoice->customer->phone }}</small>
+                        <br>
+                        <small class="text-muted text-primary">{{ $invoice->customer->customer_code ?? '-' }}</small>
+                    </td>
+                    <td>
+                        <span>{{ $invoice->package->name ?? '-' }}</span>
+                        <br>
+                        <small class="text-muted">{{ \Carbon\Carbon::createFromFormat('Y-m', $invoice->month)->format('F Y') }}</small>
+                    </td>
+                    <td>&#2547;{{ number_format($invoice->amount, 0) }}</td>
+                    <td>
+                        @if($invoice->discount > 0)
+                            <span class="text-warning">&#2547;{{ number_format($invoice->discount, 0) }}</span>
+                        @else
+                            <span class="text-muted">-</span>
+                        @endif
+                    </td>
+                    <td>
+                        @if($invoice->due_amount > 0)
+                            <span class="text-danger font-weight-bold">&#2547;{{ number_format($invoice->due_amount, 0) }}</span>
+                        @else
+                            <span class="text-success">0</span>
+                        @endif
+                    </td>
+                    <td>
+                        @if($invoice->status == 'paid')
+                            <span class="badge badge-success">Paid</span>
+                        @elseif($invoice->status == 'partial')
+                            <span class="badge badge-warning">Partial</span>
+                        @elseif($invoice->status == 'overdue')
+                            <span class="badge badge-danger">Overdue</span>
+                        @else
+                            <span class="badge badge-secondary">Unpaid</span>
+                        @endif
+                    </td>
+                    <td>{{ $invoice->due_date ? $invoice->due_date->format('d M Y') : '-' }}</td>
+                    <td>
+                        @if($invoice->status !== 'paid')
+                            <button type="button"
+                                class="btn btn-sm btn-success pay-btn"
+                                title="Pay Now"
+                                data-invoice-id="{{ $invoice->id }}"
+                                data-invoice-no="{{ $invoice->invoice_no }}"
+                                data-customer="{{ $invoice->customer->name }}"
+                                data-mobile="{{ $invoice->customer->phone }}"
+                                data-username="{{ $invoice->customer->username ?? '-' }}"
+                                data-package="{{ $invoice->package->name ?? '-' }}"
+                                data-due="{{ $invoice->due_amount }}"
+                                data-customer-id="{{ $invoice->customer_id }}"
+                                data-toggle="modal"
+                                data-target="#payModal">
+                                <i class="fas fa-money-bill-wave mr-1"></i> Pay Now
                             </button>
-                            @endif
+                        @endif
 
-                            {{-- PDF --}}
-                            <a href="{{ route('invoices.pdf', $invoice) }}"
-                               class="btn btn-xs btn-secondary" title="Download PDF">
-                                <i class="fas fa-file-pdf"></i>
-                            </a>
+                        <a href="{{ route('invoices.show', $invoice) }}"
+                           class="btn btn-sm btn-info" title="View Invoice">
+                            <i class="fas fa-file-invoice mr-1"></i> Invoice
+                        </a>
 
-                            {{-- Delete --}}
-                            @if($invoice->status !== 'paid')
-                            <button class="btn btn-xs btn-danger btnDelete"
-                                    data-id="{{ $invoice->id }}"
-                                    data-no="{{ $invoice->invoice_no }}"
-                                    title="Delete">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                            @endif
-                        </td>
-                    </tr>
-                    @empty
-                    <tr>
-                        <td colspan="11" class="text-center text-muted py-4">
-                            <i class="fas fa-file-invoice fa-2x d-block mb-2 text-muted"></i>
-                            No invoices found.
-                        </td>
-                    </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
+                        @if($invoice->status === 'unpaid')
+                            <form action="{{ route('invoices.destroy', $invoice) }}" method="POST" class="d-inline"
+                                onsubmit="return confirm('Delete this invoice?')">
+                                @csrf @method('DELETE')
+                                <button class="btn btn-sm btn-danger" title="Delete">
+                                    <i class="fas fa-trash mr-1"></i> Delete
+                                </button>
+                            </form>
+                        @endif
+                    </td>
+                </tr>
+                @empty
+                <tr>
+                    <td colspan="10" class="text-center text-muted py-4">No invoices found.</td>
+                </tr>
+                @endforelse
+            </tbody>
+        </table>
     </div>
-
-    @if($invoices->hasPages())
-    <div class="card-footer py-2">
-        <div class="d-flex justify-content-between align-items-center flex-wrap">
-            <small class="text-muted mb-1">
-                Showing {{ $invoices->firstItem() }}–{{ $invoices->lastItem() }} of {{ $invoices->total() }}
-            </small>
-            {{ $invoices->withQueryString()->links() }}
-        </div>
-    </div>
-    @endif
-</div>
-
-{{-- ══════════════════════════════════════════════════════
-     MODAL: PAY INVOICE
-══════════════════════════════════════════════════════ --}}
-<div class="modal fade" id="payModal" tabindex="-1">
-    <div class="modal-dialog modal-md">
-        <div class="modal-content">
-            <div class="modal-header bg-success text-white py-2">
-                <h5 class="modal-title">
-                    <i class="fas fa-hand-holding-usd mr-1"></i>
-                    Collect Payment — <span id="pm_no"></span>
-                </h5>
-                <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
-            </div>
-            <form method="POST" id="payForm">
-                @csrf
-                <div class="modal-body">
-                    <div class="alert alert-info py-2 mb-3">
-                        Customer: <strong id="pm_customer"></strong> &nbsp;|&nbsp;
-                        Due: <strong class="text-danger" id="pm_due"></strong>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group mb-2">
-                                <label class="small font-weight-bold">Amount <span class="text-danger">*</span></label>
-                                <input type="number" name="amount" id="pm_amount" class="form-control form-control-sm"
-                                       step="0.01" min="1" required>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group mb-2">
-                                <label class="small font-weight-bold">Method <span class="text-danger">*</span></label>
-                                <select name="method" class="form-control form-control-sm" required>
-                                    @foreach(['cash'=>'Cash','bkash'=>'bKash','nagad'=>'Nagad','rocket'=>'Rocket','card'=>'Card','bank'=>'Bank Transfer','advance'=>'Advance Balance'] as $v=>$l)
-                                        <option value="{{ $v }}">{{ $l }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group mb-2">
-                                <label class="small font-weight-bold">Payment Date <span class="text-danger">*</span></label>
-                                <input type="date" name="payment_date" class="form-control form-control-sm"
-                                       value="{{ now()->toDateString() }}" required>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group mb-2">
-                                <label class="small font-weight-bold">Discount</label>
-                                <input type="number" name="discount" class="form-control form-control-sm"
-                                       step="0.01" min="0" value="0">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group mb-2">
-                                <label class="small font-weight-bold">Transaction ID</label>
-                                <input type="text" name="transaction_id" class="form-control form-control-sm"
-                                       placeholder="Optional">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group mb-2">
-                                <label class="small font-weight-bold">Remarks</label>
-                                <input type="text" name="remarks" class="form-control form-control-sm"
-                                       placeholder="Optional">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="form-check mt-1">
-                        <input type="checkbox" name="send_sms" value="1" class="form-check-input" id="pm_sms">
-                        <label class="form-check-label small" for="pm_sms">Send SMS to customer</label>
-                    </div>
-                </div>
-                <div class="modal-footer py-2">
-                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">
-                        <i class="fas fa-times mr-1"></i> Cancel
-                    </button>
-                    <button type="submit" class="btn btn-success btn-sm" id="btnPaySubmit">
-                        <i class="fas fa-save mr-1"></i> Save Payment
-                    </button>
-                </div>
-            </form>
-        </div>
+    <div class="card-footer d-flex justify-content-between align-items-center">
+        <small class="text-muted">
+            Showing {{ $invoices->firstItem() ?? 0 }}–{{ $invoices->lastItem() ?? 0 }} of {{ $invoices->total() }} records
+        </small>
+        {{ $invoices->appends(request()->query())->links() }}
     </div>
 </div>
 
-{{-- ══════════════════════════════════════════════════════
-     MODAL: CREATE INVOICE
-══════════════════════════════════════════════════════ --}}
-<div class="modal fade" id="createInvoiceModal" tabindex="-1">
-    <div class="modal-dialog modal-md">
+{{-- ══════════════════════════════════════════════
+     MODALS
+══════════════════════════════════════════════ --}}
+
+{{-- ── New Invoice Modal ──────────────────────── --}}
+<div class="modal fade" id="newInvoiceModal" tabindex="-1">
+    <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header bg-primary text-white py-2">
-                <h5 class="modal-title">
-                    <i class="fas fa-plus mr-1"></i> Create Invoice
-                </h5>
+            <div class="modal-header bg-primary">
+                <h5 class="modal-title text-white"><i class="fas fa-file-invoice mr-1"></i> New Invoice</h5>
                 <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
             </div>
-            <form method="POST" action="{{ route('invoices.store') }}">
+            <form id="newInvoiceForm" action="{{ route('invoices.store') }}" method="POST">
                 @csrf
                 <div class="modal-body">
-                    <div class="form-group mb-2">
-                        <label class="small font-weight-bold">Customer <span class="text-danger">*</span></label>
-                        <select name="customer_id" class="form-control form-control-sm select2" required>
+
+                    {{-- Error alert --}}
+                    <div id="invoiceError" class="alert alert-danger d-none"></div>
+
+                    <div class="form-group">
+                        <label>Customer <span class="text-danger">*</span></label>
+                        <select name="customer_id" id="inv_customer" class="form-control select2" required>
                             <option value="">— Select Customer —</option>
-                            {{-- Populated via select2 AJAX or static list --}}
+                            @foreach(\App\Models\Customer::active()->with('package')->get() as $c)
+                                <option value="{{ $c->id }}"
+                                    data-package="{{ $c->package->name ?? '-' }}"
+                                    data-price="{{ $c->package->price ?? 0 }}"
+                                    data-advance="{{ $c->advance_balance ?? 0 }}"
+                                    data-name="{{ $c->name }}"
+                                    data-username="{{ $c->pppoe_username ?? '-' }}"
+                                    data-code="{{ $c->customer_code ?? '-' }}">
+                                    {{ $c->name }} ({{ $c->phone }})
+                                </option>
+                            @endforeach
                         </select>
                     </div>
+
+                    {{-- Customer Info --}}
+                    <div id="inv_customer_info" class="d-none">
+                        <div class="bg-light rounded px-3 py-2 mb-3" style="font-size:13px; line-height:1.8;">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <span class="text-muted">Name:</span> <strong id="inv_customer_name"></strong><br>
+                                    <span class="text-muted">Username:</span> <span id="inv_username"></span><br>
+                                    <span class="text-muted">Total Due:</span> <strong class="text-danger" id="inv_total_due"></strong>
+                                </div>
+                                <div class="col-md-6">
+                                    <span class="text-muted">Customer Code:</span> <strong class="text-primary" id="inv_customer_code"></strong><br>
+                                    <span class="text-muted">Package:</span> <strong id="inv_package_name"></strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="row">
                         <div class="col-md-6">
-                            <div class="form-group mb-2">
-                                <label class="small font-weight-bold">Month <span class="text-danger">*</span></label>
-                                <input type="month" name="month" class="form-control form-control-sm"
-                                       value="{{ now()->format('Y-m') }}" required>
+                            <div class="form-group">
+                                <label>Month <span class="text-danger">*</span></label>
+                                <input type="month" name="month" class="form-control"
+                                    value="{{ date('Y-m') }}" required>
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <div class="form-group mb-2">
-                                <label class="small font-weight-bold">Amount <span class="text-danger">*</span></label>
-                                <input type="number" name="amount" class="form-control form-control-sm"
-                                       step="0.01" min="0" required>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group mb-2">
-                                <label class="small font-weight-bold">Due Date</label>
-                                <input type="date" name="due_date" class="form-control form-control-sm">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group mb-2">
-                                <label class="small font-weight-bold">Discount</label>
-                                <input type="number" name="discount" class="form-control form-control-sm"
-                                       step="0.01" min="0" value="0">
+                            <div class="form-group">
+                                <label>Due Date</label>
+                                <input type="date" name="due_date" class="form-control"
+                                    value="{{ now()->endOfMonth()->format('Y-m-d') }}">
                             </div>
                         </div>
                     </div>
-                    <div class="form-group mb-0">
-                        <label class="small font-weight-bold">Notes</label>
-                        <textarea name="notes" class="form-control form-control-sm" rows="2"></textarea>
+
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Amount <span class="text-danger">*</span></label>
+                                <input type="number" name="amount" id="inv_amount" class="form-control"
+                                    step="0.01" min="0" required readonly
+                                    style="background:#f9f9f9;">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Discount</label>
+                                <input type="number" name="discount" id="inv_discount" class="form-control"
+                                    step="0.01" min="0" value="0">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Payable Amount</label>
+                                <input type="text" id="inv_payable" class="form-control"
+                                    readonly style="background:#e9f7ef; color:#155724; font-weight:600;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Notes</label>
+                        <textarea name="notes" class="form-control" rows="2"></textarea>
                     </div>
                 </div>
-                <div class="modal-footer py-2">
-                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">
-                        <i class="fas fa-times mr-1"></i> Cancel
-                    </button>
-                    <button type="submit" class="btn btn-primary btn-sm">
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm" id="newInvoiceSubmit">
                         <i class="fas fa-save mr-1"></i> Create Invoice
                     </button>
                 </div>
@@ -627,223 +628,424 @@
     </div>
 </div>
 
-{{-- ══════════════════════════════════════════════════════
-     MODAL: BULK GENERATE
-══════════════════════════════════════════════════════ --}}
-@if($billingType !== 'date_to_date')
+{{-- ── Bulk Generate Modal ─────────────────────── --}}
 <div class="modal fade" id="bulkGenerateModal" tabindex="-1">
     <div class="modal-dialog modal-sm">
         <div class="modal-content">
-            <div class="modal-header bg-success text-white py-2">
-                <h5 class="modal-title">
-                    <i class="fas fa-magic mr-1"></i> Bulk Generate Invoices
-                </h5>
+            <div class="modal-header bg-success">
+                <h5 class="modal-title text-white"><i class="fas fa-cogs mr-1"></i> Bulk Generate Invoices</h5>
                 <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
             </div>
-            <form method="POST" action="{{ route('invoices.bulk-generate') }}">
+            <form action="{{ route('invoices.bulk-generate') }}" method="POST">
                 @csrf
                 <div class="modal-body">
-                    <div class="alert alert-warning py-2 small">
-                        <i class="fas fa-info-circle mr-1"></i>
-                        This will generate invoices for all active customers for the selected month.
-                        Existing invoices will be skipped.
-                    </div>
                     <div class="form-group mb-0">
-                        <label class="small font-weight-bold">Month <span class="text-danger">*</span></label>
+                        <label>Select Month</label>
                         <input type="month" name="month" class="form-control"
-                               value="{{ now()->format('Y-m') }}" required>
+                            value="{{ date('Y-m') }}" required>
+                        <small class="text-muted">Invoices will be generated for all active customers.</small>
                     </div>
                 </div>
-                <div class="modal-footer py-2">
-                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">
-                        <i class="fas fa-times mr-1"></i> Cancel
-                    </button>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-success btn-sm">
-                        <i class="fas fa-magic mr-1"></i> Generate
+                        <i class="fas fa-cogs mr-1"></i> Generate
                     </button>
                 </div>
             </form>
         </div>
     </div>
 </div>
-@endif
 
-{{-- ══════════════════════════════════════════════════════
-     FORM: BULK DELETE (hidden)
-══════════════════════════════════════════════════════ --}}
-<form method="POST" action="{{ route('invoices.bulk-delete') }}" id="bulkDeleteForm">
-    @csrf
-    <input type="hidden" name="ids" id="bulkDeleteIds">
-</form>
+{{-- ── Pay Modal ───────────────────────────────── --}}
+<div class="modal fade" id="payModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary">
+                <h5 class="modal-title text-white"><i class="fas fa-money-bill-wave mr-1"></i> Collect Payment</h5>
+                <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+            </div>
+            <form id="payForm" method="POST">
+                @csrf
+                <div class="modal-body">
 
-{{-- ══════════════════════════════════════════════════════
-     FORM: BULK SMS (hidden)
-══════════════════════════════════════════════════════ --}}
-<form method="POST" action="{{ route('invoices.bulk-sms') }}" id="bulkSmsForm">
-    @csrf
-    <input type="hidden" name="ids" id="bulkSmsIds">
-</form>
+                    {{-- Customer Info --}}
+                    <div class="bg-light rounded p-2 mb-3">
+                        <div class="row" style="font-size:13px;">
+                            <div class="col-md-6">
+                                <span class="text-muted">Customer:</span>
+                                <strong id="pay_customer"></strong>
+                            </div>
+                            <div class="col-md-6">
+                                <span class="text-muted">Mobile:</span>
+                                <span id="pay_mobile"></span>
+                            </div>
+                            <div class="col-md-6 mt-1">
+                                <span class="text-muted">Username:</span>
+                                <span id="pay_username"></span>
+                            </div>
+                            <div class="col-md-6 mt-1">
+                                <span class="text-muted">Package:</span>
+                                <span id="pay_package"></span>
+                            </div>
+                            <div class="col-md-6 mt-1">
+                                <span class="text-muted">Bill:</span>
+                                <span id="pay_invoice_no"></span>
+                            </div>
+                            <div class="col-md-6 mt-1">
+                                <span class="text-muted">Total Due (All Invoices):</span>
+                                <strong class="text-danger" id="pay_due"></strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Payment Date</label>
+                                <input type="date" name="payment_date" class="form-control form-control-sm"
+                                    value="{{ date('Y-m-d') }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Payment Method</label>
+                                <select name="method" class="form-control form-control-sm" required>
+                                    <option value="cash">Cash</option>
+                                    <option value="bkash">bKash</option>
+                                    <option value="nagad">Nagad</option>
+                                    <option value="rocket">Rocket</option>
+                                    <option value="bank">Bank Transfer</option>
+                                    <option value="card">Card</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Received By</label>
+                                <select name="received_by" class="form-control form-control-sm select2">
+                                    <option value="">— Select —</option>
+                                    @foreach(\App\Models\HR\Employee::select('id','name')->where('status','active')->get() as $emp)
+                                        <option value="{{ $emp->id }}">{{ $emp->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Transaction / Receipt No</label>
+                                <input type="text" name="transaction_id" class="form-control form-control-sm"
+                                    placeholder="Optional">
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Amount Table --}}
+                    <table class="table table-sm table-bordered mb-2">
+                        <thead class="bg-dark text-white">
+                            <tr>
+                                <th>Details</th>
+                                <th class="text-right">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Payable Amount</td>
+                                <td class="text-right" id="pay_payable">0.00</td>
+                            </tr>
+                            <tr>
+                                <td>Discount</td>
+                                <td class="text-right">
+                                    <input type="number" name="discount" id="pay_discount"
+                                        class="form-control form-control-sm text-right" value="0" min="0"
+                                        style="width:100px; float:right;">
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Received Amount</td>
+                                <td class="text-right">
+                                    <input type="number" name="amount" id="pay_amount"
+                                        class="form-control form-control-sm text-right" min="1" required
+                                        style="width:100px; float:right;">
+                                </td>
+                            </tr>
+                            <tr id="pay_balance_row" class="table-danger">
+                                <td><strong>Balance Due</strong></td>
+                                <td class="text-right"><strong id="pay_balance_due">0.00</strong></td>
+                            </tr>
+                            <tr id="pay_advance_row" class="table-success d-none">
+                                <td><strong><i class="fas fa-wallet mr-1"></i> Advance to Wallet</strong></td>
+                                <td class="text-right text-success"><strong id="pay_advance_to_wallet">0.00</strong></td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="form-group">
+                        <label>Remarks / Note</label>
+                        <input type="text" name="remarks" class="form-control form-control-sm" placeholder="Optional">
+                    </div>
+
+                    <div class="d-flex" style="gap:20px;">
+                        {{-- <div class="form-check">
+                            <input type="checkbox" name="set_next_billing_date" value="1"
+                                class="form-check-input" id="setNextBilling" checked>
+                            <label class="form-check-label" for="setNextBilling">Set next billing date</label>
+                        </div> --}}
+                        <div class="form-check">
+                            <input type="checkbox" name="send_sms" value="1"
+                                class="form-check-input" id="sendSms" checked>
+                            <label class="form-check-label" for="sendSms">Send SMS</label>
+                        </div>
+                    </div>
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fas fa-save mr-1"></i> Save Payment
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 @endsection
 
-
-@section('extra_css')
-<style>
-    .small-box .inner h4 { font-size: 1.5rem; font-weight: 700; }
-    .opacity-75 { opacity: .75; }
-    #invTable td, #invTable th { vertical-align: middle; font-size: 13px; }
-    .btn-xs { padding: 2px 6px; font-size: 11px; }
-</style>
-@endsection
-
-
-@section('js')
+@push('js')
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
-const CSRF = '{{ csrf_token() }}';
-
 $(function () {
 
-    // ── Filter collapse ────────────────────────
-    @if(!request()->hasAny(['status','month','package_id','router_id','zone_id','sub_zone_id','connection_type_id','client_type_id','search','date_from','date_to']))
-    $('#filterBody').hide();
-    $('#filterChevron').removeClass('fa-chevron-up').addClass('fa-chevron-down');
-    @endif
+    // Pay button click — modal populate
+    $('.pay-btn').on('click', function () {
+        var btn        = $(this);
+        var invoiceId  = btn.data('invoice-id');
+        var customerId = btn.data('customer-id');
 
-    $('#filterToggle').on('click', function () {
-        $('#filterBody').slideToggle(200);
-        $('#filterChevron').toggleClass('fa-chevron-up fa-chevron-down');
+        $('#pay_customer').text(btn.data('customer'));
+        $('#pay_mobile').text(btn.data('mobile'));
+        $('#pay_username').text(btn.data('username'));
+        $('#pay_package').text(btn.data('package'));
+        $('#pay_invoice_no').text(btn.data('invoice-no'));
+        $('#pay_discount').val(0);
+        $('#pay_balance_due').text('0.00');
+        $('#pay_advance_row').addClass('d-none');
+
+        // Form action set
+        $('#payForm').attr('action', '/payments/invoice/' + invoiceId);
+
+        // Fetch total due via AJAX
+        $.get('/payments/customer-due/' + customerId, function (data) {
+            var totalDue = parseFloat(data.total_due).toFixed(2);
+            $('#pay_due').text('BDT ' + totalDue);
+            $('#pay_payable').text(totalDue);
+            $('#pay_amount').val(totalDue);
+        });
     });
 
-    // ── Per page ──────────────────────────────
+    // Balance due auto-calculate
+    $('#pay_amount, #pay_discount').on('input', function () {
+        var payable  = parseFloat($('#pay_payable').text()) || 0;
+        var amount   = parseFloat($('#pay_amount').val()) || 0;
+        var discount = parseFloat($('#pay_discount').val()) || 0;
+        var net      = payable - discount;
+        var balance  = net - amount;
+
+        if (balance > 0) {
+            // Due আছে
+            $('#pay_balance_due').text(balance.toFixed(2));
+            $('#pay_balance_row').removeClass('table-success').addClass('table-danger');
+            $('#pay_advance_row').addClass('d-none');
+            $('#pay_advance_to_wallet').text('0.00');
+        } else if (balance < 0) {
+            // Extra টাকা — advance এ যাবে
+            $('#pay_balance_due').text('0.00');
+            $('#pay_balance_row').removeClass('table-danger').addClass('table-success');
+            $('#pay_advance_to_wallet').text(Math.abs(balance).toFixed(2));
+            $('#pay_advance_row').removeClass('d-none');
+        } else {
+            // Exact
+            $('#pay_balance_due').text('0.00');
+            $('#pay_balance_row').removeClass('table-danger').addClass('table-success');
+            $('#pay_advance_row').addClass('d-none');
+        }
+    });
+
+    // New Invoice — Customer select → package price auto-fill + total due
+    $('#inv_customer').on('change', function () {
+        var opt        = $(this).find('option:selected');
+        var customerId = $(this).val();
+        var price      = parseFloat(opt.data('price')) || 0;
+        var advance    = parseFloat(opt.data('advance')) || 0;
+        var pkg        = opt.data('package') || '-';
+        var name       = opt.data('name') || '-';
+        var username   = opt.data('username') || '-';
+        var code       = opt.data('code') || '-';
+
+        if (customerId) {
+            $('#inv_customer_name').text(name);
+            $('#inv_username').text(username);
+            $('#inv_customer_code').text(code);
+            $('#inv_package_name').text(pkg);
+            $('#inv_advance_balance').text('BDT ' + advance.toFixed(2));
+            $('#inv_total_due').text('Loading...');
+            $('#inv_customer_info').removeClass('d-none');
+            $('#inv_amount').val(price.toFixed(2));
+            $('#inv_payable').val(price.toFixed(2));
+            $('#inv_discount').val(0);
+
+            // Fetch total due via AJAX
+            $.get('/payments/customer-due/' + customerId, function (data) {
+                var due = parseFloat(data.total_due).toFixed(2);
+                $('#inv_total_due').text('BDT ' + due);
+                $('#inv_advance_balance').text('BDT ' + parseFloat(data.advance_balance).toFixed(2));
+            });
+        } else {
+            $('#inv_customer_info').addClass('d-none');
+            $('#inv_amount').val('');
+            $('#inv_payable').val('');
+            $('#inv_discount').val(0);
+        }
+    });
+
+    // New Invoice — Discount → Payable auto-calculate
+    $('#inv_discount').on('input', function () {
+        var amount   = parseFloat($('#inv_amount').val()) || 0;
+        var discount = parseFloat($(this).val()) || 0;
+        var payable  = amount - discount;
+        $('#inv_payable').val(payable >= 0 ? payable.toFixed(2) : '0.00');
+    });
+
+    // New Invoice — AJAX submit
+    $('#newInvoiceForm').on('submit', function (e) {
+        e.preventDefault();
+        $('#invoiceError').addClass('d-none');
+        $('#newInvoiceSubmit').prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i> Creating...');
+
+        $.ajax({
+            url: $(this).attr('action'),
+            method: 'POST',
+            data: $(this).serialize(),
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            success: function (res) {
+                $('#newInvoiceModal').modal('hide');
+                toastr.success(res.message ?? 'Invoice created successfully.');
+                setTimeout(function () { window.location.reload(); }, 1000);
+            },
+            error: function (xhr) {
+                var msg = 'Something went wrong.';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    msg = xhr.responseJSON.message;
+                } else if (xhr.responseJSON && xhr.responseJSON.errors) {
+                    var errors = xhr.responseJSON.errors;
+                    msg = Object.values(errors).flat().join(' ');
+                }
+                $('#invoiceError').removeClass('d-none').text(msg);
+                $('#newInvoiceSubmit').prop('disabled', false).html('<i class="fas fa-save mr-1"></i> Create Invoice');
+            }
+        });
+    });
+
+    // Filter toggle
+    $('#filterToggle').on('click', function () {
+        $('#filterBody').slideToggle();
+        $('#filterIcon').toggleClass('fa-minus fa-plus');
+    });
+
+    // Select2 init
+    $('.select2').select2({ width: '100%' });
+
+    // Per page change
     $('#perPage').on('change', function () {
         var url = new URL(window.location.href);
         url.searchParams.set('per_page', $(this).val());
         window.location.href = url.toString();
     });
 
-    // ── Quick search ──────────────────────────
-    $('#tableSearch').on('keyup', function () {
-        var val = $(this).val().toLowerCase();
-        $('#invTable tbody tr').each(function () {
-            $(this).toggle($(this).text().toLowerCase().includes(val));
+    // Select All checkbox
+    $('#selectAll').on('change', function () {
+        $('.invoice-check').prop('checked', this.checked);
+        toggleBulkActions();
+    });
+
+    // Individual checkbox
+    $(document).on('change', '.invoice-check', function () {
+        toggleBulkActions();
+        if (!this.checked) $('#selectAll').prop('checked', false);
+        if ($('.invoice-check:checked').length === $('.invoice-check').length) {
+            $('#selectAll').prop('checked', true);
+        }
+    });
+
+    function toggleBulkActions() {
+        var count = $('.invoice-check:checked').length;
+        if (count > 0) {
+            $('#bulkActions').removeClass('d-none');
+        } else {
+            $('#bulkActions').addClass('d-none');
+        }
+    }
+
+    function getSelectedIds() {
+        return $('.invoice-check:checked').map(function() { return $(this).val(); }).get();
+    }
+
+    // Bulk Delete
+    $('#bulkDelete').on('click', function () {
+        var ids = $('.invoice-check:checked').filter(function() {
+            return $(this).data('status') === 'unpaid';
+        }).map(function() { return $(this).val(); }).get();
+
+        if (ids.length === 0) {
+            alert('No unpaid invoices selected for deletion.');
+            return;
+        }
+        if (!confirm('Delete ' + ids.length + ' unpaid invoice(s)?')) return;
+
+        $.post('/invoices/bulk-delete', {
+            _token: '{{ csrf_token() }}',
+            ids: ids
+        }, function () {
+            window.location.reload();
         });
     });
 
-    // ── Check all ─────────────────────────────
-    $('#checkAll').on('change', function () {
-        $('.rowCheck').prop('checked', this.checked);
+    // Bulk PDF
+    $('#bulkPdf').on('click', function () {
+        var ids = getSelectedIds();
+        if (ids.length === 0) return;
+        window.location.href = '/invoices/bulk-pdf?ids=' + ids.join(',');
     });
 
-    // ── Pay button ────────────────────────────
-    $(document).on('click', '.btnPay', function () {
-        var id  = $(this).data('id');
-        var due = parseFloat($(this).data('due'));
-        $('#pm_no').text($(this).data('no'));
-        $('#pm_customer').text($(this).data('customer'));
-        $('#pm_due').text('৳ ' + due.toLocaleString('en-BD', {minimumFractionDigits:2}));
-        $('#pm_amount').val(due);
-        $('#payForm').attr('action', '/payments/invoice/' + id);
-        $('#payModal').modal('show');
+    // Bulk XLSX
+    $('#bulkXlsx').on('click', function () {
+        var ids = getSelectedIds();
+        if (ids.length === 0) return;
+        window.location.href = '/invoices/bulk-xlsx?ids=' + ids.join(',');
     });
 
-    // ── Pay form submit ───────────────────────
-    $('#payForm').on('submit', function (e) {
-        e.preventDefault();
-        var $btn = $('#btnPaySubmit').prop('disabled', true)
-                       .html('<i class="fas fa-spinner fa-spin mr-1"></i> Saving...');
-        $.ajax({
-            url:    $(this).attr('action'),
-            method: 'POST',
-            data:   $(this).serialize(),
-            success: function (res) {
-                $('#payModal').modal('hide');
-                toastOk('Payment saved successfully.');
-                setTimeout(() => window.location.reload(), 1000);
-            },
-            error: function (xhr) {
-                var msg = xhr.responseJSON?.message ?? 'Something went wrong.';
-                toastErr(msg);
-                $btn.prop('disabled', false).html('<i class="fas fa-save mr-1"></i> Save Payment');
-            }
+    // Bulk SMS
+    $('#bulkSms').on('click', function () {
+        var ids = getSelectedIds();
+        if (ids.length === 0) return;
+        if (!confirm('Send SMS to ' + ids.length + ' customer(s)?')) return;
+        $.post('/invoices/bulk-sms', {
+            _token: '{{ csrf_token() }}',
+            ids: ids
+        }, function (res) {
+            alert(res.message ?? 'SMS sent successfully.');
         });
     });
 
-    // ── Delete single ─────────────────────────
-    $(document).on('click', '.btnDelete', function () {
-        var id = $(this).data('id');
-        var no = $(this).data('no');
-        Swal.fire({
-            title: 'Delete Invoice?',
-            text:  'Invoice ' + no + ' will be permanently deleted.',
-            icon:  'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            confirmButtonText: 'Yes, Delete',
-        }).then(res => {
-            if (res.isConfirmed) {
-                var form = $('<form method="POST" action="/invoices/' + id + '">'
-                    + '@csrf @method("DELETE")</form>');
-                $('body').append(form);
-                form.submit();
-            }
-        });
-    });
-
-    // ── Bulk Delete ───────────────────────────
-    $('#btnBulkDelete').on('click', function () {
-        var ids = getCheckedIds();
-        if (!ids.length) { toastErr('কোনো invoice select করা হয়নি।'); return; }
-        Swal.fire({
-            title: ids.length + ' invoice delete করবেন?',
-            text:  'Paid invoices automatically skip হবে।',
-            icon:  'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            confirmButtonText: 'হ্যাঁ, Delete করুন',
-        }).then(res => {
-            if (res.isConfirmed) {
-                $('#bulkDeleteIds').val(ids.join(','));
-                $('#bulkDeleteForm').submit();
-            }
-        });
-    });
-
-    // ── Bulk SMS ──────────────────────────────
-    $('#btnBulkSms').on('click', function () {
-        var ids = getCheckedIds();
-        if (!ids.length) { toastErr('কোনো invoice select করা হয়নি।'); return; }
-        Swal.fire({
-            title: ids.length + ' customer কে SMS পাঠাবেন?',
-            icon:  'question',
-            showCancelButton: true,
-            confirmButtonText: 'হ্যাঁ, পাঠান',
-        }).then(res => {
-            if (res.isConfirmed) {
-                $('#bulkSmsIds').val(ids.join(','));
-                $('#bulkSmsForm').submit();
-            }
-        });
-    });
+    // Success/Error toast from session
+    @if(session('success'))
+        toastr.success('{{ session('success') }}');
+    @endif
+    @if(session('error'))
+        toastr.error('{{ session('error') }}');
+    @endif
 
 });
-
-// ── Helpers ───────────────────────────────────
-function getCheckedIds() {
-    return $('.rowCheck:checked').map(function () { return $(this).val(); }).get();
-}
-
-function toastOk(msg) {
-    if (typeof Swal !== 'undefined') {
-        Swal.fire({ toast:true, position:'top-end', icon:'success', title:msg,
-                    showConfirmButton:false, timer:2500 });
-    } else { alert(msg); }
-}
-
-function toastErr(msg) {
-    if (typeof Swal !== 'undefined') {
-        Swal.fire({ toast:true, position:'top-end', icon:'error', title:msg,
-                    showConfirmButton:false, timer:3500 });
-    } else { alert(msg); }
-}
 </script>
-@endsection
+@endpush
