@@ -15,6 +15,7 @@ use App\Http\Controllers\ImportController;
 use App\Http\Controllers\SmsController;
 use App\Http\Controllers\TenantSmsController;
 use App\Http\Controllers\MyResellerController;
+use App\Http\Controllers\UserController;
 use App\Http\Controllers\SuperAdmin\TenantController as SuperAdminTenantController;
 use App\Http\Controllers\SuperAdmin\PlanController as SuperAdminPlanController;
 use App\Http\Controllers\SuperAdmin\SmsGatewayController as SuperAdminSmsGatewayController;
@@ -238,6 +239,17 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/',               [TenantSmsController::class, 'index'])->name('index');
         Route::post('/{slug}/save',   [TenantSmsController::class, 'save'])->name('save');
         Route::post('/{slug}/toggle', [TenantSmsController::class, 'toggle'])->name('toggle');
+    });
+
+    // ── User Management (ISP Admin) ────────────
+    Route::prefix('users')->name('users.')->group(function () {
+        Route::get('/',               [UserController::class, 'index'])   ->name('index');
+        Route::get('/create',         [UserController::class, 'create'])  ->name('create');
+        Route::post('/',              [UserController::class, 'store'])   ->name('store');
+        Route::get('/{user}/edit',    [UserController::class, 'edit'])    ->name('edit');
+        Route::put('/{user}',         [UserController::class, 'update'])  ->name('update');
+        Route::post('/{user}/toggle', [UserController::class, 'toggle'])  ->name('toggle');
+        Route::delete('/{user}',      [UserController::class, 'destroy']) ->name('destroy');
     });
 
     // ── My Resellers (Master Reseller only) ────

@@ -682,6 +682,16 @@ return [
         ],
 
         ['header' => 'MANAGEMENT', 'can' => 'isp-admin'],
+        [
+            'text'       => 'User Management',
+            'icon'       => 'fas fa-fw fa-users-cog',
+            'icon_color' => 'indigo',
+            'can'        => 'isp-admin',
+            'submenu'    => [
+                ['text' => 'All Users', 'url' => 'users',        'icon' => 'fas fa-fw fa-list'],
+                ['text' => 'Add User',  'url' => 'users/create', 'icon' => 'fas fa-fw fa-user-plus'],
+            ],
+        ],
         ['text' => 'Agents',    'url' => 'agents',    'icon' => 'fas fa-fw fa-user-tie', 'icon_color' => 'yellow', 'can' => 'isp-admin'],
         ['text' => 'Inventory', 'url' => 'inventory', 'icon' => 'fas fa-fw fa-boxes',    'icon_color' => 'brown',  'can' => 'isp-admin'],
       //  ['text' => 'SMS',       'url' => 'sms',       'icon' => 'fas fa-fw fa-sms',      'icon_color' => 'green',  'can' => 'isp-admin'],
