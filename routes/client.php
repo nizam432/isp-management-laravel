@@ -37,6 +37,13 @@ Route::prefix('client')->name('client.')->group(function () {
         Route::get ('tickets/{ticket}',           [ClientPortalController::class, 'ticketShow'])->name('tickets.show');
         Route::post('tickets/{ticket}/reply',     [ClientPortalController::class, 'ticketReply'])->name('tickets.reply');
 
+        // Live Traffic
+        Route::get ('live-traffic',  [ClientPortalController::class, 'liveTraffic'])->name('live-traffic');
+        Route::get ('session-data',  [ClientPortalController::class, 'sessionData'])->name('session-data');
+
+        // Packages
+        Route::get('packages', [ClientPortalController::class, 'packages'])->name('packages');
+
         // Profile & Password
         Route::get ('profile',          [ClientPortalController::class, 'profile'])->name('profile');
         Route::post('change-password',  [ClientPortalController::class, 'changePassword'])->name('password.change');

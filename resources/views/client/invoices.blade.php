@@ -1,10 +1,10 @@
 {{-- resources/views/client/invoices.blade.php --}}
 @extends('client.layout')
-@section('title', 'Bill Payment')
+@section('title', 'Invoice List')
 
 @section('content')
 
-<div class="page-title">Bill Payment</div>
+<div class="page-title">Invoice List</div>
 
 <div class="stats-row" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
     <div class="stat-card">

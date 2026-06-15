@@ -104,37 +104,6 @@
 
 </div>
 
-{{-- Change Password --}}
-<div class="card" style="max-width:480px;">
-    <div class="card-header"><i class="fas fa-lock"></i> Change Password</div>
-    <div class="card-body">
-        <form method="POST" action="{{ route('client.password.change') }}">
-            @csrf
-            <div class="form-group">
-                <label>Current Password</label>
-                <input type="password" name="current_password"
-                    class="form-control {{ $errors->has('current_password') ? 'is-invalid' : '' }}"
-                    placeholder="Current password" required>
-                @error('current_password') <div class="invalid-feedback">{{ $message }}</div> @enderror
-            </div>
-            <div class="form-group">
-                <label>New Password</label>
-                <input type="password" name="password"
-                    class="form-control {{ $errors->has('password') ? 'is-invalid' : '' }}"
-                    placeholder="Min 6 characters" required>
-                @error('password') <div class="invalid-feedback">{{ $message }}</div> @enderror
-            </div>
-            <div class="form-group">
-                <label>Confirm New Password</label>
-                <input type="password" name="password_confirmation"
-                    class="form-control" placeholder="Repeat new password" required>
-            </div>
-            <button type="submit" class="btn btn-primary">
-                <i class="fas fa-save"></i> Update Password
-            </button>
-        </form>
-    </div>
-</div>
 
 {{-- Contact --}}
 <div style="background:#f0faf7; border:1px solid #b0e8d0; border-radius:10px; padding:14px 18px; font-size:13px; color:#1a7a50; max-width:480px;">

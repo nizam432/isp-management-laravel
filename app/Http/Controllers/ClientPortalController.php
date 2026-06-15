@@ -7,9 +7,6 @@ use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\ClientSupportTicket;
-use App\Models\Package;
-use App\Models\MikrotikRouter;
-use App\Services\MikrotikService;
 use App\Models\ClientTicketReply;
 use App\Models\SupportCategory;
 use App\Models\Setting;
@@ -313,73 +310,6 @@ class ClientPortalController extends Controller
         }
 
         return back()->with('success', 'Message পাঠানো হয়েছে।');
-    }
-
-    // ══════════════════════════════════════════════════════
-    // LIVE TRAFFIC
-    // ══════════════════════════════════════════════════════
-
-    public function liveTraffic()
-    {
-        $customer = Auth::guard('customer')->user();
-        $customer->load(['package', 'router']);
-        return view('client.live-traffic', compact('customer'));
-    }
-
-    /**
-     * AJAX — get customer live session from MikroTik
-     */
-    public function sessionData()
-    {
-        $customer = Auth::guard('customer')->user();
-
-        try {
-            $router = $customer->router ?? MikrotikRouter::where('is_active', 1)->first();
-
-            if (!$router) {
-                return response()->json(['online' => false, 'message' => 'No router found.']);
-            }
-
-            if (!$customer->pppoe_username) {
-                return response()->json(['online' => false, 'message' => 'No PPPoE username.']);
-            }
-
-            $mikrotik = new MikrotikService();
-            $session  = $mikrotik->withRouter($router, fn($m) => $m->getCustomerSession($customer->pppoe_username));
-
-            if (!$session) {
-                return response()->json(['online' => false, 'message' => 'Offline']);
-            }
-
-            return response()->json([
-                'online'    => true,
-                'uptime'    => $session['uptime']    ?? '—',
-                'ip'        => $session['address']   ?? '—',
-                'tx_bytes'  => $session['tx-bytes']  ?? 0,
-                'rx_bytes'  => $session['rx-bytes']  ?? 0,
-                'tx_rate'   => $session['tx-rate']   ?? 0,
-                'rx_rate'   => $session['rx-rate']   ?? 0,
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json(['online' => false, 'message' => $e->getMessage()]);
-        }
-    }
-
-    // ══════════════════════════════════════════════════════
-    // PACKAGES
-    // ══════════════════════════════════════════════════════
-
-    public function packages()
-    {
-        $customer = Auth::guard('customer')->user();
-        $customer->load('package');
-
-        $packages = Package::active()
-            ->orderBy('price')
-            ->get();
-
-        return view('client.packages', compact('customer', 'packages'));
     }
 
     // ══════════════════════════════════════════════════════

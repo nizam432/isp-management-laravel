@@ -201,6 +201,77 @@ class ClientSupportController extends Controller
     }
 
 
+    // ── Admin Chat ────────────────────────────────────────────────
+
+    public function chat(ClientSupportTicket $ticket)
+    {
+        $ticket->load(['customer', 'category', 'assignees', 'replies.customer', 'replies.user']);
+        return view('client_support.chat', compact('ticket'));
+    }
+
+    public function chatReply(Request $request, ClientSupportTicket $ticket)
+    {
+        $request->validate(['message' => 'required|string|min:1|max:2000']);
+
+        $data = [
+            'ticket_id'   => $ticket->id,
+            'user_id'     => auth()->id(),
+            'message'     => $request->message,
+            'sender_type' => 'admin',
+        ];
+
+        if ($request->hasFile('attachment')) {
+            $data['attachment'] = $request->file('attachment')->store('ticket-replies', 'public');
+        }
+
+        $reply = \App\Models\ClientTicketReply::create($data);
+        $reply->load('user');
+
+        // Move to processing if pending
+        if ($ticket->status === 'pending') {
+            $ticket->update(['status' => 'processing']);
+        }
+
+        return response()->json([
+            'success' => true,
+            'reply'   => [
+                'id'          => $reply->id,
+                'message'     => $reply->message,
+                'sender_type' => 'admin',
+                'sender_name' => $reply->user->name ?? 'Admin',
+                'attachment'  => $reply->attachment ? asset('storage/' . $reply->attachment) : null,
+                'time'        => $reply->created_at->format('d M Y h:i A'),
+                'ago'         => $reply->created_at->diffForHumans(),
+            ],
+        ]);
+    }
+
+    // Polling — fetch new messages after last ID
+    public function chatMessages(Request $request, ClientSupportTicket $ticket)
+    {
+        $after   = $request->after ?? 0;
+        $replies = \App\Models\ClientTicketReply::with(['customer', 'user'])
+            ->where('ticket_id', $ticket->id)
+            ->where('id', '>', $after)
+            ->orderBy('id')
+            ->get()
+            ->map(fn($r) => [
+                'id'          => $r->id,
+                'message'     => $r->message,
+                'sender_type' => $r->sender_type,
+                'sender_name' => $r->sender_type === 'admin'
+                    ? ($r->user->name ?? 'Admin')
+                    : ($r->customer->name ?? 'Customer'),
+                'attachment'  => $r->attachment ? asset('storage/' . $r->attachment) : null,
+                'time'        => $r->created_at->format('d M Y h:i A'),
+                'ago'         => $r->created_at->diffForHumans(),
+            ]);
+
+        return response()->json(['success' => true, 'replies' => $replies]);
+    }
+
+    // ── Admin Chat ────────────────────────────────────────────────
+
     // Quick Solve
     public function solve(Request $request, ClientSupportTicket $ticket)
     {

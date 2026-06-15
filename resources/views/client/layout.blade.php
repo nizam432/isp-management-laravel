@@ -175,7 +175,7 @@
         /* ── Mobile ── */
         /* ── User Dropdown ── */
         .user-dropdown {
-            display: none;
+            display: none !important;
             position: absolute;
             top: calc(100% + 10px);
             right: 0;
@@ -183,11 +183,11 @@
             border-radius: 12px;
             box-shadow: 0 8px 30px rgba(0,0,0,.15);
             min-width: 220px;
-            z-index: 999;
+            z-index: 9999;
             overflow: hidden;
             border: 1px solid #eef0f5;
         }
-        .user-dropdown.open { display: block; }
+        .user-dropdown.open { display: block !important; }
         .dropdown-header {
             display: flex; align-items: center; gap: 12px;
             padding: 16px; background: #f8f9fc;
@@ -232,10 +232,31 @@
         </a>
     </div>
     <div class="topbar-right">
-        <div class="user-pill">
+        <div class="user-pill" id="userPill" onclick="toggleUserDropdown(event)" style="position:relative; cursor:pointer;">
             <div class="user-avatar">{{ strtoupper(substr(Auth::guard('customer')->user()->name, 0, 2)) }}</div>
             <span>{{ Auth::guard('customer')->user()->name }}</span>
             <i class="fas fa-chevron-down" style="font-size:10px; color:#aaa; margin-left:4px;"></i>
+
+            <div class="user-dropdown" id="userDropdown" onclick="event.stopPropagation()">
+                <div class="dropdown-header">
+                    <div class="dropdown-avatar">{{ strtoupper(substr(Auth::guard('customer')->user()->name, 0, 2)) }}</div>
+                    <div>
+                        <div class="dropdown-name">{{ Auth::guard('customer')->user()->name }}</div>
+                        <div class="dropdown-sub">Welcome !</div>
+                    </div>
+                </div>
+                <div class="dropdown-divider"></div>
+                <a href="{{ route('client.profile') }}" class="dropdown-item">
+                    <i class="fas fa-user"></i> My Profile
+                </a>
+                <div class="dropdown-divider"></div>
+                <form method="POST" action="{{ route('client.logout') }}">
+                    @csrf
+                    <button type="submit" class="dropdown-item" style="width:100%; background:none; border:none; cursor:pointer; text-align:left; color:#e74c3c;">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 </div>
@@ -246,19 +267,19 @@
         <a href="{{ route('client.dashboard') }}" class="nav-item {{ request()->routeIs('client.dashboard') ? 'active' : '' }}">
             <i class="fas fa-home"></i> Dashboard
         </a>
-        <a href="#" class="nav-item">
+        {{-- <a href="#" class="nav-item">
             <i class="fas fa-bell"></i> Notices
-        </a>
+        </a> --}}
         <a href="{{ route('client.invoices') }}" class="nav-item {{ request()->routeIs('client.invoices*') ? 'active' : '' }}">
-            <i class="fas fa-file-invoice-dollar"></i> Bill Payment
+            <i class="fas fa-file-invoice-dollar"></i> Invoice List
         </a>
-        <a href="#" class="nav-item">
+        <a href="{{ route('client.live-traffic') }}" class="nav-item {{ request()->routeIs('client.live-traffic') ? 'active' : '' }}">
             <i class="fas fa-chart-line"></i> Live Traffic
         </a>
-        <a href="#" class="nav-item">
+        {{-- <a href="#" class="nav-item">
             <i class="fas fa-list-ul"></i> Usages List
-        </a>
-        <a href="#" class="nav-item">
+        </a> --}}
+        <a href="{{ route('client.packages') }}" class="nav-item {{ request()->routeIs('client.packages') ? 'active' : '' }}">
             <i class="fas fa-box"></i> Package List
         </a>
         <a href="{{ route('client.tickets') }}" class="nav-item {{ request()->routeIs('client.tickets*') ? 'active' : '' }}">
@@ -314,25 +335,19 @@ function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('open');
 }
 
-// Dropdown toggle
-document.addEventListener('DOMContentLoaded', function() {
-    var pill     = document.getElementById('userPill');
+function toggleUserDropdown(e) {
+    e.stopPropagation();
     var dropdown = document.getElementById('userDropdown');
-
-    if (pill && dropdown) {
-        pill.addEventListener('click', function(e) {
-            e.stopPropagation();
-            dropdown.classList.toggle('open');
-        });
-
-        document.addEventListener('click', function() {
-            dropdown.classList.remove('open');
-        });
-
-        dropdown.addEventListener('click', function(e) {
-            e.stopPropagation();
-        });
+    if (dropdown.classList.contains('open')) {
+        dropdown.classList.remove('open');
+    } else {
+        dropdown.classList.add('open');
     }
+}
+
+document.addEventListener('click', function() {
+    var dropdown = document.getElementById('userDropdown');
+    if (dropdown) dropdown.classList.remove('open');
 });
 </script>
 @yield('extra_js')

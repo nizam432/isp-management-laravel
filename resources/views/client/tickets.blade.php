@@ -8,22 +8,39 @@
         background: #fff;
         border-radius: 10px;
         border: 1px solid #eef0f5;
-        padding: 20px 24px;
+        padding: 16px 20px;
         display: flex;
         align-items: center;
-        gap: 20px;
+        gap: 16px;
     }
     .stat-icon-circle {
-        width: 56px; height: 56px; border-radius: 50%;
+        width: 52px; height: 52px; border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
-        font-size: 22px; flex-shrink: 0;
+        font-size: 20px; flex-shrink: 0;
     }
     .stat-icon-circle.blue   { background: #4e73df; color: #fff; }
     .stat-icon-circle.yellow { background: #f6c23e; color: #fff; }
     .stat-icon-circle.green  { background: #1cc88a; color: #fff; }
     .stat-icon-circle.red    { background: #e74a3b; color: #fff; }
-    .stat-num  { font-size: 26px; font-weight: 700; color: #1a1f36; }
-    .stat-lbl  { font-size: 13px; color: #888; margin-top: 2px; }
+    .stat-num  { font-size: 24px; font-weight: 700; color: #1a1f36; }
+    .stat-lbl  { font-size: 12px; color: #888; margin-top: 2px; }
+
+    /* Stat grid — desktop: 5 col, tablet: 3 col, mobile: 2 col */
+    .stats-grid-tickets {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 14px;
+        margin-bottom: 20px;
+    }
+    @media (max-width: 1024px) {
+        .stats-grid-tickets { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 600px) {
+        .stats-grid-tickets { grid-template-columns: repeat(2, 1fr); }
+        .stat-card-ticket { padding: 12px 14px; gap: 10px; }
+        .stat-icon-circle { width: 40px; height: 40px; font-size: 16px; }
+        .stat-num { font-size: 20px; }
+    }
 
     .section-header {
         display: flex; align-items: center; justify-content: space-between;
@@ -40,26 +57,31 @@
     .dt-search { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #555; }
     .dt-search input {
         padding: 5px 10px; border: 1px solid #ddd; border-radius: 6px;
-        font-size: 13px; outline: none; width: 180px;
+        font-size: 13px; outline: none; width: 160px;
     }
     .dt-search input:focus { border-color: #00c897; }
 
-    table.ticket-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    /* Table — horizontal scroll on mobile */
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table.ticket-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 700px; }
     table.ticket-table th {
         background: #f8f9fc; padding: 10px 14px;
         text-align: left; font-weight: 600; color: #555;
         border-bottom: 2px solid #eef0f5; white-space: nowrap;
     }
     table.ticket-table th .sort-icon { color: #ccc; margin-left: 4px; font-size: 10px; }
-    table.ticket-table td { padding: 11px 14px; border-bottom: 1px solid #f4f6f9; color: #444; vertical-align: middle; }
+    table.ticket-table td { padding: 10px 14px; border-bottom: 1px solid #f4f6f9; color: #444; vertical-align: middle; }
     table.ticket-table tr:last-child td { border-bottom: none; }
     table.ticket-table tr:hover td { background: #fafbfd; }
     table.ticket-table td a.subject-link { color: #4e73df; font-weight: 500; text-decoration: none; }
     table.ticket-table td a.subject-link:hover { text-decoration: underline; }
 
-    .dt-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; flex-wrap: wrap; gap: 10px; }
+    .dt-footer {
+        display: flex; align-items: center; justify-content: space-between;
+        margin-top: 14px; flex-wrap: wrap; gap: 10px;
+    }
     .dt-info { font-size: 13px; color: #888; }
-    .dt-pages { display: flex; gap: 4px; }
+    .dt-pages { display: flex; gap: 4px; flex-wrap: wrap; }
     .dt-pages a, .dt-pages span {
         padding: 5px 11px; border-radius: 6px; font-size: 12px;
         border: 1px solid #e0e4ef; color: #555; text-decoration: none; cursor: pointer;
@@ -67,21 +89,32 @@
     .dt-pages .active { background: #4e73df; color: #fff; border-color: #4e73df; }
     .dt-pages a:hover { background: #f0f2f7; }
 
+    /* Mobile dt-controls stack */
+    @media (max-width: 600px) {
+        .dt-controls { flex-direction: column; align-items: flex-start; }
+        .dt-search input { width: 100%; }
+        .dt-footer { flex-direction: column; align-items: flex-start; }
+        .page-title { font-size: 18px; }
+    }
+
     /* Modal */
     .modal-overlay {
         display: none; position: fixed; inset: 0;
         background: rgba(0,0,0,.5); z-index: 999;
         align-items: center; justify-content: center;
+        padding: 1rem;
     }
     .modal-overlay.open { display: flex; }
     .modal-box {
         background: #fff; border-radius: 12px;
-        width: 100%; max-width: 500px; margin: 1rem;
-        box-shadow: 0 20px 60px rgba(0,0,0,.2); overflow: hidden;
+        width: 100%; max-width: 500px;
+        box-shadow: 0 20px 60px rgba(0,0,0,.2);
+        overflow: hidden; max-height: 90vh; overflow-y: auto;
     }
     .modal-head {
         background: #1a1f36; padding: 14px 20px;
         display: flex; align-items: center; justify-content: space-between;
+        position: sticky; top: 0; z-index: 1;
     }
     .modal-head-title { color: #fff; font-size: 15px; font-weight: 600; }
     .modal-close { background: none; border: none; color: #aaa; font-size: 22px; cursor: pointer; line-height: 1; }
@@ -95,12 +128,12 @@
 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:10px;">
     <div class="page-title" style="margin:0;">Tickets</div>
     <div style="font-size:12px; color:#aaa;">
-        SmartISP &rsaquo; Apps &rsaquo; Tickets
+        {{ \App\Models\Setting::get('company_name', 'SmartISP') }} &rsaquo; Apps &rsaquo; Tickets
     </div>
 </div>
 
 {{-- Stat Cards --}}
-<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:16px; margin-bottom:24px;">
+<div class="stats-grid-tickets">
     <div class="stat-card-ticket">
         <div class="stat-icon-circle blue"><i class="fas fa-tag"></i></div>
         <div><div class="stat-num">{{ $stats['total'] }}</div><div class="stat-lbl">Total Tickets</div></div>
@@ -110,12 +143,16 @@
         <div><div class="stat-num">{{ $stats['pending'] }}</div><div class="stat-lbl">Pending Tickets</div></div>
     </div>
     <div class="stat-card-ticket">
-        <div class="stat-icon-circle green"><i class="fas fa-check-circle"></i></div>
-        <div><div class="stat-num">{{ $stats['solved'] }}</div><div class="stat-lbl">Closed Tickets</div></div>
+        <div class="stat-icon-circle" style="background:#3a7bd5; color:#fff;"><i class="fas fa-spinner"></i></div>
+        <div><div class="stat-num">{{ $stats['processing'] }}</div><div class="stat-lbl">Processing Tickets</div></div>
     </div>
     <div class="stat-card-ticket">
-        <div class="stat-icon-circle red"><i class="fas fa-trash"></i></div>
-        <div><div class="stat-num">0</div><div class="stat-lbl">Deleted Tickets</div></div>
+        <div class="stat-icon-circle green"><i class="fas fa-check-circle"></i></div>
+        <div><div class="stat-num">{{ $stats['solved'] }}</div><div class="stat-lbl">Solved Tickets</div></div>
+    </div>
+    <div class="stat-card-ticket">
+        <div class="stat-icon-circle red"><i class="fas fa-times-circle"></i></div>
+        <div><div class="stat-num">{{ $stats['closed'] }}</div><div class="stat-lbl">Close Tickets</div></div>
     </div>
 </div>
 
@@ -148,7 +185,7 @@
         </div>
 
         {{-- Table --}}
-        <div style="overflow-x:auto;">
+        <div class="table-scroll">
             <table class="ticket-table">
                 <thead>
                     <tr>
@@ -173,7 +210,7 @@
                         ];
                         $statusMap = [
                             'pending'    => ['#f6c23e','Pending'],
-                            'processing' => ['#f39c12','Customer Reply'],
+                            'processing' => ['#f39c12','Processing'],
                             'solved'     => ['#1cc88a','Closed'],
                             'closed'     => ['#95a5a6','Closed'],
                         ];
@@ -207,8 +244,8 @@
                         </td>
                         <td><small>{{ $ticket->created_at->format('Y/m/d h:iA') }}</small></td>
                         <td>
-                            <a href="{{ route('client.tickets.show', $ticket) }}" class="btn btn-primary btn-sm">
-                                <i class="fas fa-eye"></i>
+                            <a href="{{ route('client.tickets.show', $ticket) }}" class="btn btn-primary btn-sm" title="View Discussion">
+                                <i class="fas fa-comments"></i>
                             </a>
                         </td>
                     </tr>
@@ -310,8 +347,9 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Attachment <small style="color:#888;">(png, jpg, jpeg, pdf)</small></label>
-                    <input type="file" name="attachment" class="form-control" accept=".png,.jpg,.jpeg,.pdf">
+                    <label>Attachment <small style="color:#888;">(png, jpg, jpeg, pdf — max 1MB)</small></label>
+                    <input type="file" name="attachment" class="form-control {{ $errors->has('attachment') ? 'is-invalid' : '' }}" accept=".png,.jpg,.jpeg,.pdf">
+                    @error('attachment') <div class="invalid-feedback">{{ $message }}</div> @enderror
                 </div>
 
                 <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:6px;">
@@ -345,6 +383,32 @@ modal.addEventListener('click', function(e) {
 // Auto open on validation error
 @if($errors->any())
     modal.classList.add('open');
+@endif
+
+// Auto open + pre-fill if coming from package page
+@if(request('pkg'))
+    modal.classList.add('open');
+    const pkgName = @json(request('pkg'));
+
+    // Pre-fill remarks
+    const remarksField = document.querySelector('textarea[name="remarks"]');
+    if (remarksField) {
+        remarksField.value = 'I would like to change my current package to: ' + pkgName;
+    }
+
+    // Auto-select "Package Change" category if exists
+    const categorySelect = document.querySelector('select[name="support_category_id"]');
+    if (categorySelect) {
+        Array.from(categorySelect.options).forEach(opt => {
+            if (opt.text.toLowerCase().includes('package')) {
+                opt.selected = true;
+            }
+        });
+    }
+
+    // Auto-select Medium priority
+    const prioritySelect = document.querySelector('select[name="priority"]');
+    if (prioritySelect) prioritySelect.value = 'medium';
 @endif
 
 // Search debounce

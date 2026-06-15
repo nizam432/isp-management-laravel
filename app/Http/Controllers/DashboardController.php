@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Payment;
-use App\Models\Ticket;
+use App\Models\ClientSupportTicket;
 use App\Models\InventoryItem;
 use App\Models\MikrotikRouter;
 use App\Services\MikrotikService;
@@ -24,8 +24,8 @@ class DashboardController extends Controller
             'month_payments'     => Payment::thisMonth()->sum('amount'),
             'unpaid_invoices'    => Invoice::unpaid()->count(),
             'overdue_invoices'   => Invoice::overdue()->count(),
-            'open_tickets'       => Ticket::open()->count(),
-            'urgent_tickets'     => Ticket::urgent()->count(),
+            'open_tickets'       => ClientSupportTicket::where('status', 'pending')->count(),
+            'urgent_tickets'     => ClientSupportTicket::where('priority', 'urgent')->count(),
             'low_stock_items'    => InventoryItem::lowStock()->count(),
             'online_users'       => 0, // MikroTik থেকে live data
         ];
@@ -64,10 +64,10 @@ class DashboardController extends Controller
                                  ->get();
 
         // Latest 5 tickets
-        $recentTickets = Ticket::with('customer')
-                               ->latest()
-                               ->take(5)
-                               ->get();
+        $recentTickets = ClientSupportTicket::with('customer')
+                                            ->latest()
+                                            ->take(5)
+                                            ->get();
 
         return view('dashboard', compact('stats', 'chartData', 'recentPayments', 'recentTickets'));
     }

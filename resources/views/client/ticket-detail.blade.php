@@ -165,7 +165,10 @@
                 <form method="POST" action="{{ route('client.tickets.reply', $ticket) }}" enctype="multipart/form-data">
                     @csrf
                     @error('message')
-                        <div style="color:#e74c3c; font-size:12px; margin-bottom:6px;">{{ $message }}</div>
+                        <div style="color:#e74c3c; font-size:12px; margin-bottom:6px;"><i class="fas fa-exclamation-circle"></i> {{ $message }}</div>
+                    @enderror
+                    @error('attachment')
+                        <div style="color:#e74c3c; font-size:12px; margin-bottom:6px;"><i class="fas fa-exclamation-circle"></i> {{ $message }}</div>
                     @enderror
                     <textarea name="message" class="reply-area" placeholder="Your message..." required></textarea>
                     <div class="reply-footer">

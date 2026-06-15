@@ -122,6 +122,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/{ticket}/edit',                 [ClientSupportController::class, 'edit'])         ->name('edit');
         Route::put('/{ticket}',                      [ClientSupportController::class, 'update'])       ->name('update');
         Route::delete('/{ticket}',                   [ClientSupportController::class, 'destroy'])      ->name('destroy');
+        Route::get('/{ticket}/chat',                 [ClientSupportController::class, 'chat'])         ->name('chat');
+        Route::post('/{ticket}/chat',                [ClientSupportController::class, 'chatReply'])    ->name('chat.reply');
+        Route::get('/{ticket}/chat/messages',        [ClientSupportController::class, 'chatMessages']) ->name('chat.messages');
         Route::post('/{ticket}/solve',               [ClientSupportController::class, 'solve'])        ->name('solve');
         Route::get('/{ticket}/mikrotik-status',      [ClientSupportController::class, 'mikrotikStatus'])->name('mikrotik-status');
         Route::post('/{ticket}/reassign',            [ClientSupportController::class, 'reassign'])     ->name('reassign');

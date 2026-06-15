@@ -16,12 +16,12 @@
     <td><small>{{ $t->createdBy->name ?? '—' }}</small></td>
     <td class="status-badge">
         @if($t->status === 'processing')
-            <span class="badge badge-warning btn-ticket-solve" data-id="{{ $t->id }}"
-                  data-mac="{{ $t->customer->mac_address }}"
-                  data-ip="{{ $t->customer->ip_address }}"
-                  style="cursor:pointer;">
+            <button class="btn btn-xs btn-warning btn-ticket-solve"
+                    data-id="{{ $t->id }}"
+                    data-mac="{{ $t->customer->mac_address }}"
+                    data-ip="{{ $t->customer->ip_address }}">
                 Processing
-            </span>
+            </button>
         @else
             <span class="badge badge-{{ $t->status_badge }}">{{ ucfirst($t->status) }}</span>
         @endif
@@ -41,6 +41,9 @@
                         data-mac="{{ $t->customer->mac_address }}"
                         data-ip="{{ $t->customer->ip_address }}"
                         title="Solve"><i class="fas fa-check"></i></button>
+                <a href="{{ route('client-support.chat', $t->id) }}" class="btn btn-xs btn-primary" title="Chat">
+                    <i class="fas fa-comments"></i>
+                </a>
                 <button class="btn btn-xs btn-info btn-ticket-edit" data-id="{{ $t->id }}" title="Edit"><i class="fas fa-edit"></i></button>
                 <button class="btn btn-xs btn-danger btn-ticket-delete" data-id="{{ $t->id }}" title="Delete"><i class="fas fa-trash"></i></button>
             </div>
