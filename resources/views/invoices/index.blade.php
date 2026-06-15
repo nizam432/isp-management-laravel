@@ -1024,7 +1024,7 @@ $(function () {
         if (ids.length === 0) return;
         window.location.href = '/invoices/bulk-xlsx?ids=' + ids.join(',');
     });
-
+   
     // Bulk SMS
     $('#bulkSms').on('click', function () {
         var ids = getSelectedIds();
