@@ -4,9 +4,13 @@
 
 @section('content')
 
-<div style="margin-bottom:1rem;">
+<div style="margin-bottom:1rem; display:flex; align-items:center; justify-content:space-between;">
     <a href="{{ route('client.invoices') }}" style="color:#6b7280; font-size:13px; text-decoration:none;">
         <i class="fas fa-arrow-left"></i> Back to Invoices
+    </a>
+    <a href="{{ route('invoices.pdf', $invoice) }}" target="_blank"
+       style="background:#e74c3c; color:#fff; border-radius:7px; padding:7px 16px; font-size:13px; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+        <i class="fas fa-file-pdf"></i> Download PDF
     </a>
 </div>
 

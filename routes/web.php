@@ -354,7 +354,7 @@ Route::middleware(['auth'])->group(function () {
     }); // end super-admin
 
     // ── Settings ───────────────────────────────
-    Route::middleware(['auth', 'can:isp-admin'])->prefix('settings')->name('settings.')->group(function () {
+    Route::middleware(['auth', 'can:settings.manage'])->prefix('settings')->name('settings.')->group(function () {
 
         Route::get('general', [App\Http\Controllers\Settings\SettingController::class, 'index'])->name('general');
         Route::put('general', [App\Http\Controllers\Settings\SettingController::class, 'update'])->name('update');
@@ -535,7 +535,7 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ── Bandwidth Buy Module ───────────────────────
-    Route::prefix('bandwidth-buy')->name('bandwidth-buy.')->middleware('can:isp-admin')->group(function () {
+    Route::prefix('bandwidth-buy')->name('bandwidth-buy.')->middleware('can:bandwidth.provider.view')->group(function () {
 
         // Provider
         Route::prefix('provider')->name('provider.')->group(function () {
@@ -571,7 +571,7 @@ Route::middleware(['auth'])->group(function () {
     }); // end bandwidth-buy
 
     // ── Bandwidth Sale Module ──────────────────
-    Route::prefix('bandwidth-sale')->name('bandwidth-sale.')->middleware('can:isp-admin')->group(function () {
+    Route::prefix('bandwidth-sale')->name('bandwidth-sale.')->middleware('can:bandwidth.sale.view')->group(function () {
 
         // Dashboard — redirect to customers index for now
         Route::get('dashboard', fn() => redirect()->route('bandwidth-sale.customers.index'))->name('dashboard');

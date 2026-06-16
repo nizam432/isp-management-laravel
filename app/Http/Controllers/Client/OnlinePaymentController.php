@@ -36,7 +36,22 @@ class OnlinePaymentController extends Controller
                 ->with('error', 'No online payment gateway is active. Please contact admin.');
         }
 
-        return view('client.payment.select-gateway', compact('invoice', 'gateways', 'customer'));
+        // pay_all=1 হলে customer এর সব unpaid invoices এর total due
+        $payAll = request('pay_all') == '1';
+        if ($payAll) {
+            $allUnpaid   = Invoice::where('customer_id', $customer->id)
+                ->whereIn('status', ['unpaid', 'partial', 'overdue'])
+                ->get();
+            $totalDue    = $allUnpaid->sum('due_amount');
+            $unpaidCount = $allUnpaid->count();
+        } else {
+            $totalDue    = $invoice->due_amount;
+            $unpaidCount = 1;
+        }
+
+        return view('client.payment.select-gateway', compact(
+            'invoice', 'gateways', 'customer', 'payAll', 'totalDue', 'unpaidCount'
+        ));
     }
 
     // ── Initiate payment ─────────────────────────────────────────
@@ -51,10 +66,29 @@ class OnlinePaymentController extends Controller
 
         $request->validate([
             'gateway' => 'required|string|in:sslcommerz,amarpayz,bkash,nagad,stripe,paypal,razorpay',
+            'amount'  => 'nullable|numeric|min:1',
         ]);
 
         $slug     = $request->gateway;
+        $payAll   = $request->pay_all == '1';
         $tenantId = PaymentGatewayService::tenantId();
+
+        // Amount determine
+        $allowPartial = \App\Models\Setting::get('allow_partial_payment', '0') == '1';
+
+        if ($payAll) {
+            // সব unpaid invoice এর total
+            $totalDue = Invoice::where('customer_id', $customer->id)
+                ->whereIn('status', ['unpaid', 'partial', 'overdue'])
+                ->sum('due_amount');
+            $amount = $allowPartial && $request->amount
+                ? min(floatval($request->amount), $totalDue)
+                : $totalDue;
+        } else {
+            $amount = $allowPartial && $request->amount
+                ? min(floatval($request->amount), floatval($invoice->due_amount))
+                : floatval($invoice->due_amount);
+        }
 
         try {
             $result = PaymentGatewayService::initiate(
@@ -62,7 +96,7 @@ class OnlinePaymentController extends Controller
                 slug:         $slug,
                 customerId:   $customer->id,
                 invoiceId:    $invoice->id,
-                amount:       floatval($invoice->due_amount),
+                amount:       $amount,
                 customerData: [
                     'name'    => $customer->name,
                     'email'   => $customer->email   ?? 'customer@isp.com',

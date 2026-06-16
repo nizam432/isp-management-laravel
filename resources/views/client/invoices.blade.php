@@ -6,6 +6,11 @@
 
 <div class="page-title">Invoice List</div>
 
+@php
+    $allowPartial = \App\Models\Setting::get('allow_partial_payment', '0') == '1';
+    $unpaidInvoices = $invoices->filter(fn($i) => in_array($i->status, ['unpaid','partial','overdue']));
+@endphp
+
 <div class="stats-row" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
     <div class="stat-card">
         <div class="stat-icon orange"><i class="fas fa-file-invoice-dollar"></i></div>
@@ -22,6 +27,25 @@
         </div>
     </div>
 </div>
+
+{{-- Single Pay Now button for all dues --}}
+@if($totalDue > 0)
+<div style="background:#fff; border-radius:12px; border:1px solid #eef0f5; padding:16px 20px; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+    <div>
+        <div style="font-size:13px; color:#888; margin-bottom:3px;">Total Outstanding</div>
+        <div style="font-size:24px; font-weight:700; color:#e74c3c;">Tk{{ number_format($totalDue, 0) }}</div>
+        @if($allowPartial)
+            <div style="font-size:11px; color:#aaa; margin-top:2px;">You can pay any amount</div>
+        @else
+            <div style="font-size:11px; color:#aaa; margin-top:2px;">Full amount required</div>
+        @endif
+    </div>
+    <a href="{{ route('client.payment.select', ['invoice' => $unpaidInvoices->first()->id ?? 0, 'pay_all' => 1]) }}"
+       style="background:#28a745; color:#fff; border-radius:8px; padding:12px 28px; font-weight:700; font-size:15px; text-decoration:none; display:flex; align-items:center; gap:8px;">
+        <i class="fas fa-credit-card"></i> Pay Now
+    </a>
+</div>
+@endif
 
 <div class="card">
     <div class="card-header" style="justify-content:space-between;">
@@ -87,12 +111,10 @@
                         </small>
                     </td>
                     <td>
-                        <div style="display:flex;gap:6px;align-items:center;">
-                            @include('client.payment._pay-button', ['invoice' => $invoice])
-                            <a href="{{ route('client.invoices.show', $invoice) }}" class="btn btn-primary btn-sm">
-                                <i class="fas fa-eye"></i>
-                            </a>
-                        </div>
+                        <a href="{{ route('invoices.pdf', $invoice) }}" target="_blank"
+                           style="background:#e74c3c; color:#fff; border-radius:6px; padding:6px 12px; font-size:12px; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:5px;">
+                            <i class="fas fa-file-pdf"></i> PDF
+                        </a>
                     </td>
                 </tr>
                 @endforeach

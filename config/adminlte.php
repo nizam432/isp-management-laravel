@@ -546,7 +546,7 @@ return [
         [
             'text' => 'System Settings',
             'icon' => 'fas fa-fw fa-cog',
-            'can'  => 'settings.manage',
+           'can'  => 'settings.manage',
             'submenu' => [
                 ['text' => 'General Settings', 'url' => 'settings/general', 'icon' => 'fas fa-fw fa-sliders-h'],
                 ['text' => 'Zone',     'url' => 'settings/zones',     'icon' => 'fas fa-fw fa-map-marked-alt'],

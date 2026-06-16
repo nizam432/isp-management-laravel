@@ -272,6 +272,24 @@
                                 </div>
                             </div>
 
+                            {{-- Allow Partial Payment --}}
+                            <div class="form-group">
+                                <label class="font-weight-bold d-block mb-2">Online Partial Payment</label>
+                                <div class="custom-control custom-switch">
+                                    <input type="hidden" name="allow_partial_payment" value="0">
+                                    <input type="checkbox" class="custom-control-input" id="allow_partial_payment"
+                                           name="allow_partial_payment" value="1"
+                                           {{ ($billing['allow_partial_payment'] ?? '0') == '1' ? 'checked' : '' }}>
+                                    <label class="custom-control-label" for="allow_partial_payment">
+                                        Allow customers to pay partial amount online
+                                    </label>
+                                </div>
+                                <small class="text-muted">
+                                    If enabled, customers can edit the payment amount before paying.
+                                    If disabled, they must pay the full due amount.
+                                </small>
+                            </div>
+
                             <div class="form-group mb-0">
                                 <label class="font-weight-bold">Invoice Footer Text</label>
                                 <textarea name="invoice_footer_text" class="form-control" rows="2">{{ $billing['invoice_footer_text'] ?? 'Thank you for your payment.' }}</textarea>

@@ -273,8 +273,13 @@
 @endif
 
 <!-- Footer -->
-<div style="position:fixed; bottom:60px; left:0; right:0; text-align:center;">
-    <span style="font-size:11px; color:#777; font-style:italic;">This is electronically generated, no signature required</span>
+<div style="width:100%; padding:10px 28px; background:#f9f9f9; border-top:1px solid #eee; margin-top:12px;">
+    <table style="width:100%; border-collapse:collapse;">
+        <tr>
+            <td style="font-size:11px; color:#777; font-style:italic;">This is electronically generated, no signature required</td>
+            <td style="font-size:11px; color:#777; text-align:right;">Generated on {{ now()->format('d M Y h:i A') }}</td>
+        </tr>
+    </table>
 </div>
 
 </body>
