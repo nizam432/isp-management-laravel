@@ -65,22 +65,38 @@ Route::middleware(['auth'])->group(function () {
 
     // ── Customers ──────────────────────────────
     // ⚠️ Static/AJAX routes MUST come before resource() — otherwise {customer} catches them
-    Route::get ('customers/sub-zones',                    [CustomerController::class, 'getSubZones'])           ->name('customers.sub-zones');
-    Route::get ('customers/package-price',                [CustomerController::class, 'getPackagePrice'])        ->name('customers.package-price');
-    Route::post('customers/quick-add/zone',               [CustomerController::class, 'quickAddZone'])           ->name('customers.quick-add.zone');
-    Route::post('customers/quick-add/connection-type',    [CustomerController::class, 'quickAddConnectionType']) ->name('customers.quick-add.connection-type');
-    Route::post('customers/quick-add/client-type',        [CustomerController::class, 'quickAddClientType'])     ->name('customers.quick-add.client-type');
-    Route::post('customers/quick-add/protocol-type',      [CustomerController::class, 'quickAddProtocolType'])   ->name('customers.quick-add.protocol-type');
+    Route::get ('customers/sub-zones',                    [CustomerController::class, 'getSubZones'])           ->name('customers.sub-zones')->middleware('can:customer.view');
+    Route::get ('customers/package-price',                [CustomerController::class, 'getPackagePrice'])        ->name('customers.package-price')->middleware('can:customer.view');
+    Route::post('customers/quick-add/zone',               [CustomerController::class, 'quickAddZone'])           ->name('customers.quick-add.zone')->middleware('can:customer.create');
+    Route::post('customers/quick-add/connection-type',    [CustomerController::class, 'quickAddConnectionType']) ->name('customers.quick-add.connection-type')->middleware('can:customer.create');
+    Route::post('customers/quick-add/client-type',        [CustomerController::class, 'quickAddClientType'])     ->name('customers.quick-add.client-type')->middleware('can:customer.create');
+    Route::post('customers/quick-add/protocol-type',      [CustomerController::class, 'quickAddProtocolType'])   ->name('customers.quick-add.protocol-type')->middleware('can:customer.create');
 
-    Route::resource('customers', CustomerController::class);
-    Route::patch('customers/{customer}/status', [CustomerController::class, 'updateStatus'])->name('customers.status');
-    Route::get('customers/{customer}/mikrotik-info', [CustomerController::class, 'mikrotikInfo'])->name('customers.mikrotik-info');
+    Route::resource('customers', CustomerController::class)->middleware([
+        'index'   => 'can:customer.view',
+        'show'    => 'can:customer.view',
+        'create'  => 'can:customer.create',
+        'store'   => 'can:customer.create',
+        'edit'    => 'can:customer.edit',
+        'update'  => 'can:customer.edit',
+        'destroy' => 'can:customer.delete',
+    ]);
+    Route::patch('customers/{customer}/status',       [CustomerController::class, 'updateStatus']) ->name('customers.status')->middleware('can:customer.suspend');
+    Route::get  ('customers/{customer}/mikrotik-info',[CustomerController::class, 'mikrotikInfo'])->name('customers.mikrotik-info')->middleware('can:customer.view');
 
     // ── Packages ───────────────────────────────
-    Route::get('packages/sync',  [PackageController::class, 'syncPreview'])->name('packages.sync.preview');
-    Route::post('packages/sync', [PackageController::class, 'syncStore'])->name('packages.sync.store');
-    Route::resource('packages', PackageController::class);
-    Route::patch('packages/{package}/toggle', [PackageController::class, 'toggleStatus'])->name('packages.toggle');
+    Route::get ('packages/sync',  [PackageController::class, 'syncPreview'])->name('packages.sync.preview')->middleware('can:package.mikrotik.sync');
+    Route::post('packages/sync', [PackageController::class, 'syncStore'])  ->name('packages.sync.store')  ->middleware('can:package.mikrotik.sync');
+    Route::resource('packages', PackageController::class)->middleware([
+        'index'   => 'can:package.view',
+        'show'    => 'can:package.view',
+        'create'  => 'can:package.create',
+        'store'   => 'can:package.create',
+        'edit'    => 'can:package.edit',
+        'update'  => 'can:package.edit',
+        'destroy' => 'can:package.delete',
+    ]);
+    Route::patch('packages/{package}/toggle', [PackageController::class, 'toggleStatus'])->name('packages.toggle')->middleware('can:package.edit');
 
     // ── Invoices ───────────────────────────────
     // Bulk routes must be before resource routes
