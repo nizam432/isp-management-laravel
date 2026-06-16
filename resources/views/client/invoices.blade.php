@@ -58,7 +58,7 @@
                     <th>Due</th>
                     <th>Status</th>
                     <th>Due Date</th>
-                    <th></th>
+                    <th>Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -87,9 +87,12 @@
                         </small>
                     </td>
                     <td>
-                        <a href="{{ route('client.invoices.show', $invoice) }}" class="btn btn-primary btn-sm">
-                            <i class="fas fa-eye"></i> View
-                        </a>
+                        <div style="display:flex;gap:6px;align-items:center;">
+                            @include('client.payment._pay-button', ['invoice' => $invoice])
+                            <a href="{{ route('client.invoices.show', $invoice) }}" class="btn btn-primary btn-sm">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                        </div>
                     </td>
                 </tr>
                 @endforeach

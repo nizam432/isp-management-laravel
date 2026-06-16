@@ -1,12 +1,12 @@
 {{-- resources/views/client/invoice-detail.blade.php --}}
 @extends('client.layout')
-@section('title', 'ইনভয়েস বিবরণ')
+@section('title', 'Invoice Detail')
 
 @section('content')
 
 <div style="margin-bottom:1rem;">
     <a href="{{ route('client.invoices') }}" style="color:#6b7280; font-size:13px; text-decoration:none;">
-        <i class="fas fa-arrow-left"></i> বিলের তালিকায় ফিরুন
+        <i class="fas fa-arrow-left"></i> Back to Invoices
     </a>
 </div>
 
@@ -15,10 +15,10 @@
         <span><i class="fas fa-file-invoice" style="color:#1a56db;"></i> {{ $invoice->invoice_no }}</span>
         @php
             $statusMap = [
-                'paid'    => ['badge-success', 'পরিশোধিত'],
-                'partial' => ['badge-warning', 'আংশিক'],
-                'overdue' => ['badge-danger',  'বিলম্বিত'],
-                'unpaid'  => ['badge-danger',  'বাকি'],
+                'paid'    => ['badge-success', 'Paid'],
+                'partial' => ['badge-warning', 'Partial'],
+                'overdue' => ['badge-danger',  'Overdue'],
+                'unpaid'  => ['badge-danger',  'Unpaid'],
             ];
             [$badgeClass, $statusBn] = $statusMap[$invoice->status] ?? ['badge-secondary', ucfirst($invoice->status)];
         @endphp
@@ -29,7 +29,7 @@
         {{-- Invoice Info --}}
         <table style="width:100%; font-size:13px; margin-bottom:1rem;">
             <tr>
-                <td style="color:#6b7280; padding:5px 0; width:45%;">গ্রাহকের নাম</td>
+                <td style="color:#6b7280; padding:5px 0; width:45%;">Customer Name</td>
                 <td>{{ $customer->name }}</td>
             </tr>
             <tr>
@@ -37,15 +37,15 @@
                 <td>{{ $customer->customer_code }}</td>
             </tr>
             <tr>
-                <td style="color:#6b7280; padding:5px 0;">প্যাকেজ</td>
+                <td style="color:#6b7280; padding:5px 0;">Package</td>
                 <td>{{ $invoice->package->name ?? '—' }}</td>
             </tr>
             <tr>
-                <td style="color:#6b7280; padding:5px 0;">মাস / মেয়াদ</td>
+                <td style="color:#6b7280; padding:5px 0;">Period</td>
                 <td>{{ $invoice->period_label }}</td>
             </tr>
             <tr>
-                <td style="color:#6b7280; padding:5px 0;">শেষ পরিশোধের তারিখ</td>
+                <td style="color:#6b7280; padding:5px 0;">Due Date</td>
                 <td>{{ $invoice->due_date?->format('d M Y') ?? '—' }}</td>
             </tr>
         </table>
@@ -55,17 +55,17 @@
         {{-- Amount breakdown --}}
         <table style="width:100%; font-size:13px;">
             <tr>
-                <td style="padding:5px 0; color:#374151;">বিলের পরিমাণ</td>
+                <td style="padding:5px 0; color:#374151;">Invoice Amount</td>
                 <td style="text-align:right;">৳{{ number_format($invoice->amount, 2) }}</td>
             </tr>
             @if($invoice->discount > 0)
             <tr>
-                <td style="padding:5px 0; color:#374151;">ছাড়</td>
+                <td style="padding:5px 0; color:#374151;">Discount</td>
                 <td style="text-align:right; color:#16a34a;">- ৳{{ number_format($invoice->discount, 2) }}</td>
             </tr>
             @endif
             <tr style="border-top:2px solid #111;">
-                <td style="padding:8px 0 5px; font-weight:600;">বকেয়া পরিমাণ</td>
+                <td style="padding:8px 0 5px; font-weight:600;">Due Amount</td>
                 <td style="text-align:right; font-weight:600; font-size:18px; color:{{ $invoice->due_amount > 0 ? '#dc2626' : '#16a34a' }};">
                     ৳{{ number_format($invoice->due_amount, 2) }}
                 </td>
@@ -76,14 +76,14 @@
         @if($invoice->payments->where('status', 'active')->count() > 0)
         <div style="margin-top:1.25rem;">
             <div style="font-size:13px; font-weight:500; margin-bottom:8px; color:#374151;">
-                <i class="fas fa-history" style="color:#1a56db;"></i> পেমেন্ট ইতিহাস
+                <i class="fas fa-history" style="color:#1a56db;"></i> Payment History
             </div>
             <table style="width:100%; font-size:12px;">
                 <thead>
                     <tr style="background:#f9fafb;">
-                        <th style="padding:7px 10px; text-align:left; color:#6b7280; font-weight:500;">পরিমাণ</th>
-                        <th style="padding:7px 10px; text-align:left; color:#6b7280; font-weight:500;">পদ্ধতি</th>
-                        <th style="padding:7px 10px; text-align:left; color:#6b7280; font-weight:500;">তারিখ</th>
+                        <th style="padding:7px 10px; text-align:left; color:#6b7280; font-weight:500;">Amount</th>
+                        <th style="padding:7px 10px; text-align:left; color:#6b7280; font-weight:500;">Method</th>
+                        <th style="padding:7px 10px; text-align:left; color:#6b7280; font-weight:500;">Date</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -100,10 +100,8 @@
         @endif
 
         @if($invoice->due_amount > 0)
-        <div style="margin-top:1.25rem; background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:12px 14px; font-size:13px; color:#9a3412;">
-            <i class="fas fa-info-circle"></i>
-            বিল পরিশোধের জন্য আপনার ISP অফিসে যোগাযোগ করুন অথবা bKash/Nagad এ পেমেন্ট করুন।<br>
-            <strong>{{ \App\Models\Setting::get('company_phone', '') }}</strong>
+        <div style="margin-top:1.25rem;">
+            @include('client.payment._pay-button', ['invoice' => $invoice])
         </div>
         @endif
 

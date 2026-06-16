@@ -197,6 +197,9 @@ class PermissionSeeder extends Seeder
             'role.create',
             'role.edit',
             'role.delete',
+
+            // ── Settings ───────────────────────────────
+            'settings.manage',
         ];
 
         // Insert all permissions

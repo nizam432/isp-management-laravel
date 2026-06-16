@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Client\ClientPortalController;
+use App\Http\Controllers\Client\OnlinePaymentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -47,5 +48,10 @@ Route::prefix('client')->name('client.')->group(function () {
         // Profile & Password
         Route::get ('profile',          [ClientPortalController::class, 'profile'])->name('profile');
         Route::post('change-password',  [ClientPortalController::class, 'changePassword'])->name('password.change');
+
+        // ── Online Payment ──────────────────────────────────
+        Route::get ('pay/done/{ref}',         [OnlinePaymentController::class, 'successPage'])->name('payment.success-page');
+        Route::get ('pay/{invoice}/select',   [OnlinePaymentController::class, 'selectGateway'])->name('payment.select');
+        Route::post('pay/{invoice}/initiate', [OnlinePaymentController::class, 'initiate'])    ->name('payment.initiate');
     });
 });

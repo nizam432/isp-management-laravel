@@ -319,7 +319,8 @@ return [
             'icon_color' => 'yellow',
             'can'        => 'super-admin',
         ],
-        ['text' => 'SMS Gateways', 'url' => 'super-admin/sms', 'icon' => 'fas fa-fw fa-sms', 'icon_color' => 'green', 'can' => 'super-admin'],
+        ['text' => 'SMS Gateways',     'url' => 'super-admin/sms',              'icon' => 'fas fa-fw fa-sms',         'icon_color' => 'green',  'can' => 'super-admin'],
+        ['text' => 'Payment Gateways', 'url' => 'super-admin/payment-gateways', 'icon' => 'fas fa-fw fa-credit-card', 'icon_color' => 'purple', 'can' => 'super-admin'],
         [
             'text'       => 'Permissions',
             'url'        => 'super-admin/permissions',
@@ -330,16 +331,16 @@ return [
         
         
          // ISP Admin menu তে
-        ['text' => 'Dashboard',        'url' => 'dashboard',  'icon' => 'fas fa-fw fa-tachometer-alt', 'icon_color' => 'blue',   'can' => 'isp-admin'],
-       
-       [
+        ['text' => 'Dashboard', 'url' => 'dashboard', 'icon' => 'fas fa-fw fa-tachometer-alt', 'icon_color' => 'blue', 'can' => 'dashboard.view'],
+
+        [
             'text'       => 'MikroTik',
             'icon'       => 'fas fa-fw fa-server',
             'icon_color' => 'red',
-            'can'        => 'isp-admin',
+            'can'        => 'mikrotik.view',
             'submenu'    => [
-                ['text' => 'Routers',        'url' => 'mikrotik',              'icon' => 'fas fa-fw fa-network-wired'],
-                ['text' => 'Active Sessions','url' => 'mikrotik/active-sessions',       'icon' => 'fas fa-fw fa-circle text-success'],
+                ['text' => 'Routers',        'url' => 'mikrotik', 'icon' => 'fas fa-fw fa-network-wired', 'can' => 'mikrotik.view'],
+                ['text' => 'Active Sessions','url' => 'mikrotik/active-sessions', 'icon' => 'fas fa-fw fa-circle text-success', 'can' => 'mikrotik.session.view'],
                 ['text' => 'Import',         'url' => 'import',                'icon' => 'fas fa-fw fa-file-import'],
             ],
         ],
@@ -349,10 +350,10 @@ return [
             'text'       => 'OLT Management',
             'icon'       => 'fas fa-fw fa-network-wired',
             'icon_color' => 'cyan',
-            'can'        => 'isp-admin',
+            'can'        => 'olt.view',
             'submenu'    => [
-                ['text' => 'OLT',       'url' => 'olt',       'icon' => 'fas fa-fw fa-server'],
-                ['text' => 'OLT Users', 'url' => 'olt/users', 'icon' => 'fas fa-fw fa-users'],
+                ['text' => 'OLT',       'url' => 'olt',       'icon' => 'fas fa-fw fa-server', 'can' => 'olt.view'],
+                ['text' => 'OLT Users', 'url' => 'olt/users', 'icon' => 'fas fa-fw fa-users',  'can' => 'olt.user.view'],
             ],
         ],        
        // ['header' => 'SETTINGS', 'can' => 'isp-admin'],
@@ -363,7 +364,7 @@ return [
     'text'       => 'Packages',
     'icon'       => 'fas fa-fw fa-box',
     'icon_color' => 'purple',
-    'can'        => 'isp-admin',
+    'can'        => 'package.view',
     'submenu'    => [
         [
             'text' => 'All Packages',
@@ -383,7 +384,7 @@ return [
         'url'        => 'customers',
         'icon'       => 'fas fa-fw fa-users',
         'icon_color' => 'green',
-        'can'        => 'isp-admin',
+        'can'        => 'customer.view',
         'submenu'    => [
             [
                 'text' => 'All Customers',
@@ -406,7 +407,7 @@ return [
         'text'       => 'Billing',
         'icon'       => 'fas fa-fw fa-file-invoice-dollar',
         'icon_color' => 'orange',
-        'can'        => 'isp-admin',
+        'can'        => 'invoice.view',
         'submenu'    => [
             [
                 'text' => 'Invoices',
@@ -431,7 +432,7 @@ return [
         'text'       => 'Accounting',
         'icon'       => 'fas fa-fw fa-book',
         'icon_color' => 'teal',
-        'can'        => 'isp-admin',
+        'can'        => 'accounting.view',
         'submenu'    => [
             [
                 'text' => 'Dashboard',
@@ -470,7 +471,7 @@ return [
         'text'       => 'Reports',
         'icon'       => 'fas fa-fw fa-chart-bar',
         'icon_color' => 'blue',
-        'can'        => 'isp-admin',
+        'can'        => 'report.revenue.view',
         'submenu'    => [
             [
                 'text' => 'Revenue',
@@ -493,7 +494,7 @@ return [
         'text'       => 'SMS',
         'icon'       => 'fas fa-fw fa-sms',
         'icon_color' => 'green',
-        'can'        => 'isp-admin',
+        'can'        => 'sms.view',
         'submenu'    => [
             [
                 'text' => 'Gateway Settings',
@@ -523,7 +524,7 @@ return [
             'text'       => 'Support & Ticketing',
             'icon'       => 'fas fa-fw fa-headset',
             'icon_color' => 'red',
-            'can'        => 'isp-admin',
+            'can'        => 'support.client.view',
             'submenu'    => [
                 [
                     'text' => 'Support Category',
@@ -545,7 +546,7 @@ return [
         [
             'text' => 'System Settings',
             'icon' => 'fas fa-fw fa-cog',
-            'can'  => 'isp-admin',
+            'can'  => 'settings.manage',
             'submenu' => [
                 ['text' => 'General Settings', 'url' => 'settings/general', 'icon' => 'fas fa-fw fa-sliders-h'],
                 ['text' => 'Zone',     'url' => 'settings/zones',     'icon' => 'fas fa-fw fa-map-marked-alt'],
@@ -561,7 +562,7 @@ return [
             'text'       => 'HR & Payroll',
             'icon'       => 'fas fa-fw fa-user-tie',
             'icon_color' => 'blue',
-            'can'        => 'isp-admin',
+            'can'        => 'hr.employee.view',
             'submenu'    => [
                 [
                     'text' => 'Departments',
@@ -623,7 +624,7 @@ return [
             'text'       => 'Bandwidth Buy',
             'icon'       => 'fas fa-fw fa-wifi',
             'icon_color' => 'blue',
-            'can'        => 'isp-admin',
+            'can'        => 'bandwidth.provider.view',
             'submenu'    => [
                 [
                     'text' => 'Provider',
@@ -653,7 +654,7 @@ return [
             'text'       => 'Bandwidth Sale',
             'icon'       => 'fas fa-fw fa-satellite-dish',
             'icon_color' => 'cyan',
-            'can'        => 'isp-admin',
+            'can'        => 'bandwidth.sale.view',
             'submenu'    => [
                 [
                     'text' => 'Dashboard',
@@ -688,12 +689,12 @@ return [
             ],
         ],
 
-        ['header' => 'MANAGEMENT', 'can' => 'isp-admin'],
+        ['header' => 'MANAGEMENT', 'can' => 'user.view'],
         [
             'text'       => 'User Management',
             'icon'       => 'fas fa-fw fa-users-cog',
             'icon_color' => 'indigo',
-            'can'        => 'isp-admin',
+            'can'        => 'user.view',
             'submenu'    => [
                 ['text' => 'All Users', 'url' => 'users',        'icon' => 'fas fa-fw fa-list'],
                 ['text' => 'Add User',  'url' => 'users/create', 'icon' => 'fas fa-fw fa-user-plus'],
@@ -703,20 +704,20 @@ return [
             'text'       => 'Role Management',
             'icon'       => 'fas fa-fw fa-user-tag',
             'icon_color' => 'orange',
-            'can'        => 'isp-admin',
+            'can'        => 'role.view',
             'submenu'    => [
                 ['text' => 'All Roles', 'url' => 'roles',        'icon' => 'fas fa-fw fa-list'],
                 ['text' => 'New Role',  'url' => 'roles/create', 'icon' => 'fas fa-fw fa-plus'],
             ],
         ],
-        ['text' => 'Agents',    'url' => 'agents',    'icon' => 'fas fa-fw fa-user-tie', 'icon_color' => 'yellow', 'can' => 'isp-admin'],
-        ['text' => 'Inventory', 'url' => 'inventory', 'icon' => 'fas fa-fw fa-boxes',    'icon_color' => 'brown',  'can' => 'isp-admin'],
+        ['text' => 'Agents',    'url' => 'agents',    'icon' => 'fas fa-fw fa-user-tie', 'icon_color' => 'yellow', 'can' => 'agent.view'],
+        ['text' => 'Inventory', 'url' => 'inventory', 'icon' => 'fas fa-fw fa-boxes',    'icon_color' => 'brown',  'can' => 'isp-admin'],  // inventory permission not defined yet
       //  ['text' => 'SMS',       'url' => 'sms',       'icon' => 'fas fa-fw fa-sms',      'icon_color' => 'green',  'can' => 'isp-admin'],
         [
             'text'       => 'SMS',
             'icon'       => 'fas fa-fw fa-sms',
             'icon_color' => 'green',
-            'can'        => 'isp-admin',
+            'can'        => 'sms.view',
             'submenu'    => [
                 [
                     'text' => 'Gateway Settings',
@@ -740,12 +741,12 @@ return [
                 ],
             ],
         ],
-        ['header' => 'REPORTS', 'can' => 'isp-admin'],
+        ['header' => 'REPORTS', 'can' => 'report.revenue.view'],
         [
             'text'       => 'Reports',
             'icon'       => 'fas fa-fw fa-chart-bar',
             'icon_color' => 'blue',
-            'can'        => 'isp-admin',
+            'can'        => 'report.revenue.view',
             'submenu'    => [
                 ['text' => 'Revenue',   'url' => 'reports/revenue',   'icon' => 'fas fa-fw fa-dollar-sign', 'icon_color' => 'green'],
                 ['text' => 'Due',       'url' => 'reports/due',       'icon' => 'fas fa-fw fa-exclamation', 'icon_color' => 'red'],

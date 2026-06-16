@@ -10,8 +10,15 @@ use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
 {
-    // ── Roles allowed for ISP Admin to assign ──
-    private array $allowedRoles = ['manager', 'staff', 'agent', 'accountant', 'support'];
+    private array $systemRoles = ['super-admin', 'isp-admin'];
+
+    /**
+     * Get roles ISP Admin can assign (all except system roles)
+     */
+    private function getAssignableRoles()
+    {
+        return Role::whereNotIn('name', $this->systemRoles)->get();
+    }
 
     /**
      * List all staff users (excludes super-admin & isp-admin itself)
@@ -19,7 +26,7 @@ class UserController extends Controller
     public function index()
     {
         $users = User::with('roles')
-            ->whereDoesntHave('roles', fn($q) => $q->whereIn('name', ['super-admin', 'isp-admin']))
+            ->whereDoesntHave('roles', fn($q) => $q->whereIn('name', $this->systemRoles))
             ->latest()
             ->paginate(20);
 
@@ -31,7 +38,7 @@ class UserController extends Controller
      */
     public function create()
     {
-        $roles = Role::whereIn('name', $this->allowedRoles)->get();
+        $roles = $this->getAssignableRoles();
         return view('users.create', compact('roles'));
     }
 
@@ -40,12 +47,14 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
+        $assignableRoleNames = $this->getAssignableRoles()->pluck('name')->toArray();
+
         $request->validate([
             'name'     => 'required|string|max:100',
             'email'    => 'required|email|unique:users,email',
             'phone'    => 'nullable|string|max:20',
             'password' => 'required|string|min:6|confirmed',
-            'role'     => 'required|string|in:' . implode(',', $this->allowedRoles),
+            'role'     => 'required|string|in:' . implode(',', $assignableRoleNames),
         ]);
 
         $user = User::create([
@@ -73,12 +82,11 @@ class UserController extends Controller
      */
     public function edit(User $user)
     {
-        // Prevent editing super-admin / isp-admin via this controller
-        if ($user->hasAnyRole(['super-admin', 'isp-admin'])) {
+        if ($user->hasAnyRole($this->systemRoles)) {
             abort(403, 'Cannot edit this user.');
         }
 
-        $roles       = Role::whereIn('name', $this->allowedRoles)->get();
+        $roles       = $this->getAssignableRoles();
         $currentRole = $user->roles->first()?->name;
 
         return view('users.edit', compact('user', 'roles', 'currentRole'));
@@ -89,14 +97,16 @@ class UserController extends Controller
      */
     public function update(Request $request, User $user)
     {
-        if ($user->hasAnyRole(['super-admin', 'isp-admin'])) {
+        if ($user->hasAnyRole($this->systemRoles)) {
             abort(403, 'Cannot edit this user.');
         }
+
+        $assignableRoleNames = $this->getAssignableRoles()->pluck('name')->toArray();
 
         $request->validate([
             'name'     => 'required|string|max:100',
             'phone'    => 'nullable|string|max:20',
-            'role'     => 'required|string|in:' . implode(',', $this->allowedRoles),
+            'role'     => 'required|string|in:' . implode(',', $assignableRoleNames),
             'password' => 'nullable|string|min:6|confirmed',
         ]);
 
@@ -110,8 +120,6 @@ class UserController extends Controller
         }
 
         $user->update($data);
-
-        // Sync role — remove old, assign new
         $user->syncRoles([$request->role]);
 
         ActivityLog::log('User updated', 'User', $user->id, null, [
@@ -128,7 +136,7 @@ class UserController extends Controller
      */
     public function toggle(User $user)
     {
-        if ($user->hasAnyRole(['super-admin', 'isp-admin'])) {
+        if ($user->hasAnyRole($this->systemRoles)) {
             abort(403, 'Cannot modify this user.');
         }
 
@@ -146,7 +154,7 @@ class UserController extends Controller
      */
     public function destroy(User $user)
     {
-        if ($user->hasAnyRole(['super-admin', 'isp-admin'])) {
+        if ($user->hasAnyRole($this->systemRoles)) {
             abort(403, 'Cannot delete this user.');
         }
 

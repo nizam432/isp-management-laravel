@@ -47,6 +47,9 @@ use App\Http\Controllers\BandwidthBuy\BandwidthPurchaseController;
 use App\Http\Controllers\BandwidthBuy\BandwidthReportController;
 use App\Http\Controllers\BandwidthSale\BwsCustomerController;
 use App\Http\Controllers\BandwidthSale\BwsInvoiceController;
+use App\Http\Controllers\SuperAdmin\PaymentGatewayController as SuperAdminPGController;
+use App\Http\Controllers\Settings\PaymentGatewaySettingController;
+use App\Http\Controllers\Client\OnlinePaymentController;
 
 // ─────────────────────────────────────────────
 // Public Routes
@@ -61,7 +64,7 @@ require __DIR__ . '/auth.php';
 Route::middleware(['auth'])->group(function () {
 
     // ── Dashboard ──────────────────────────────
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard')->middleware('can:dashboard.view');
 
     // ── Customers ──────────────────────────────
     // ⚠️ Static/AJAX routes MUST come before resource() — otherwise {customer} catches them
@@ -100,23 +103,29 @@ Route::middleware(['auth'])->group(function () {
 
     // ── Invoices ───────────────────────────────
     // Bulk routes must be before resource routes
-    Route::post('invoices/bulk-generate',    [InvoiceController::class, 'bulkGenerate'])->name('invoices.bulk-generate');
-    Route::post('invoices/bulk-delete',      [InvoiceController::class, 'bulkDelete'])->name('invoices.bulk-delete');
-    Route::get('invoices/bulk-xlsx',         [InvoiceController::class, 'bulkXlsx'])->name('invoices.bulk-xlsx');
-    Route::get('invoices/bulk-pdf',          [InvoiceController::class, 'bulkPdf'])->name('invoices.bulk-pdf');
-    Route::post('invoices/bulk-sms',         [InvoiceController::class, 'bulkSms'])->name('invoices.bulk-sms');
+    Route::post('invoices/bulk-generate',    [InvoiceController::class, 'bulkGenerate'])->name('invoices.bulk-generate')->middleware('can:invoice.bulk');
+    Route::post('invoices/bulk-delete',      [InvoiceController::class, 'bulkDelete'])->name('invoices.bulk-delete')->middleware('can:invoice.delete');
+    Route::get('invoices/bulk-xlsx',         [InvoiceController::class, 'bulkXlsx'])->name('invoices.bulk-xlsx')->middleware('can:invoice.view');
+    Route::get('invoices/bulk-pdf',          [InvoiceController::class, 'bulkPdf'])->name('invoices.bulk-pdf')->middleware('can:invoice.view');
+    Route::post('invoices/bulk-sms',         [InvoiceController::class, 'bulkSms'])->name('invoices.bulk-sms')->middleware('can:sms.send');
 
-    Route::resource('invoices', InvoiceController::class)->except(['edit', 'update']);
-    Route::get('invoices/{invoice}/pdf',     [InvoiceController::class, 'pdf'])->name('invoices.pdf');
+    Route::resource('invoices', InvoiceController::class)->except(['edit', 'update'])->middleware([
+        'index'   => 'can:invoice.view',
+        'show'    => 'can:invoice.view',
+        'create'  => 'can:invoice.create',
+        'store'   => 'can:invoice.create',
+        'destroy' => 'can:invoice.delete',
+    ]);
+    Route::get('invoices/{invoice}/pdf',     [InvoiceController::class, 'pdf'])->name('invoices.pdf')->middleware('can:invoice.view');
     Route::get('invoices/{invoice}/receipt', [InvoiceController::class, 'receipt'])->name('invoices.receipt');
 
     // ── Payments ───────────────────────────────
-    Route::get('payments',                          [PaymentController::class, 'index'])->name('payments.index');
-    Route::post('payments/invoice/{invoice}',       [PaymentController::class, 'payInvoice'])->name('payments.pay-invoice');
-    Route::get('payments/collect',                  [PaymentController::class, 'collectPage'])->name('payments.collect');
-    Route::post('payments/collect',                 [PaymentController::class, 'collectStore'])->name('payments.collect-store');
-    Route::get('payments/customer-due/{customer}',  [PaymentController::class, 'customerDue'])->name('payments.customer-due');
-    Route::post('payments/{payment}/void',          [PaymentController::class, 'void'])->name('payments.void');
+    Route::get('payments',                          [PaymentController::class, 'index'])->name('payments.index')->middleware('can:payment.view');
+    Route::post('payments/invoice/{invoice}',       [PaymentController::class, 'payInvoice'])->name('payments.pay-invoice')->middleware('can:payment.collect');
+    Route::get('payments/collect',                  [PaymentController::class, 'collectPage'])->name('payments.collect')->middleware('can:payment.collect');
+    Route::post('payments/collect',                 [PaymentController::class, 'collectStore'])->name('payments.collect-store')->middleware('can:payment.collect');
+    Route::get('payments/customer-due/{customer}',  [PaymentController::class, 'customerDue'])->name('payments.customer-due')->middleware('can:payment.view');
+    Route::post('payments/{payment}/void',          [PaymentController::class, 'void'])->name('payments.void')->middleware('can:payment.void');
 
     // ── Tickets (legacy — dashboard & customers/show reference) ───
     Route::resource('tickets', TicketController::class)->except(['edit']);
@@ -126,8 +135,8 @@ Route::middleware(['auth'])->group(function () {
 
     // Support Categories (AJAX)
     Route::prefix('support-categories')->name('support-categories.')->group(function () {
-        Route::get('/',                              [SupportCategoryController::class, 'index'])  ->name('index');
-        Route::post('/',                             [SupportCategoryController::class, 'store'])  ->name('store');
+        Route::get('/',                              [SupportCategoryController::class, 'index'])  ->name('index')->middleware('can:support.category.view');
+        Route::post('/',                             [SupportCategoryController::class, 'store'])  ->name('store')->middleware('can:support.category.create');
         Route::get('/{supportCategory}/edit',        [SupportCategoryController::class, 'edit'])   ->name('edit');
         Route::put('/{supportCategory}',             [SupportCategoryController::class, 'update']) ->name('update');
         Route::delete('/{supportCategory}',          [SupportCategoryController::class, 'destroy'])->name('destroy');
@@ -135,9 +144,9 @@ Route::middleware(['auth'])->group(function () {
 
     // Client Support (Tickets) (AJAX)
     Route::prefix('client-support')->name('client-support.')->group(function () {
-        Route::get('/',                              [ClientSupportController::class, 'index'])        ->name('index');
+        Route::get('/',                              [ClientSupportController::class, 'index'])        ->name('index')->middleware('can:support.client.view');
         Route::get('/customer-info',                 [ClientSupportController::class, 'customerInfo']) ->name('customer-info');
-        Route::post('/',                             [ClientSupportController::class, 'store'])        ->name('store');
+        Route::post('/',                             [ClientSupportController::class, 'store'])        ->name('store')->middleware('can:support.client.create');
         Route::get('/{ticket}/edit',                 [ClientSupportController::class, 'edit'])         ->name('edit');
         Route::put('/{ticket}',                      [ClientSupportController::class, 'update'])       ->name('update');
         Route::delete('/{ticket}',                   [ClientSupportController::class, 'destroy'])      ->name('destroy');
@@ -152,28 +161,35 @@ Route::middleware(['auth'])->group(function () {
 
     // Support History
     Route::prefix('support-history')->name('support-history.')->group(function () {
-        Route::get('/',        [SupportHistoryController::class, 'index'])     ->name('index');
+        Route::get('/',        [SupportHistoryController::class, 'index'])     ->name('index')->middleware('can:support.history.view');
         Route::get('/pdf',     [SupportHistoryController::class, 'exportPdf']) ->name('pdf');
         Route::get('/csv',     [SupportHistoryController::class, 'exportCsv']) ->name('csv');
     });
 
     // ── Agents ─────────────────────────────────
-    Route::resource('agents', AgentController::class)->except(['edit']);
-    Route::post('agents/{agent}/pay-commission', [AgentController::class, 'payCommission'])->name('agents.pay-commission');
+    Route::resource('agents', AgentController::class)->except(['edit'])->middleware([
+        'index'   => 'can:agent.view',
+        'show'    => 'can:agent.view',
+        'create'  => 'can:agent.create',
+        'store'   => 'can:agent.create',
+        'update'  => 'can:agent.edit',
+        'destroy' => 'can:agent.delete',
+    ]);
+    Route::post('agents/{agent}/pay-commission', [AgentController::class, 'payCommission'])->name('agents.pay-commission')->middleware('can:agent.edit');
 
     // ── MikroTik ───────────────────────────────
-    Route::prefix('mikrotik')->name('mikrotik.')->group(function () {
+    Route::prefix('mikrotik')->name('mikrotik.')->middleware('can:mikrotik.view')->group(function () {
         Route::get('/',                        [MikrotikController::class, 'index'])->name('index');
-        Route::post('/',                       [MikrotikController::class, 'store'])->name('store');
-        Route::get('active-sessions',          [MikrotikController::class, 'activeSessionsPage'])->name('active-sessions.page');
-        Route::post('kick-by-username',        [MikrotikController::class, 'kickByUsername'])->name('kick-by-username');
-        Route::post('bulk-suspend',            [MikrotikController::class, 'bulkSuspend'])->name('bulk.suspend');
+        Route::post('/',                       [MikrotikController::class, 'store'])->name('store')->middleware('can:mikrotik.create');
+        Route::get('active-sessions',          [MikrotikController::class, 'activeSessionsPage'])->name('active-sessions.page')->middleware('can:mikrotik.session.view');
+        Route::post('kick-by-username',        [MikrotikController::class, 'kickByUsername'])->name('kick-by-username')->middleware('can:mikrotik.sync');
+        Route::post('bulk-suspend',            [MikrotikController::class, 'bulkSuspend'])->name('bulk.suspend')->middleware('can:mikrotik.sync');
         Route::post('sync-all',                [MikrotikController::class, 'syncAll'])->name('sync.all');
         Route::get('sync-status',              [MikrotikController::class, 'syncStatus'])->name('sync.status');
         Route::put('pool/{pool}',              [MikrotikController::class, 'updatePool'])->name('pool.update');
         Route::delete('pool/{pool}',           [MikrotikController::class, 'destroyPool'])->name('pool.destroy');
-        Route::put('{mikrotikRouter}',         [MikrotikController::class, 'update'])->name('update');
-        Route::delete('{mikrotikRouter}',      [MikrotikController::class, 'destroy'])->name('destroy');
+        Route::put('{mikrotikRouter}',         [MikrotikController::class, 'update'])->name('update')->middleware('can:mikrotik.edit');
+        Route::delete('{mikrotikRouter}',      [MikrotikController::class, 'destroy'])->name('destroy')->middleware('can:mikrotik.delete');
         Route::post('{mikrotikRouter}/pool',   [MikrotikController::class, 'addPool'])->name('pool.store');
         Route::get('{router}/status',          [MikrotikController::class, 'routerStatus'])->name('router.status');
         Route::get('{router}/pppoe-users',     [MikrotikController::class, 'pppoeUsers'])->name('pppoe.users');
@@ -183,17 +199,17 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ── OLT Management ─────────────────────────────────────────────
-    Route::prefix('olt')->name('olt.')->group(function () {
+    Route::prefix('olt')->name('olt.')->middleware('can:olt.view')->group(function () {
         // static routes আগে
         Route::get ('users',         [OltController::class, 'users'])     ->name('users');
         Route::get ('users/data',    [OltController::class, 'usersData']) ->name('users.data');
         Route::post('sync-all',      [OltController::class, 'syncAll'])   ->name('sync-all');
         // CRUD
         Route::get   ('/',           [OltController::class, 'index'])     ->name('index');
-        Route::post  ('/',           [OltController::class, 'store'])     ->name('store');
+        Route::post  ('/',           [OltController::class, 'store'])     ->name('store')->middleware('can:olt.create');
         Route::get   ('/{olt}',      [OltController::class, 'show'])      ->name('show');
-        Route::put   ('/{olt}',      [OltController::class, 'update'])    ->name('update');
-        Route::delete('/{olt}',      [OltController::class, 'destroy'])   ->name('destroy');
+        Route::put   ('/{olt}',      [OltController::class, 'update'])    ->name('update')->middleware('can:olt.edit');
+        Route::delete('/{olt}',      [OltController::class, 'destroy'])   ->name('destroy')->middleware('can:olt.delete');
         Route::post  ('/{olt}/sync', [OltController::class, 'sync'])      ->name('sync');
     });
     Route::prefix('customers/{customer}/mikrotik')->name('customers.mikrotik.')->group(function () {
@@ -208,9 +224,9 @@ Route::middleware(['auth'])->group(function () {
 
     // ── Import ─────────────────────────────────
     Route::prefix('import')->name('import.')->group(function () {
-        Route::get('/',                 [ImportController::class, 'index'])->name('index');
-        Route::any('mikrotik/preview',  [ImportController::class, 'mikrotikPreview'])->name('mikrotik.preview');
-        Route::post('mikrotik/execute', [ImportController::class, 'mikrotikImport'])->name('mikrotik.execute');
+        Route::get('/',                 [ImportController::class, 'index'])->name('index')->middleware('can:customer.import.view');
+        Route::any('mikrotik/preview',  [ImportController::class, 'mikrotikPreview'])->name('mikrotik.preview')->middleware('can:mikrotik.import.customer');
+        Route::post('mikrotik/execute', [ImportController::class, 'mikrotikImport'])->name('mikrotik.execute')->middleware('can:mikrotik.import.customer');
         Route::post('csv/preview',      [ImportController::class, 'csvPreview'])->name('csv.preview');
         Route::post('csv/execute',      [ImportController::class, 'csvImport'])->name('csv.execute');
         Route::get('csv/template',      [ImportController::class, 'downloadTemplate'])->name('csv.template');
@@ -229,24 +245,24 @@ Route::middleware(['auth'])->group(function () {
 
     // ── Reports ────────────────────────────────
     Route::prefix('reports')->name('reports.')->group(function () {
-        Route::get('revenue',           [ReportController::class, 'revenue'])->name('revenue');
-        Route::get('due',               [ReportController::class, 'due'])->name('due');
-        Route::get('customers',         [ReportController::class, 'customers'])->name('customers');
-        Route::get('export/{type}/pdf', [ReportController::class, 'exportPdf'])->name('export.pdf');
+        Route::get('revenue',           [ReportController::class, 'revenue'])->name('revenue')->middleware('can:report.revenue.view');
+        Route::get('due',               [ReportController::class, 'due'])->name('due')->middleware('can:report.revenue.view');
+        Route::get('customers',         [ReportController::class, 'customers'])->name('customers')->middleware('can:report.collection.view');
+        Route::get('export/{type}/pdf', [ReportController::class, 'exportPdf'])->name('export.pdf')->middleware('can:report.revenue.view');
     });
 
     // ── SMS ────────────────────────────────────
     Route::prefix('sms')->name('sms.')->group(function () {
-        Route::get('/',                          [SmsController::class, 'index'])->name('index');
-        Route::post('gateway/{gateway}/toggle',  [SmsController::class, 'toggleGateway'])->name('gateway.toggle');
-        Route::post('gateway/{gateway}/config',  [SmsController::class, 'updateConfig'])->name('gateway.config');
-        Route::post('test',                      [SmsController::class, 'sendTest'])->name('test');
-        Route::post('bulk',                      [SmsController::class, 'sendBulk'])->name('bulk');
+        Route::get('/',                          [SmsController::class, 'index'])->name('index')->middleware('can:sms.view');
+        Route::post('gateway/{gateway}/toggle',  [SmsController::class, 'toggleGateway'])->name('gateway.toggle')->middleware('can:sms.gateway.manage');
+        Route::post('gateway/{gateway}/config',  [SmsController::class, 'updateConfig'])->name('gateway.config')->middleware('can:sms.gateway.manage');
+        Route::post('test',                      [SmsController::class, 'sendTest'])->name('test')->middleware('can:sms.send');
+        Route::post('bulk',                      [SmsController::class, 'sendBulk'])->name('bulk')->middleware('can:sms.send');
         Route::delete('logs',                    [SmsController::class, 'clearLogs'])->name('logs.clear');
-        Route::get('reports',                    [App\Http\Controllers\SmsReportController::class, 'index'])->name('reports');
+        Route::get('reports',                    [App\Http\Controllers\SmsReportController::class, 'index'])->name('reports')->middleware('can:sms.report.view');
         Route::get('reports/details',            [App\Http\Controllers\SmsReportController::class, 'details'])->name('reports.details');
-        Route::get('templates',                  [App\Http\Controllers\SmsTemplateController::class, 'index'])->name('templates.index');
-        Route::post('templates',                 [App\Http\Controllers\SmsTemplateController::class, 'store'])->name('templates.store');
+        Route::get('templates',                  [App\Http\Controllers\SmsTemplateController::class, 'index'])->name('templates.index')->middleware('can:sms.template.view');
+        Route::post('templates',                 [App\Http\Controllers\SmsTemplateController::class, 'store'])->name('templates.store')->middleware('can:sms.template.create');
         Route::put('templates/{smsTemplate}',    [App\Http\Controllers\SmsTemplateController::class, 'update'])->name('templates.update');
         Route::delete('templates/{smsTemplate}', [App\Http\Controllers\SmsTemplateController::class, 'destroy'])->name('templates.destroy');
         Route::post('templates/{smsTemplate}/toggle', [App\Http\Controllers\SmsTemplateController::class, 'toggle'])->name('templates.toggle');
@@ -321,6 +337,12 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/{gateway}/toggle', [SuperAdminSmsGatewayController::class, 'toggle'])->name('toggle');
         });
 
+        // Payment Gateways
+        Route::prefix('payment-gateways')->name('payment-gateways.')->group(function () {
+            Route::get ('/',                 [SuperAdminPGController::class, 'index'])  ->name('index');
+            Route::post('/{gateway}/toggle', [SuperAdminPGController::class, 'toggle']) ->name('toggle');
+        });
+
         // Permissions
         Route::prefix('permissions')->name('permissions.')->group(function () {
             Route::get('/',                [SuperAdminPermissionController::class, 'index'])  ->name('index');
@@ -383,70 +405,100 @@ Route::middleware(['auth'])->group(function () {
         Route::post  ('olt-types/{oltType}/toggle', [OltTypeController::class, 'toggle']) ->name('olt-types.toggle');
         Route::delete('olt-types/{oltType}',        [OltTypeController::class, 'destroy'])->name('olt-types.destroy');
 
+        // ── Payment Gateways (ISP Admin credentials) ───────────
+        Route::prefix('payment-gateways')->name('payment-gateway.')->group(function () {
+            Route::get ('/{slug}/config', [PaymentGatewaySettingController::class, 'config']) ->name('config');
+            Route::post('/{slug}/save',   [PaymentGatewaySettingController::class, 'save'])   ->name('save');
+            Route::post('/{slug}/toggle', [PaymentGatewaySettingController::class, 'toggle']) ->name('toggle');
+        });
+
     }); // end settings
 
     // ── HR ─────────────────────────────────────
-    Route::resource('employees', EmployeeController::class);
-    Route::resource('departments', DepartmentController::class);
-    Route::resource('positions', PositionController::class);
-    Route::resource('salary-heads', SalaryHeadController::class);
+    Route::resource('employees', EmployeeController::class)->middleware([
+        'index'   => 'can:hr.employee.view',
+        'show'    => 'can:hr.employee.view',
+        'create'  => 'can:hr.employee.create',
+        'store'   => 'can:hr.employee.create',
+        'edit'    => 'can:hr.employee.edit',
+        'update'  => 'can:hr.employee.edit',
+        'destroy' => 'can:hr.employee.delete',
+    ]);
+    Route::resource('departments', DepartmentController::class)->middleware([
+        'index'   => 'can:hr.department.view',
+        'store'   => 'can:hr.department.create',
+        'update'  => 'can:hr.department.edit',
+        'destroy' => 'can:hr.department.delete',
+    ]);
+    Route::resource('positions', PositionController::class)->middleware([
+        'index'   => 'can:hr.position.view',
+        'store'   => 'can:hr.position.create',
+        'update'  => 'can:hr.position.edit',
+        'destroy' => 'can:hr.position.delete',
+    ]);
+    Route::resource('salary-heads', SalaryHeadController::class)->middleware([
+        'index'   => 'can:hr.salary.head.view',
+        'store'   => 'can:hr.salary.head.create',
+        'update'  => 'can:hr.salary.head.edit',
+        'destroy' => 'can:hr.salary.head.delete',
+    ]);
 
-    Route::delete('employees/documents/{document}', [EmployeeController::class, 'destroyDocument'])->name('employees.documents.destroy');
-    Route::get('departments/{department}/positions', [EmployeeController::class, 'getPositions'])->name('departments.positions');
-    Route::post('employees/{employee}/resign-terminate', [EmployeeController::class, 'resignTerminate'])->name('employees.resign-terminate');
+    Route::delete('employees/documents/{document}', [EmployeeController::class, 'destroyDocument'])->name('employees.documents.destroy')->middleware('can:hr.employee.edit');
+    Route::get('departments/{department}/positions', [EmployeeController::class, 'getPositions'])->name('departments.positions')->middleware('can:hr.department.view');
+    Route::post('employees/{employee}/resign-terminate', [EmployeeController::class, 'resignTerminate'])->name('employees.resign-terminate')->middleware('can:hr.employee.edit');
 
     Route::prefix('payroll')->name('payroll.')->group(function () {
-        Route::get('/',                  [PayrollController::class, 'index'])->name('index');
-        Route::get('/generate',          [PayrollController::class, 'generate'])->name('generate');
-        Route::post('/',                 [PayrollController::class, 'store'])->name('store');
+        Route::get('/',                  [PayrollController::class, 'index'])->name('index')->middleware('can:hr.payroll.view');
+        Route::get('/generate',          [PayrollController::class, 'generate'])->name('generate')->middleware('can:hr.payroll.manage');
+        Route::post('/',                 [PayrollController::class, 'store'])->name('store')->middleware('can:hr.payroll.manage');
         Route::get('/{payroll}',         [PayrollController::class, 'show'])->name('show');
         Route::post('/{payroll}/pay',    [PayrollController::class, 'pay'])->name('pay');
         Route::get('/{payroll}/payslip', [PayrollController::class, 'payslip'])->name('payslip');
     });
 
     Route::prefix('leave')->name('leave.')->group(function () {
-        Route::get('/',                 [LeaveController::class, 'index'])->name('index');
-        Route::get('/create',           [LeaveController::class, 'create'])->name('create');
-        Route::post('/',                [LeaveController::class, 'store'])->name('store');
-        Route::post('/{leave}/approve', [LeaveController::class, 'approve'])->name('approve');
-        Route::post('/{leave}/reject',  [LeaveController::class, 'reject'])->name('reject');
-        Route::get('/types',            [LeaveController::class, 'types'])->name('types');
-        Route::post('/types',           [LeaveController::class, 'storeType'])->name('types.store');
+        Route::get('/',                 [LeaveController::class, 'index'])->name('index')->middleware('can:hr.leave.view');
+        Route::get('/create',           [LeaveController::class, 'create'])->name('create')->middleware('can:hr.leave.create');
+        Route::post('/',                [LeaveController::class, 'store'])->name('store')->middleware('can:hr.leave.create');
+        Route::post('/{leave}/approve', [LeaveController::class, 'approve'])->name('approve')->middleware('can:hr.leave.approve');
+        Route::post('/{leave}/reject',  [LeaveController::class, 'reject'])->name('reject')->middleware('can:hr.leave.approve');
+        Route::get('/types',            [LeaveController::class, 'types'])->name('types')->middleware('can:hr.leave.type.view');
+        Route::post('/types',           [LeaveController::class, 'storeType'])->name('types.store')->middleware('can:hr.leave.type.create');
         Route::put('/types/{type}',     [LeaveController::class, 'updateType'])->name('types.update');
         Route::delete('/types/{type}',  [LeaveController::class, 'destroyType'])->name('types.destroy');
     });
 
     Route::prefix('salary-advance')->name('salary-advance.')->group(function () {
-        Route::get('/',                  [SalaryAdvanceController::class, 'index'])->name('index');
-        Route::post('/',                 [SalaryAdvanceController::class, 'store'])->name('store');
-        Route::post('/{advance}/deduct', [SalaryAdvanceController::class, 'deduct'])->name('deduct');
+        Route::get('/',                  [SalaryAdvanceController::class, 'index'])->name('index')->middleware('can:hr.salary.advance.view');
+        Route::post('/',                 [SalaryAdvanceController::class, 'store'])->name('store')->middleware('can:hr.salary.advance.create');
+        Route::post('/{advance}/deduct', [SalaryAdvanceController::class, 'deduct'])->name('deduct')->middleware('can:hr.salary.advance.approve');
     });
 
     // ── Financial Module ───────────────────────
     Route::prefix('expenses')->name('expenses.')->group(function () {
 
         // P&L Report — static routes BEFORE resource-style {expense} routes
-        Route::get('reports/profit-loss',     [ExpenseController::class, 'profitLoss'])    ->name('profit-loss');
+        Route::get('reports/profit-loss',     [ExpenseController::class, 'profitLoss'])    ->name('profit-loss')->middleware('can:accounting.report.view');
         Route::get('reports/profit-loss/pdf', [ExpenseController::class, 'profitLossPdf']) ->name('profit-loss.pdf');
         Route::get('api/chart-data',          [ExpenseController::class, 'chartData'])     ->name('chart-data');
 
         // CRUD
-        Route::get('/',               [ExpenseController::class, 'index'])  ->name('index');
-        Route::get('/create',         [ExpenseController::class, 'create']) ->name('create');
-        Route::post('/',              [ExpenseController::class, 'store'])  ->name('store');
+        Route::get('/',               [ExpenseController::class, 'index'])  ->name('index')->middleware('can:accounting.expense.view');
+        Route::get('/create',         [ExpenseController::class, 'create']) ->name('create')->middleware('can:accounting.expense.create');
+        Route::post('/',              [ExpenseController::class, 'store'])  ->name('store')->middleware('can:accounting.expense.create');
         Route::get('/{expense}',      [ExpenseController::class, 'show'])   ->name('show');
         Route::get('/{expense}/edit-data', [ExpenseController::class, 'editData']) ->name('edit-data');
         Route::get('/{expense}/edit', [ExpenseController::class, 'edit'])   ->name('edit');
-        Route::put('/{expense}',      [ExpenseController::class, 'update']) ->name('update');
+        Route::put('/{expense}',      [ExpenseController::class, 'update']) ->name('update')->middleware('can:accounting.expense.edit');
 
         // Void & hard delete
-        Route::post('/{expense}/void', [ExpenseController::class, 'void'])    ->name('void');
-        Route::delete('/{expense}',    [ExpenseController::class, 'destroy']) ->name('destroy');
+        Route::post('/{expense}/void', [ExpenseController::class, 'void'])    ->name('void')->middleware('can:accounting.expense.void');
+        Route::delete('/{expense}',    [ExpenseController::class, 'destroy']) ->name('destroy')->middleware('can:accounting.expense.delete');
     });
 
     Route::prefix('expense-categories')->name('expense-categories.')->group(function () {
-        Route::get('/',                    [ExpenseController::class, 'categoriesIndex'])  ->name('index');
-        Route::post('/',                   [ExpenseController::class, 'categoryStore'])    ->name('store');
+        Route::get('/',                    [ExpenseController::class, 'categoriesIndex'])  ->name('index')->middleware('can:accounting.expense.category.view');
+        Route::post('/',                   [ExpenseController::class, 'categoryStore'])    ->name('store')->middleware('can:accounting.expense.category.create');
         Route::post('/quick-add',          [ExpenseController::class, 'quickAddCategory']) ->name('quick-add');
         Route::put('/{expenseCategory}',   [ExpenseController::class, 'categoryUpdate'])   ->name('update');
         Route::delete('/{expenseCategory}',[ExpenseController::class, 'categoryDestroy'])  ->name('destroy');
@@ -456,13 +508,13 @@ Route::middleware(['auth'])->group(function () {
     Route::prefix('incomes')->name('incomes.')->group(function () {
 
         // Static routes BEFORE {income} to avoid route collision
-        Route::get('/',                   [IncomeController::class, 'index'])           ->name('index');
-        Route::post('/',                  [IncomeController::class, 'store'])           ->name('store');
+        Route::get('/',                   [IncomeController::class, 'index'])           ->name('index')->middleware('can:accounting.income.view');
+        Route::post('/',                  [IncomeController::class, 'store'])           ->name('store')->middleware('can:accounting.income.create');
         Route::get('/{income}/edit-data', [IncomeController::class, 'editData'])        ->name('edit-data');
         Route::get('/{income}',           [IncomeController::class, 'show'])            ->name('show');
-        Route::put('/{income}',           [IncomeController::class, 'update'])          ->name('update');
-        Route::post('/{income}/void',     [IncomeController::class, 'void'])            ->name('void');
-        Route::delete('/{income}',        [IncomeController::class, 'destroy'])         ->name('destroy');
+        Route::put('/{income}',           [IncomeController::class, 'update'])          ->name('update')->middleware('can:accounting.income.edit');
+        Route::post('/{income}/void',     [IncomeController::class, 'void'])            ->name('void')->middleware('can:accounting.income.void');
+        Route::delete('/{income}',        [IncomeController::class, 'destroy'])         ->name('destroy')->middleware('can:accounting.income.delete');
     });
 
     // ── Accounting Quick Add Categories ────────────
@@ -472,12 +524,12 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ── Accounting Dashboard ───────────────────────
-    Route::get('accounting/dashboard', [AccountingController::class, 'dashboard'])->name('accounting.dashboard');
+    Route::get('accounting/dashboard', [AccountingController::class, 'dashboard'])->name('accounting.dashboard')->middleware('can:accounting.view');
 
     // ── Income Categories ──────────────────────────
     Route::prefix('income-categories')->name('income-categories.')->group(function () {
-        Route::get('/',                     [IncomeController::class, 'categoriesIndex'])  ->name('index');
-        Route::post('/',                    [IncomeController::class, 'categoryStore'])    ->name('store');
+        Route::get('/',                     [IncomeController::class, 'categoriesIndex'])  ->name('index')->middleware('can:accounting.income.category.view');
+        Route::post('/',                    [IncomeController::class, 'categoryStore'])    ->name('store')->middleware('can:accounting.income.category.create');
         Route::put('/{incomeCategory}',     [IncomeController::class, 'categoryUpdate'])   ->name('update');
         Route::delete('/{incomeCategory}',  [IncomeController::class, 'categoryDestroy'])  ->name('destroy');
     });
@@ -571,3 +623,35 @@ Route::middleware(['auth'])->group(function () {
 // Client Portal Routes (নিজস্ব guard — auth এর বাইরে)
 // ─────────────────────────────────────────────
 require __DIR__ . '/client.php';
+
+// ─────────────────────────────────────────────
+// Payment Gateway Callbacks — No Auth, No CSRF
+// (Gateway redirect করে এখানে — session নেই)
+// ─────────────────────────────────────────────
+Route::prefix('client/payment')->group(function () {
+
+    // SSLCommerz & AmarPay — POST success/fail/cancel
+    Route::post('{gateway}/success', [OnlinePaymentController::class, 'success'])->name('client.payment.success');
+    Route::post('{gateway}/fail',    [OnlinePaymentController::class, 'fail'])   ->name('client.payment.fail');
+    Route::post('{gateway}/cancel',  [OnlinePaymentController::class, 'cancel']) ->name('client.payment.cancel');
+
+    // Razorpay & Stripe cancel — GET
+    Route::get('{gateway}/cancel',   [OnlinePaymentController::class, 'cancel']);
+
+    // Stripe success — GET (has ?session_id=)
+    Route::get('{gateway}/success',  [OnlinePaymentController::class, 'success']);
+
+    // bKash & Nagad & Razorpay — GET/POST callback
+    Route::get ('{gateway}/callback', [OnlinePaymentController::class, 'callback'])->name('client.payment.callback');
+    Route::post('{gateway}/callback', [OnlinePaymentController::class, 'callback']);
+
+    // IPN — server-to-server (SSLCommerz, AmarPay)
+    Route::post('{gateway}/ipn', [OnlinePaymentController::class, 'ipn'])
+         ->name('client.payment.ipn')
+         ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+
+    // Stripe Webhook
+    Route::post('stripe/webhook', [OnlinePaymentController::class, 'stripeWebhook'])
+         ->name('client.payment.stripe-webhook')
+         ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+});
