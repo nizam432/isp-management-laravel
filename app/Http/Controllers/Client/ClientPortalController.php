@@ -421,4 +421,17 @@ class ClientPortalController extends Controller
 
         return back()->with('success', 'Password updated successfully.');
     }
+
+    // ── Invoice PDF ───────────────────────────────────────────────
+    public function invoicePdf(\App\Models\Invoice $invoice)
+    {
+        $customer = Auth::guard('customer')->user();
+
+        if ($invoice->customer_id !== $customer->id) {
+            abort(403, 'Unauthorized.');
+        }
+
+        // Reuse existing InvoiceController@pdf
+        return app(\App\Http\Controllers\InvoiceController::class)->pdf($invoice);
+    }
 }

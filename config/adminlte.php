@@ -611,6 +611,57 @@ return [
                 ],
             ],
         ],        
+        // ── MAC Reseller Module ───────────────────────────────────
+        ['header' => 'MAC RESELLER', 'can' => 'isp-admin'],
+        [
+            'text'       => 'MACReseller',
+            'icon'       => 'fas fa-fw fa-users-cog',
+            'icon_color' => 'teal',
+            'can'        => 'isp-admin',
+            'submenu'    => [
+                [
+                    'text' => 'Package',
+                    'url'  => 'mac-reseller/package',
+                    'icon' => 'fas fa-fw fa-box',
+                ],
+                [
+                    'text' => 'Tariff Config',
+                    'url'  => 'mac-reseller/tariff',
+                    'icon' => 'fas fa-fw fa-tags',
+                ],
+                [
+                    'text' => 'Add MAC Reseller',
+                    'url'  => 'mac-reseller/list/create',
+                    'icon' => 'fas fa-fw fa-user-plus',
+                ],
+                [
+                    'text' => 'MAC Reseller List',
+                    'url'  => 'mac-reseller/list',
+                    'icon' => 'fas fa-fw fa-list',
+                ],
+                [
+                    'text' => 'Reseller Funding',
+                    'url'  => 'mac-reseller/funding',
+                    'icon' => 'fas fa-fw fa-money-bill-wave',
+                ],
+                [
+                    'text' => 'Client PGW Payments',
+                    'url'  => 'mac-reseller/pgw-payments',
+                    'icon' => 'fas fa-fw fa-credit-card',
+                ],
+                [
+                    'text' => 'PGW Transaction Settlement',
+                    'url'  => 'mac-reseller/settlement',
+                    'icon' => 'fas fa-fw fa-exchange-alt',
+                ],
+                [
+                    'text' => 'MACReseller Notice',
+                    'url'  => 'mac-reseller/notice',
+                    'icon' => 'fas fa-fw fa-bell',
+                ],
+            ],
+        ],
+
          ['header' => 'RESELLER', 'can' => 'create-reseller'],
         [
             'text'       => 'My Resellers',

@@ -616,7 +616,80 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('recurring/{bwsInvoice}',      [BwsInvoiceController::class, 'recurringDestroy'])->name('recurring.destroy');
 
     }); // end bandwidth-sale
-   
+
+    // ── MAC Reseller Module ────────────────────────────────
+    Route::prefix('mac-reseller')->name('mac-reseller.')->middleware('can:isp-admin')->group(function () {
+
+        // 1. Package
+        Route::prefix('package')->name('package.')->group(function () {
+            Route::get('/',             [App\Http\Controllers\MacReseller\MacResellerPackageController::class, 'index'])  ->name('index');
+            Route::post('/',            [App\Http\Controllers\MacReseller\MacResellerPackageController::class, 'store'])  ->name('store');
+            Route::get('/{package}',    [App\Http\Controllers\MacReseller\MacResellerPackageController::class, 'edit'])   ->name('edit');
+            Route::put('/{package}',    [App\Http\Controllers\MacReseller\MacResellerPackageController::class, 'update']) ->name('update');
+            Route::delete('/{package}', [App\Http\Controllers\MacReseller\MacResellerPackageController::class, 'destroy'])->name('destroy');
+        });
+
+        // 2. Tariff Config
+        Route::prefix('tariff')->name('tariff.')->group(function () {
+            Route::get('/',                        [App\Http\Controllers\MacReseller\MacResellerTariffController::class, 'index'])       ->name('index');
+            Route::post('/',                       [App\Http\Controllers\MacReseller\MacResellerTariffController::class, 'store'])       ->name('store');
+            Route::get('/{tariff}',                [App\Http\Controllers\MacReseller\MacResellerTariffController::class, 'show'])        ->name('show');
+            Route::put('/{tariff}',                [App\Http\Controllers\MacReseller\MacResellerTariffController::class, 'update'])      ->name('update');
+            Route::delete('/{tariff}',             [App\Http\Controllers\MacReseller\MacResellerTariffController::class, 'destroy'])     ->name('destroy');
+            Route::post('/{tariff}/toggle',        [App\Http\Controllers\MacReseller\MacResellerTariffController::class, 'toggle'])      ->name('toggle');
+            Route::post('/{tariff}/sync-mikrotik', [App\Http\Controllers\MacReseller\MacResellerTariffController::class, 'syncMikrotik'])->name('sync');
+        });
+
+        // 3. MAC Reseller List (Add / Edit / Toggle)
+        Route::prefix('list')->name('list.')->group(function () {
+            Route::get('/',                              [App\Http\Controllers\MacReseller\MacResellerController::class, 'index'])              ->name('index');
+            Route::get('/create',                        [App\Http\Controllers\MacReseller\MacResellerController::class, 'create'])             ->name('create');
+            Route::post('/',                             [App\Http\Controllers\MacReseller\MacResellerController::class, 'store'])              ->name('store');
+            Route::get('/{macReseller}/edit',            [App\Http\Controllers\MacReseller\MacResellerController::class, 'edit'])               ->name('edit');
+            Route::put('/{macReseller}',                 [App\Http\Controllers\MacReseller\MacResellerController::class, 'update'])             ->name('update');
+            Route::post('/{macReseller}/client-enabled', [App\Http\Controllers\MacReseller\MacResellerController::class, 'toggleClientEnabled'])->name('toggle-client-enabled');
+            Route::post('/{macReseller}/fund-start',     [App\Http\Controllers\MacReseller\MacResellerController::class, 'toggleFundStart'])    ->name('toggle-fund-start');
+            Route::post('/{macReseller}/locked',         [App\Http\Controllers\MacReseller\MacResellerController::class, 'toggleLocked'])       ->name('toggle-locked');
+        });
+
+        // 4. Reseller Funding
+        Route::prefix('funding')->name('funding.')->group(function () {
+            Route::get('/',                            [App\Http\Controllers\MacReseller\MacResellerFundingController::class, 'index'])              ->name('index');
+            Route::post('/',                           [App\Http\Controllers\MacReseller\MacResellerFundingController::class, 'store'])              ->name('store');
+            Route::get('/history',                     [App\Http\Controllers\MacReseller\MacResellerFundingController::class, 'history'])            ->name('history');
+            Route::get('/download-pdf',                [App\Http\Controllers\MacReseller\MacResellerFundingController::class, 'downloadPdf'])        ->name('download-pdf');
+            Route::get('/download-excel',              [App\Http\Controllers\MacReseller\MacResellerFundingController::class, 'downloadExcel'])      ->name('download-excel');
+            Route::post('/bulk-toggle-restrict',       [App\Http\Controllers\MacReseller\MacResellerFundingController::class, 'bulkToggleRestrict'])->name('bulk-toggle-restrict');
+            Route::post('/{funding}/paid',             [App\Http\Controllers\MacReseller\MacResellerFundingController::class, 'markPaid'])           ->name('paid');
+            Route::post('/{funding}/refund',           [App\Http\Controllers\MacReseller\MacResellerFundingController::class, 'refund'])             ->name('refund');
+            Route::post('/{funding}/toggle-restrict',  [App\Http\Controllers\MacReseller\MacResellerFundingController::class, 'toggleRestrict'])    ->name('toggle-restrict');
+        });
+
+        // 5. Client PGW Payments
+        Route::prefix('pgw-payments')->name('pgw.')->group(function () {
+            Route::get('/', [App\Http\Controllers\MacReseller\MacResellerPgwController::class, 'index'])->name('index');
+        });
+
+        // 6. PGW Transaction Settlement
+        Route::prefix('settlement')->name('settlement.')->group(function () {
+            Route::get('/',                        [App\Http\Controllers\MacReseller\MacResellerSettlementController::class, 'index'])             ->name('index');
+            Route::get('/pgw-transactions',        [App\Http\Controllers\MacReseller\MacResellerSettlementController::class, 'pgwTransactions'])   ->name('pgw-transactions');
+            Route::get('/history',                 [App\Http\Controllers\MacReseller\MacResellerSettlementController::class, 'settlementHistory']) ->name('history');
+            Route::post('/{macReseller}/settle',   [App\Http\Controllers\MacReseller\MacResellerSettlementController::class, 'settle'])            ->name('settle');
+        });
+
+        // 7. MACReseller Notice
+        Route::prefix('notice')->name('notice.')->group(function () {
+            Route::get('/',                 [App\Http\Controllers\MacReseller\MacResellerNoticeController::class, 'index'])  ->name('index');
+            Route::post('/',                [App\Http\Controllers\MacReseller\MacResellerNoticeController::class, 'store'])  ->name('store');
+            Route::get('/{notice}',         [App\Http\Controllers\MacReseller\MacResellerNoticeController::class, 'edit'])   ->name('edit');
+            Route::put('/{notice}',         [App\Http\Controllers\MacReseller\MacResellerNoticeController::class, 'update']) ->name('update');
+            Route::delete('/{notice}',      [App\Http\Controllers\MacReseller\MacResellerNoticeController::class, 'destroy'])->name('destroy');
+            Route::post('/{notice}/toggle', [App\Http\Controllers\MacReseller\MacResellerNoticeController::class, 'toggle']) ->name('toggle');
+        });
+
+    }); // end mac-reseller
+
 }); // end auth
 
 // ─────────────────────────────────────────────

@@ -111,7 +111,7 @@
                         </small>
                     </td>
                     <td>
-                        <a href="{{ route('invoices.pdf', $invoice) }}" target="_blank"
+                        <a href="{{ route('client.invoice.pdf', $invoice) }}" target="_blank"
                            style="background:#e74c3c; color:#fff; border-radius:6px; padding:6px 12px; font-size:12px; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:5px;">
                             <i class="fas fa-file-pdf"></i> PDF
                         </a>
