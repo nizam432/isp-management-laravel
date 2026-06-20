@@ -7,9 +7,9 @@
     <a href="{{ route('customers.edit', $customer) }}" class="btn btn-warning btn-sm">
         <i class="fas fa-edit mr-1"></i> Edit
     </a>
-    <a href="{{ route('invoices.create', ['customer_id' => $customer->id]) }}" class="btn btn-success btn-sm">
+    {{-- <a href="{{ route('invoices.create', ['customer_id' => $customer->id]) }}" class="btn btn-success btn-sm">
         <i class="fas fa-file-invoice mr-1"></i> Create Invoice
-    </a>
+    </a>--}}
     <a href="{{ route('customers.index') }}" class="btn btn-secondary btn-sm">
         <i class="fas fa-arrow-left mr-1"></i> Back
     </a>
@@ -46,7 +46,7 @@
 <div class="row">
 
     {{-- ── LEFT: Customer Profile Card ─────────────────── --}}
-    <div class="col-lg-3 col-md-4">
+    <div class="col-lg-4 col-md-4">
 
         {{-- Profile --}}
         <div class="card">
@@ -256,9 +256,11 @@
         </div>
 
     </div>
-
+    <div class="col-lg-8 col-md-8"> 
+    <div class="col-lg-12 col-md-12 row">
+        
     {{-- ── MIDDLE: MikroTik Card ────────────────────────── --}}
-    <div class="col-lg-5 col-md-8">
+    <div class="col-lg-6 col-md-6">
 
         <div class="card">
             <div class="card-header py-2" style="background:linear-gradient(90deg,#001f3f,#003366);color:#fff;">
@@ -395,95 +397,92 @@
     </div>
 
     {{-- ── RIGHT: Stats mini cards ─────────────────────── --}}
-    <div class="col-lg-4 col-md-12">
+   
 
-        {{-- Due Amount Card --}}
-        @php
-            $totalDue = $customer->invoices->whereIn('status',['unpaid','partial','overdue'])->sum('due_amount');
-            $totalPaid = $customer->payments->where('status','active')->sum('amount');
-            $lastPayment = $customer->payments->where('status','active')->sortByDesc('paid_at')->first();
-        @endphp
+           <div class="col-lg-6 col-md-6"> 
 
-        <div class="row">
-            <div class="col-6">
-                <div class="card text-center py-3" style="border-left:4px solid #dd4b39;">
-                    <div class="text-danger font-weight-bold" style="font-size:22px;">
-                        ৳{{ number_format($totalDue) }}
+                {{-- Due Amount Card --}}
+                @php
+                    $totalDue = $customer->invoices->whereIn('status',['unpaid','partial','overdue'])->sum('due_amount');
+                    $totalPaid = $customer->payments->where('status','active')->sum('amount');
+                    $lastPayment = $customer->payments->where('status','active')->sortByDesc('paid_at')->first();
+                @endphp
+
+                <div class="row">
+                    <div class="col-6">
+                        <div class="card text-center py-3" style="border-left:4px solid #dd4b39;">
+                            <div class="text-danger font-weight-bold" style="font-size:22px;">
+                                ৳{{ number_format($totalDue) }}
+                            </div>
+                            <small class="text-muted">Total Due</small>
+                        </div>
                     </div>
-                    <small class="text-muted">Total Due</small>
-                </div>
-            </div>
-            <div class="col-6">
-                <div class="card text-center py-3" style="border-left:4px solid #00a65a;">
-                    <div class="text-success font-weight-bold" style="font-size:22px;">
-                        ৳{{ number_format($totalPaid) }}
+                    <div class="col-6">
+                        <div class="card text-center py-3" style="border-left:4px solid #00a65a;">
+                            <div class="text-success font-weight-bold" style="font-size:22px;">
+                                ৳{{ number_format($totalPaid) }}
+                            </div>
+                            <small class="text-muted">Total Paid</small>
+                        </div>
                     </div>
-                    <small class="text-muted">Total Paid</small>
-                </div>
-            </div>
-            <div class="col-6">
-                <div class="card text-center py-3" style="border-left:4px solid #17a2b8;">
-                    <div class="text-info font-weight-bold" style="font-size:22px;">
-                        {{ $customer->invoices->count() }}
+                    <div class="col-6">
+                        <div class="card text-center py-3" style="border-left:4px solid #17a2b8;">
+                            <div class="text-info font-weight-bold" style="font-size:22px;">
+                                {{ $customer->invoices->count() }}
+                            </div>
+                            <small class="text-muted">Invoices</small>
+                        </div>
                     </div>
-                    <small class="text-muted">Invoices</small>
-                </div>
-            </div>
-            <div class="col-6">
-                <div class="card text-center py-3" style="border-left:4px solid #6f42c1;">
-                    <div class="font-weight-bold" style="font-size:22px;color:#6f42c1;">
-                        {{ $customer->tickets->count() }}
+                    <div class="col-6">
+                        <div class="card text-center py-3" style="border-left:4px solid #6f42c1;">
+                            <div class="font-weight-bold" style="font-size:22px;color:#6f42c1;">
+                                {{ $customer->tickets->count() }}
+                            </div>
+                            <small class="text-muted">Tickets</small>
+                        </div>
                     </div>
-                    <small class="text-muted">Tickets</small>
                 </div>
-            </div>
+
+                {{-- Last Payment --}}
+                @if($lastPayment)
+                <div class="card">
+                    <div class="card-body py-2">
+                        <small class="text-muted d-block mb-1"><i class="fas fa-money-bill-wave mr-1"></i> Last Payment</small>
+                        <strong class="text-success">৳{{ number_format($lastPayment->amount) }}</strong>
+                        <small class="text-muted ml-2">{{ $lastPayment->paid_at?->format('d M Y') }}</small>
+                        <span class="badge badge-secondary ml-1">{{ ucfirst($lastPayment->method ?? '—') }}</span>
+                    </div>
+                </div>
+                @endif
+
+                {{-- Advance Balance --}}
+                @if($customer->advance_balance > 0)
+                <div class="card">
+                    <div class="card-body py-2">
+                        <small class="text-muted d-block mb-1"><i class="fas fa-piggy-bank mr-1"></i> Advance Balance</small>
+                        <strong class="text-primary">৳{{ number_format($customer->advance_balance) }}</strong>
+                    </div>
+                </div>
+                @endif
         </div>
+  
+        
 
-        {{-- Last Payment --}}
-        @if($lastPayment)
-        <div class="card">
-            <div class="card-body py-2">
-                <small class="text-muted d-block mb-1"><i class="fas fa-money-bill-wave mr-1"></i> Last Payment</small>
-                <strong class="text-success">৳{{ number_format($lastPayment->amount) }}</strong>
-                <small class="text-muted ml-2">{{ $lastPayment->paid_at?->format('d M Y') }}</small>
-                <span class="badge badge-secondary ml-1">{{ ucfirst($lastPayment->method ?? '—') }}</span>
-            </div>
-        </div>
-        @endif
 
-        {{-- Advance Balance --}}
-        @if($customer->advance_balance > 0)
-        <div class="card">
-            <div class="card-body py-2">
-                <small class="text-muted d-block mb-1"><i class="fas fa-piggy-bank mr-1"></i> Advance Balance</small>
-                <strong class="text-primary">৳{{ number_format($customer->advance_balance) }}</strong>
-            </div>
-        </div>
-        @endif
 
     </div>
 
-</div>
-
-{{-- ══════════════════════════════════════════════════════ --}}
-{{-- ROW 2: Empty placeholder (col-4) | Invoices+Tickets+Payments (col-8) --}}
-{{-- ══════════════════════════════════════════════════════ --}}
-<div class="row">
-
-    {{-- Empty placeholder to match left profile column --}}
-    <div class="col-lg-4 d-none d-lg-block"></div>
-
     {{-- ── RIGHT col-8: Invoices, Tickets, Payment History ── --}}
-    <div class="col-lg-8">
+    <div class="col-lg-12 col-md-12">
 
         {{-- Invoices --}}
         <div class="card">
             <div class="card-header py-2 d-flex justify-content-between align-items-center">
                 <h6 class="mb-0"><i class="fas fa-file-invoice mr-1 text-success"></i> Invoices</h6>
-                <a href="{{ route('invoices.create', ['customer_id' => $customer->id]) }}"
+                {{--<a href="{{ route('invoices.create', ['customer_id' => $customer->id]) }}"
                    class="btn btn-xs btn-success">
                     <i class="fas fa-plus mr-1"></i>New
-                </a>
+                </a>--}}
             </div>
             <div class="card-body p-0">
                 <table class="table table-sm table-hover mb-0">
@@ -533,16 +532,18 @@
                     </tbody>
                 </table>
             </div>
-        </div>
+        </div> 
+        
+    
 
         {{-- Support Tickets --}}
         <div class="card">
             <div class="card-header py-2 d-flex justify-content-between align-items-center">
                 <h6 class="mb-0"><i class="fas fa-ticket-alt mr-1 text-warning"></i> Support Tickets</h6>
-                <a href="{{ route('tickets.create', ['customer_id' => $customer->id]) }}"
+                {{--  <a href="{{ route('tickets.create', ['customer_id' => $customer->id]) }}"
                    class="btn btn-xs btn-warning">
                     <i class="fas fa-plus mr-1"></i>New
-                </a>
+                </a>--}}
             </div>
             <div class="card-body p-0">
                 <table class="table table-sm table-hover mb-0">
@@ -625,10 +626,11 @@
                 @endif
             </div>
         </div>
+        </div>
 
-    </div>
-
+    <div style="clear:both"></div>
 </div>
+
 
 @endsection
 

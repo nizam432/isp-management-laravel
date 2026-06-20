@@ -1,4 +1,3 @@
-{{-- resources/views/customers/index.blade.php --}}
 @extends('layouts.app')
 @section('page_title', 'Customers')
 @section('page_actions')
@@ -358,11 +357,12 @@
                         </button>
                         <br>
                         <small class="text-muted">
-                            {{ $customer->pppoe_username ?? '—' }}
-                            @if($customer->pppoe_password)
-                                | <span class="pppoe-pass" data-pass="{{ $customer->pppoe_password }}">••••••</span>
-                                <i class="fas fa-eye toggle-pass" style="cursor:pointer; font-size:10px;" title="Show password"></i>
-                            @endif
+                            {{ $customer->pppoe_username ?? '—' }} <b>-</b>
+                            {{ $customer->pppoe_password }}
+                          {{--    @if($customer->pppoe_password)
+                               | <span class="pppoe-pass" data-pass="{{ $customer->pppoe_password }}">••••••</span>
+                                <i class="fas fa-eye toggle-pass" style="cursor:pointer; font-size:11px; padding:6px 8px; display:inline-block; min-width:16px; min-height:16px;" title="Show password"></i>
+                            @endif--}}
                         </small>
                     </td>
 
@@ -623,20 +623,27 @@ var csrfToken         = '{{ csrf_token() }}';
 var smsCustomerPhone  = '';
 
 // ── PPPoE Password Toggle ─────────────────────────────
-document.querySelectorAll('.toggle-pass').forEach(function(icon) {
-    icon.addEventListener('click', function() {
-        var span = this.previousElementSibling;
-        var pass = span.getAttribute('data-pass');
-        if (span.textContent === '••••••') {
-            span.textContent = pass;
-            this.classList.replace('fa-eye', 'fa-eye-slash');
-        } else {
-            span.textContent = '••••••';
-            this.classList.replace('fa-eye-slash', 'fa-eye');
-        }
-    });
-});
+document.addEventListener('click', function (e) {
 
+    let icon = e.target.closest('.toggle-pass');
+    if (!icon) return;
+
+    let container = icon.closest('small') || icon.parentElement;
+    let span = container ? container.querySelector('.pppoe-pass') : null;
+
+    if (!span) return;
+
+    if (span.textContent.trim() === '••••••') {
+        span.textContent = span.dataset.pass;
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        span.textContent = '••••••';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+
+});
 // ── Zone → Sub Zone filter ────────────────────────────
 document.getElementById('zoneFilter').addEventListener('change', function() {
     var zoneId = this.value;
