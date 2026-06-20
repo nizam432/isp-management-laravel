@@ -27,7 +27,7 @@ class ResellerBillingController extends Controller
         if ($request->filled('search')) {
             $s = $request->search;
             $query->where(function ($q) use ($s) {
-                $q->where('invoice_number', 'like', "%{$s}%")
+                $q->where('invoice_no', 'like', "%{$s}%")
                   ->orWhereHas('customer', function ($cq) use ($s) {
                       $cq->where('name', 'like', "%{$s}%")
                          ->orWhere('customer_code', 'like', "%{$s}%");
@@ -48,7 +48,7 @@ class ResellerBillingController extends Controller
             'total_invoices' => Invoice::whereIn('customer_id', $customerIds)->count(),
             'paid'           => Invoice::whereIn('customer_id', $customerIds)->where('status', 'paid')->count(),
             'unpaid'         => Invoice::whereIn('customer_id', $customerIds)->where('status', 'unpaid')->count(),
-            'total_due'      => Invoice::whereIn('customer_id', $customerIds)->where('status', '!=', 'paid')->sum('total'),
+            'total_due'      => Invoice::whereIn('customer_id', $customerIds)->where('status', '!=', 'paid')->sum('due_amount'),
         ];
 
         return view('reseller.billing.index', compact('invoices', 'stats'));

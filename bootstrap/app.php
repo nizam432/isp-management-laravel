@@ -19,6 +19,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'superadmin'         => \App\Http\Middleware\SuperAdminMiddleware::class,
             'reseller'           => \App\Http\Middleware\ResellerMiddleware::class,
             'client.auth'        => \App\Http\Middleware\ClientAuthenticate::class,
+            'reseller.active'    => \App\Http\Middleware\EnsureResellerIsActive::class,
+            'reseller.menu'      => \App\Http\Middleware\CheckResellerMenuAccess::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

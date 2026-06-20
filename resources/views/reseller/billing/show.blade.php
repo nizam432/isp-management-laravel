@@ -11,12 +11,12 @@
 </div>
 
 @php
-    $total = $invoice->total ?? $invoice->amount ?? 0;
-    $paid  = $invoice->paid_amount ?? 0;
-    $due   = $total - $paid;
+    $total = $invoice->amount ?? 0;
+    $paid  = $invoice->total_paid ?? 0;
+    $due   = $invoice->due_amount ?? ($total - $paid);
     $badgeColor = match($invoice->status) {
         'paid' => 'success', 'unpaid' => 'danger',
-        'partial' => 'warning', default => 'secondary',
+        'overdue' => 'warning', default => 'secondary',
     };
 @endphp
 
@@ -25,7 +25,7 @@
         <div class="card border-0 shadow-sm" style="border-radius:12px">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="font-weight-bold mb-0">{{ $invoice->invoice_number ?? ('INV-' . $invoice->id) }}</h5>
+                    <h5 class="font-weight-bold mb-0">{{ $invoice->invoice_no ?? ('INV-' . $invoice->id) }}</h5>
                     <span class="badge badge-{{ $badgeColor }} px-3 py-2">{{ ucfirst($invoice->status ?? 'unpaid') }}</span>
                 </div>
                 <table class="table table-sm table-borderless mb-0" style="font-size:.875rem">

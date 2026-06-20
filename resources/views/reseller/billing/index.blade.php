@@ -85,9 +85,9 @@
                 <tbody>
                     @forelse($invoices as $inv)
                     @php
-                        $total = $inv->total ?? $inv->amount ?? 0;
-                        $paid  = $inv->paid_amount ?? 0;
-                        $due   = $total - $paid;
+                        $total = $inv->amount ?? 0;
+                        $paid  = $inv->total_paid ?? 0;
+                        $due   = $inv->due_amount ?? ($total - $paid);
                         $badgeColor = match($inv->status) {
                             'paid' => 'success',
                             'unpaid' => 'danger',
@@ -96,7 +96,7 @@
                         };
                     @endphp
                     <tr>
-                        <td>{{ $inv->invoice_number ?? ('INV-' . $inv->id) }}</td>
+                        <td>{{ $inv->invoice_no ?? ('INV-' . $inv->id) }}</td>
                         <td>{{ $inv->customer?->name ?? '—' }}</td>
                         <td>{{ number_format($total, 2) }}</td>
                         <td>{{ number_format($paid, 2) }}</td>

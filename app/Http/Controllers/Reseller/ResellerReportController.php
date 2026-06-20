@@ -33,9 +33,9 @@ class ResellerReportController extends Controller
             ->whereBetween('created_at', [$fromDate, $toDate . ' 23:59:59']);
 
         $billingStats = [
-            'total_invoiced' => (clone $invoicesInRange)->sum('total'),
-            'total_paid'     => (clone $invoicesInRange)->where('status', 'paid')->sum('total'),
-            'total_unpaid'   => (clone $invoicesInRange)->where('status', '!=', 'paid')->sum('total'),
+            'total_invoiced' => (clone $invoicesInRange)->sum('amount'),
+            'total_paid'     => (clone $invoicesInRange)->where('status', 'paid')->sum('amount'),
+            'total_unpaid'   => (clone $invoicesInRange)->where('status', '!=', 'paid')->sum('due_amount'),
             'invoice_count'  => (clone $invoicesInRange)->count(),
         ];
 

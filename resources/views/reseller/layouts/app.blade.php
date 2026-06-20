@@ -61,17 +61,17 @@
 
             @php
                 $menuLinks = [
-                    'CONFIGURATION'   => ['route' => 'reseller.configuration',   'icon' => 'fa-sliders-h', 'label' => 'Configuration'],
-                    'MIKROTIK CLIENT' => ['route' => 'reseller.mikrotik-client', 'icon' => 'fa-server',     'label' => 'Mikrotik Client'],
-                    'EMPLOYEES'       => ['route' => 'reseller.employees',       'icon' => 'fa-users',      'label' => 'Employees'],
-                    'CLIENT'          => ['route' => 'reseller.client',          'icon' => 'fa-user',       'label' => 'Client'],
-                    'BILLING'         => ['route' => 'reseller.billing',         'icon' => 'fa-file-invoice-dollar', 'label' => 'Billing'],
-                    'MONITORING'      => ['route' => 'reseller.monitoring',      'icon' => 'fa-chart-line', 'label' => 'Monitoring'],
-                    'CLIENT SUPPORT'  => ['route' => 'reseller.client-support',  'icon' => 'fa-headset',    'label' => 'Client Support'],
-                    'SMS SERVICE'     => ['route' => 'reseller.sms-service',     'icon' => 'fa-sms',        'label' => 'SMS Service'],
-                    'REPORT'          => ['route' => 'reseller.report',          'icon' => 'fa-chart-bar',  'label' => 'Report'],
-                    'FUND HISTORY'    => ['route' => 'reseller.fund-history',    'icon' => 'fa-wallet',     'label' => 'Fund History'],
-                    'TUTORIALS'       => ['route' => 'reseller.tutorials',       'icon' => 'fa-book',       'label' => 'Tutorials'],
+                    'CONFIGURATION'   => ['route' => 'reseller.configuration.index',   'icon' => 'fa-sliders-h', 'label' => 'Configuration'],
+                    'MIKROTIK CLIENT' => ['route' => 'reseller.mikrotik-client.index', 'icon' => 'fa-server',     'label' => 'Mikrotik Client'],
+                    'EMPLOYEES'       => ['route' => 'reseller.employees.index',       'icon' => 'fa-users',      'label' => 'Employees'],
+                    'CLIENT'          => ['route' => 'reseller.client.index',          'icon' => 'fa-user',       'label' => 'Client'],
+                    'BILLING'         => ['route' => 'reseller.billing.index',         'icon' => 'fa-file-invoice-dollar', 'label' => 'Billing'],
+                    'MONITORING'      => ['route' => 'reseller.monitoring.index',      'icon' => 'fa-chart-line', 'label' => 'Monitoring'],
+                    'CLIENT SUPPORT'  => ['route' => 'reseller.client-support.index',  'icon' => 'fa-headset',    'label' => 'Client Support'],
+                    'SMS SERVICE'     => ['route' => 'reseller.sms-service.index',     'icon' => 'fa-sms',        'label' => 'SMS Service'],
+                    'REPORT'          => ['route' => 'reseller.report.index',          'icon' => 'fa-chart-bar',  'label' => 'Report'],
+                    'FUND HISTORY'    => ['route' => 'reseller.fund-history.index',    'icon' => 'fa-wallet',     'label' => 'Fund History'],
+                    'TUTORIALS'       => ['route' => 'reseller.tutorials.index',       'icon' => 'fa-book',       'label' => 'Tutorials'],
                 ];
                 $allowed = auth('mac_reseller')->user()->allowed_menus ?? [];
                 $allowedUpper = array_map('strtoupper', $allowed);
@@ -79,7 +79,7 @@
 
             @foreach($menuLinks as $key => $item)
                 @if(in_array($key, $allowedUpper))
-                <a class="nav-link {{ request()->routeIs($item['route']) ? 'active' : '' }}" href="{{ route($item['route']) }}">
+                <a class="nav-link {{ request()->routeIs(str_replace('.index', '.*', $item['route'])) ? 'active' : '' }}" href="{{ route($item['route']) }}">
                     <i class="fas {{ $item['icon'] }}"></i> {{ $item['label'] }}
                 </a>
                 @endif
