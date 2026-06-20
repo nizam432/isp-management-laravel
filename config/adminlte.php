@@ -659,6 +659,11 @@ return [
                     'url'  => 'mac-reseller/notice',
                     'icon' => 'fas fa-fw fa-bell',
                 ],
+                [
+                    'text' => 'Reseller Tutorials',
+                    'url'  => 'mac-reseller/tutorial',
+                    'icon' => 'fas fa-fw fa-graduation-cap',
+                ],
             ],
         ],
 

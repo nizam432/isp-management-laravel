@@ -48,7 +48,23 @@ class MacResellerPackageController extends Controller
 
     public function destroy(MacResellerPackage $package)
     {
+        // কোনো Tariff এ এই package assigned থাকলে delete হবে না
+        $tariffCount = $package->tariffPackages()->count();
+        if ($tariffCount > 0) {
+            $tariffNames = $package->tariffPackages()
+                ->with('tariff')
+                ->get()
+                ->pluck('tariff.name')
+                ->filter()
+                ->unique()
+                ->join(', ');
+            return response()->json([
+                'success' => false,
+                'message' => "This package is used in {$tariffCount} tariff line(s): {$tariffNames}. Please remove it from those tariffs first.",
+            ], 422);
+        }
+
         $package->delete();
-        return response()->json(['success' => true, 'message' => 'Package deleted.']);
+        return response()->json(['success' => true, 'message' => 'Package deleted successfully.']);
     }
 }

@@ -297,6 +297,22 @@ class MikrotikController extends Controller
         }
     }
 
+    /**
+     * GET /mikrotik/{router}/hotspot-profiles
+     * Hotspot User Profile লিস্ট
+     */
+    public function hotspotProfiles(MikrotikRouter $router): JsonResponse
+    {
+        try {
+            $mikrotik = new MikrotikService();
+            $profiles = $mikrotik->withRouter($router, fn($m) => $m->getHotspotProfiles());
+            return response()->json(["success" => true, "data" => $profiles]);
+        } catch (\Exception $e) {
+            return response()->json(["success" => false, "message" => $e->getMessage()], 500);
+        }
+    }
+
+
     // ══════════════════════════════════════════════
     // Customer-level Operations
     // ══════════════════════════════════════════════

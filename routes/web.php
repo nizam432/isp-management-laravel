@@ -90,6 +90,10 @@ Route::middleware(['auth'])->group(function () {
     // ── Packages ───────────────────────────────
     Route::get ('packages/sync',  [PackageController::class, 'syncPreview'])->name('packages.sync.preview')->middleware('can:package.mikrotik.sync');
     Route::post('packages/sync', [PackageController::class, 'syncStore'])  ->name('packages.sync.store')  ->middleware('can:package.mikrotik.sync');
+    // Must be declared before Route::resource('packages', ...) — otherwise
+    // GET /packages/mikrotik-profiles gets shadowed by the resource's
+    // GET /packages/{package} (show) route and 404s via model binding.
+    Route::get('/packages/mikrotik-profiles', [PackageController::class, 'mikrotikProfilesByProtocol'])->name('packages.mikrotik-profiles');
     Route::resource('packages', PackageController::class)->middleware([
         'index'   => 'can:package.view',
         'show'    => 'can:package.view',
@@ -195,7 +199,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('{router}/pppoe-users',     [MikrotikController::class, 'pppoeUsers'])->name('pppoe.users');
         Route::get('{router}/active-sessions', [MikrotikController::class, 'activeSessions'])->name('active.sessions');
         Route::get('{router}/queues',          [MikrotikController::class, 'queues'])->name('queues');
-        Route::get('{router}/profiles',        [MikrotikController::class, 'profiles'])->name('profiles');
+        Route::get('{router}/profiles',         [MikrotikController::class, 'profiles'])->name('profiles');
+        Route::get('{router}/hotspot-profiles', [MikrotikController::class, 'hotspotProfiles'])->name('hotspot-profiles');
     });
 
     // ── OLT Management ─────────────────────────────────────────────
@@ -638,6 +643,8 @@ Route::middleware(['auth'])->group(function () {
             Route::delete('/{tariff}',             [App\Http\Controllers\MacReseller\MacResellerTariffController::class, 'destroy'])     ->name('destroy');
             Route::post('/{tariff}/toggle',        [App\Http\Controllers\MacReseller\MacResellerTariffController::class, 'toggle'])      ->name('toggle');
             Route::post('/{tariff}/sync-mikrotik', [App\Http\Controllers\MacReseller\MacResellerTariffController::class, 'syncMikrotik'])->name('sync');
+            Route::put('/line/{line}',             [App\Http\Controllers\MacReseller\MacResellerTariffController::class, 'updateLine']) ->name('line.update');
+            Route::delete('/line/{line}',          [App\Http\Controllers\MacReseller\MacResellerTariffController::class, 'destroyLine'])->name('line.destroy');
         });
 
         // 3. MAC Reseller List (Add / Edit / Toggle)
@@ -645,6 +652,9 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/',                              [App\Http\Controllers\MacReseller\MacResellerController::class, 'index'])              ->name('index');
             Route::get('/create',                        [App\Http\Controllers\MacReseller\MacResellerController::class, 'create'])             ->name('create');
             Route::post('/',                             [App\Http\Controllers\MacReseller\MacResellerController::class, 'store'])              ->name('store');
+            Route::post('/quick-add-zone',                [App\Http\Controllers\MacReseller\MacResellerController::class, 'quickAddZone'])      ->name('quick-add-zone');
+            Route::get('/upazilas',                        [App\Http\Controllers\MacReseller\MacResellerController::class, 'getUpazilas'])      ->name('get-upazilas');
+            Route::post('/quick-add-upazila',               [App\Http\Controllers\MacReseller\MacResellerController::class, 'quickAddUpazila'])  ->name('quick-add-upazila');
             Route::get('/{macReseller}/edit',            [App\Http\Controllers\MacReseller\MacResellerController::class, 'edit'])               ->name('edit');
             Route::put('/{macReseller}',                 [App\Http\Controllers\MacReseller\MacResellerController::class, 'update'])             ->name('update');
             Route::post('/{macReseller}/client-enabled', [App\Http\Controllers\MacReseller\MacResellerController::class, 'toggleClientEnabled'])->name('toggle-client-enabled');
@@ -688,6 +698,16 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/{notice}/toggle', [App\Http\Controllers\MacReseller\MacResellerNoticeController::class, 'toggle']) ->name('toggle');
         });
 
+        // 8. Reseller Tutorials
+        Route::prefix('tutorial')->name('tutorial.')->group(function () {
+            Route::get('/',                   [App\Http\Controllers\MacReseller\MacResellerTutorialController::class, 'index'])  ->name('index');
+            Route::post('/',                  [App\Http\Controllers\MacReseller\MacResellerTutorialController::class, 'store'])  ->name('store');
+            Route::get('/{tutorial}',         [App\Http\Controllers\MacReseller\MacResellerTutorialController::class, 'edit'])   ->name('edit');
+            Route::put('/{tutorial}',         [App\Http\Controllers\MacReseller\MacResellerTutorialController::class, 'update']) ->name('update');
+            Route::delete('/{tutorial}',      [App\Http\Controllers\MacReseller\MacResellerTutorialController::class, 'destroy'])->name('destroy');
+            Route::post('/{tutorial}/toggle', [App\Http\Controllers\MacReseller\MacResellerTutorialController::class, 'toggle']) ->name('toggle');
+        });
+
     }); // end mac-reseller
 
 }); // end auth
@@ -696,6 +716,11 @@ Route::middleware(['auth'])->group(function () {
 // Client Portal Routes (নিজস্ব guard — auth এর বাইরে)
 // ─────────────────────────────────────────────
 require __DIR__ . '/client.php';
+
+// ─────────────────────────────────────────────
+// MAC Reseller Portal Routes (নিজস্ব guard — auth এর বাইরে)
+// ─────────────────────────────────────────────
+require __DIR__ . '/reseller.php';
 
 // ─────────────────────────────────────────────
 // Payment Gateway Callbacks — No Auth, No CSRF

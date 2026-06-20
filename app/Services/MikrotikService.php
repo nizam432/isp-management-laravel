@@ -340,6 +340,15 @@ class MikrotikService
     /**
      * PPPoE profile তৈরি করো
      */
+
+    /**
+     * সব Hotspot User Profile লিস্ট
+     */
+    public function getHotspotProfiles(): array
+    {
+        return $this->api->query(["/ip/hotspot/user/profile/print"]);
+    }
+
     public function createPPPoEProfile(array $params): bool
     {
         // $params = ['name', 'rate_limit', 'local_address', 'remote_address', 'dns_server', 'only_one']
@@ -355,6 +364,66 @@ class MikrotikService
         if (isset($params['only_one']))        $command[] = '=only-one='       . ($params['only_one'] ? 'yes' : 'no');
 
         $this->api->query($command);
+        return true;
+    }
+
+    /**
+     * Create a Hotspot user profile.
+     */
+    public function createHotspotProfile(array $params): bool
+    {
+        // $params = ['name', 'upload_mbps', 'download_mbps']
+        $command = [
+            '/ip/hotspot/user/profile/add',
+            '=name='       . $params['name'],
+            '=rate-limit=' . $this->formatSpeed($params['upload_mbps']) . '/' . $this->formatSpeed($params['download_mbps']),
+        ];
+
+        $this->api->query($command);
+        return true;
+    }
+
+    // ══════════════════════════════════════════════════════
+    // HOTSPOT ACTIVE SESSIONS
+    // ══════════════════════════════════════════════════════
+
+    /**
+     * সব active Hotspot session — একবারে bulk fetch
+     */
+    public function getActiveHotspotSessions(): array
+    {
+        return $this->api->query(['/ip/hotspot/active/print']);
+    }
+
+    /**
+     * একজন hotspot customer এর active session
+     */
+    public function getCustomerHotspotSession(string $username): ?array
+    {
+        $sessions = $this->api->query([
+            '/ip/hotspot/active/print',
+            '?user=' . $username,
+        ]);
+
+        return $sessions[0] ?? null;
+    }
+
+    /**
+     * Hotspot active session kick (force disconnect)
+     */
+    public function kickActiveHotspotSession(string $username): bool
+    {
+        $sessions = $this->api->query([
+            '/ip/hotspot/active/print',
+            '?user=' . $username,
+        ]);
+
+        foreach ($sessions as $session) {
+            if (isset($session['.id'])) {
+                $this->api->query(['/ip/hotspot/active/remove', '=.id=' . $session['.id']]);
+            }
+        }
+
         return true;
     }
 

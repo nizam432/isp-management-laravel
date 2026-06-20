@@ -8,6 +8,7 @@
     "require": {
         "php": "^8.2",
         "barryvdh/laravel-dompdf": "^3.1",
+        "devfaysal/laravel-bangladesh-geocode": "^2.8",
         "doctrine/dbal": "^4.4",
         "endroid/qr-code": "^5.0",
         "jeroennoten/laravel-adminlte": "^3.16",

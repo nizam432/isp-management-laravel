@@ -11,9 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('customers', function (Blueprint $table) {
-            $table->decimal('latitude', 10, 8)->nullable()->after('address');
-            $table->decimal('longitude', 11, 8)->nullable()->after('latitude');
+        Schema::table('packages', function (Blueprint $table) {
+            $table->unsignedInteger('validity_days')
+                  ->default(30)
+                  ->after('data_limit');
         });
     }
 
@@ -22,8 +23,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('customers', function (Blueprint $table) {
-            //
+        Schema::table('packages', function (Blueprint $table) {
+            $table->dropColumn('validity_days');
         });
     }
 };

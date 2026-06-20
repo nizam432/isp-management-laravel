@@ -5,6 +5,9 @@ namespace App\Http\Controllers\MacReseller;
 use App\Http\Controllers\Controller;
 use App\Models\MacReseller;
 use App\Models\MacResellerTariff;
+use App\Models\Zone;
+use Devfaysal\BangladeshGeocode\Models\District;
+use Devfaysal\BangladeshGeocode\Models\Upazila;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
@@ -15,6 +18,68 @@ class MacResellerController extends Controller
         'BILLING', 'MONITORING', 'CLIENT SUPPORT', 'SMS SERVICE',
         'REPORT', 'FUND HISTORY', 'TUTORIALS',
     ];
+
+    /**
+     * Add/Edit MAC Reseller form থেকে Zone dropdown-এর পাশের "+" বাটনে
+     * quick-add করার জন্য — পুরো page reload ছাড়াই নতুন Zone তৈরি করে
+     * dropdown-এ যোগ করে দেয় (AJAX)।
+     */
+    public function quickAddZone(Request $request)
+    {
+        $data = $request->validate([
+            'name' => 'required|string|max:255|unique:zones,name',
+        ]);
+
+        $zone = Zone::create([
+            'name'      => $data['name'],
+            'is_active' => true,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'id'      => $zone->id,
+            'name'    => $zone->name,
+        ]);
+    }
+
+    /**
+     * District select করলে AJAX দিয়ে সেই District-এর সব Upazila লোড করে
+     * (devfaysal/laravel-bangladesh-geocode package থেকে)।
+     */
+    public function getUpazilas(Request $request)
+    {
+        $request->validate(['district_id' => 'required|integer']);
+
+        $upazilas = Upazila::where('district_id', $request->district_id)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return response()->json($upazilas);
+    }
+
+    /**
+     * Add/Edit MAC Reseller form থেকে Upazila dropdown-এর পাশের "+" বাটনে
+     * quick-add করার জন্য। নোট: bangladesh-geocode প্যাকেজের Upazila টেবিল
+     * একটা নির্দিষ্ট District-এর অধীনে থাকে, তাই district_id লাগবে।
+     */
+    public function quickAddUpazila(Request $request)
+    {
+        $data = $request->validate([
+            'district_id' => 'required|integer|exists:districts,id',
+            'name'        => 'required|string|max:255',
+        ]);
+
+        $upazila = Upazila::create([
+            'district_id' => $data['district_id'],
+            'name'        => $data['name'],
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'id'      => $upazila->id,
+            'name'    => $upazila->name,
+        ]);
+    }
 
     public function index(Request $request)
     {
@@ -42,10 +107,12 @@ class MacResellerController extends Controller
 
     public function create()
     {
-        $tariffs = MacResellerTariff::where('is_active', true)->orderBy('name')->get();
-        $menus   = self::MENUS;
-        $nextCode = MacReseller::generateCode();
-        return view('mac-reseller.reseller.create', compact('tariffs', 'menus', 'nextCode'));
+        $tariffs   = MacResellerTariff::where('is_active', true)->orderBy('name')->get();
+        $zones     = Zone::active()->orderBy('name')->get();
+        $districts = District::orderBy('name')->get(['id', 'name']);
+        $menus     = self::MENUS;
+        $nextCode  = MacReseller::generateCode();
+        return view('mac-reseller.reseller.create', compact('tariffs', 'zones', 'districts', 'menus', 'nextCode'));
     }
 
     public function store(Request $request)
@@ -92,9 +159,18 @@ class MacResellerController extends Controller
 
     public function edit(MacReseller $macReseller)
     {
-        $tariffs = MacResellerTariff::where('is_active', true)->orderBy('name')->get();
-        $menus   = self::MENUS;
-        return view('mac-reseller.reseller.edit', compact('macReseller', 'tariffs', 'menus'));
+        $tariffs   = MacResellerTariff::where('is_active', true)->orderBy('name')->get();
+        $zones     = Zone::active()->orderBy('name')->get();
+        $districts = District::orderBy('name')->get(['id', 'name']);
+
+        // বর্তমান reseller-এর district অনুযায়ী আগে থেকেই upazila list লোড করছি
+        $currentDistrict = District::where('name', $macReseller->district)->first();
+        $upazilas = $currentDistrict
+            ? Upazila::where('district_id', $currentDistrict->id)->orderBy('name')->get(['id', 'name'])
+            : collect();
+
+        $menus = self::MENUS;
+        return view('mac-reseller.reseller.edit', compact('macReseller', 'tariffs', 'zones', 'districts', 'upazilas', 'menus'));
     }
 
     public function update(Request $request, MacReseller $macReseller)

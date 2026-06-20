@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Session\TokenMismatchException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -17,9 +18,17 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
             'superadmin'         => \App\Http\Middleware\SuperAdminMiddleware::class,
             'reseller'           => \App\Http\Middleware\ResellerMiddleware::class,
-            'client.auth' => \App\Http\Middleware\ClientAuthenticate::class,
+            'client.auth'        => \App\Http\Middleware\ClientAuthenticate::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
-    })->create();
+
+        $exceptions->render(function (TokenMismatchException $e, $request) {
+
+            return redirect()->route('login')
+                ->with('error', 'Your session has expired. Please login again.');
+
+        });
+
+    })
+    ->create();

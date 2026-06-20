@@ -2,14 +2,15 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Notifications\Notifiable;
 
-class MacReseller extends Model
+class MacReseller extends Authenticatable
 {
-    use SoftDeletes;
+    use SoftDeletes, Notifiable;
 
     protected $table = 'mac_resellers';
 
@@ -46,7 +47,7 @@ class MacReseller extends Model
         'created_by',
     ];
 
-    protected $hidden = ['password'];
+    protected $hidden = ['password', 'remember_token'];
 
     protected $casts = [
         'allowed_menus'                   => 'array',
@@ -61,6 +62,25 @@ class MacReseller extends Model
         'min_balance'                     => 'decimal:2',
         'min_rechargeable_amount'         => 'decimal:2',
     ];
+
+    // ── Auth: Username field override (default email এর বদলে username) ──
+    public function username()
+    {
+        return 'username';
+    }
+
+    // ── Auth: লক করা থাকলে login block করো ──────────────
+    public function isLoginAllowed(): bool
+    {
+        return $this->is_active && !$this->is_locked;
+    }
+
+    // ── Menu permission check helper ─────────────────────
+    public function canAccessMenu(string $menuKey): bool
+    {
+        $menus = $this->allowed_menus ?? [];
+        return in_array(strtoupper($menuKey), array_map('strtoupper', $menus));
+    }
 
     // ── Relationships ──────────────────────────────────────
 

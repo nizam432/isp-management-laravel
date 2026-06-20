@@ -11,40 +11,33 @@ class Customer extends Authenticatable
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'mikrotik_status', 'occupation', 'gender', 'zone_id', 'sub_zone_id',
+        'mikrotik_status', 'mikrotik_uid', 'last_online_at',
+        'occupation', 'gender', 'zone_id', 'sub_zone_id',
         'connection_type_id', 'client_type_id', 'protocol_type_id', 'router_id',
-        'billing_status', 'monthly_bill_amount', 'portal_password',
+        'mac_reseller_id',
+        'billing_status', 'monthly_bill_amount',
         'customer_code', 'name', 'phone', 'email', 'nid_number',
-        'nid_photo', 'photo', 'address', 'area', 'package_id',
-        'agent_id', 'connection_date', 'billing_date', 'status',
+        'nid_photo', 'photo', 'address', 'latitude', 'longitude', 'package_id',
+        'agent_id', 'connection_date', 'connection_fee', 'billing_date',
+        'expire_date', 'last_payment_date', 'status',
         'ip_address', 'mac_address', 'pppoe_username', 'pppoe_password',
         'remarks', 'created_by', 'advance_balance',
     ];
 
     protected $casts = [
-        'connection_date' => 'date',
-        'billing_date'    => 'integer',
-        'advance_balance' => 'decimal:2',
+        'connection_date'  => 'date',
+        'expire_date'      => 'date',
+        'last_payment_date'=> 'date',
+        'last_online_at'   => 'datetime',
+        'billing_date'     => 'integer',
+        'advance_balance'  => 'decimal:2',
+        'connection_fee'   => 'decimal:2',
+        'monthly_bill_amount' => 'decimal:2',
     ];
 
     protected $hidden = [
         'pppoe_password',
-        'portal_password',
     ];
-
-    // ── Authenticatable overrides ──────────────────────────
-    // Laravel এর default 'email'+'password' এর বদলে
-    // আমরা 'customer_code' + 'portal_password' ব্যবহার করব
-
-    public function getAuthIdentifierName(): string
-    {
-        return 'customer_code';
-    }
-
-    public function getAuthPassword(): string
-    {
-        return $this->portal_password;
-    }
 
     // ── Relations ──────────────────────────────────────────
 
@@ -118,6 +111,12 @@ class Customer extends Authenticatable
         return $this->belongsTo(\App\Models\MikrotikRouter::class, 'router_id');
     }
 
+    // MAC Reseller Portal — এই customer কোন reseller (POP) এর অধীনে
+    public function macReseller()
+    {
+        return $this->belongsTo(\App\Models\MacReseller::class, 'mac_reseller_id');
+    }
+
     // ── Scopes ─────────────────────────────────────────────
 
     public function scopeActive($query)
@@ -133,6 +132,12 @@ class Customer extends Authenticatable
     public function scopeByArea($query, $area)
     {
         return $query->where('area', $area);
+    }
+
+    // Reseller Portal এর Client list এর জন্য — শুধু নিজের customer
+    public function scopeForReseller($query, $resellerId)
+    {
+        return $query->where('mac_reseller_id', $resellerId);
     }
 
     // ── Helpers ────────────────────────────────────────────

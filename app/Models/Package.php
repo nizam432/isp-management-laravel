@@ -10,8 +10,9 @@ class Package extends Model
 
     protected $fillable = [
         'name', 'speed_download', 'speed_upload', 'data_limit',
-        'price', 'connection_fee','client_type_id', 'btrc_price', 
-        'btrc_bandwidth','mikrotik_profile','is_active', 'description',
+        'price', 'connection_fee', 'client_type_id', 'protocol_type_id',
+        'validity_days', 'btrc_price', 'btrc_bandwidth', 'mikrotik_profile',
+        'is_active', 'description',
     ];
 
     protected $casts = [
@@ -50,6 +51,11 @@ class Package extends Model
     public function clientType()
     {
         return $this->belongsTo(\App\Models\ClientType::class)->withDefault(['name' => 'All']);
+    }   
+    
+    public function protocolType()
+    {
+        return $this->belongsTo(\App\Models\ProtocolType::class);
     }    
 }
 

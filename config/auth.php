@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use App\Models\Customer;
+use App\Models\MacReseller;
 
 return [
 
@@ -17,10 +18,16 @@ return [
             'provider' => 'users',
         ],
 
-        // Client Portal guard (নতুন)
+        // Client Portal guard (existing — হাত দেওয়া হয়নি)
         'customer' => [
             'driver'   => 'session',
             'provider' => 'customers',
+        ],
+
+        // MAC Reseller Portal guard (নতুন)
+        'mac_reseller' => [
+            'driver'   => 'session',
+            'provider' => 'mac_resellers',
         ],
     ],
 
@@ -37,6 +44,13 @@ return [
             'driver' => 'eloquent',
             'model'  => Customer::class,
         ],
+
+        // MAC Reseller portal (নতুন)
+        // username দিয়ে login হবে (username() override করা আছে Model এ)
+        'mac_resellers' => [
+            'driver' => 'eloquent',
+            'model'  => MacReseller::class,
+        ],
     ],
 
     'passwords' => [
@@ -50,6 +64,13 @@ return [
         'customers' => [
             'provider' => 'customers',
             'table'    => 'customer_password_resets',
+            'expire'   => 60,
+            'throttle' => 60,
+        ],
+
+        'mac_resellers' => [
+            'provider' => 'mac_resellers',
+            'table'    => 'mac_reseller_password_resets',
             'expire'   => 60,
             'throttle' => 60,
         ],
