@@ -65,6 +65,7 @@ Route::middleware(['auth'])->group(function () {
 
     // ── Dashboard ──────────────────────────────
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard')->middleware('can:dashboard.view');
+    Route::get('/dashboard/stats', [DashboardController::class, 'stats'])->name('dashboard.stats')->middleware('can:dashboard.view');
 
     // ── Customers ──────────────────────────────
     // ⚠️ Static/AJAX routes MUST come before resource() — otherwise {customer} catches them

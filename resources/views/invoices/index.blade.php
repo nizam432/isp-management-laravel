@@ -953,8 +953,25 @@ $(function () {
         $('#filterIcon').toggleClass('fa-minus fa-plus');
     });
 
-    // Select2 init
-    $('.select2').select2({ width: '100%' });
+    // Select2 init — সাধারণ dropdown গুলো (page এর মধ্যে)
+    $('.select2').not('#inv_customer').select2({ width: '100%' });
+
+    // Select2 init — Modal এর ভেতরের dropdown (dropdownParent না দিলে
+    // search input এ keyboard input ধরে না, এটা Bootstrap Modal + Select2
+    // এর পরিচিত conflict)
+    $('#inv_customer').select2({
+        width: '100%',
+        dropdownParent: $('#newInvoiceModal'),
+    });
+
+    // Modal খোলার সময় Select2 search box এ ফোকাস বাধ্যতামূলক করা
+    // (নাহলে প্রথমবার টাইপ করলে কাজ নাও করতে পারে)
+    $('#newInvoiceModal').on('shown.bs.modal', function () {
+        $('#inv_customer').select2('open');
+        setTimeout(function () {
+            $('.select2-search__field').first().trigger('focus');
+        }, 50);
+    });
 
     // Per page change
     $('#perPage').on('change', function () {

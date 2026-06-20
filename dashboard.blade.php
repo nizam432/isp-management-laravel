@@ -217,7 +217,7 @@
     <div class="row mb-3">
         <div class="col-lg-3 col-md-6 col-6">
             <div class="cust-stat-card" style="background:#e67e22">
-                <a href="{{ route('client-support.index', ['status' => 'pending']) }}" class="sc-link"></a>
+                <a href="{{ route('tickets.index', ['status' => 'pending']) }}" class="sc-link"></a>
                 <div class="sc-left">
                     <div class="sc-label"><i class="fas fa-ticket-alt mr-1"></i> Open Ticket</div>
                     <div class="sc-value" data-stat="open_tickets">{{ $stats['open_tickets'] }}</div>
@@ -227,7 +227,7 @@
         </div>
         <div class="col-lg-3 col-md-6 col-6">
             <div class="cust-stat-card" style="background:#2980b9">
-                <a href="{{ route('client-support.index', ['status' => 'processing']) }}" class="sc-link"></a>
+                <a href="{{ route('tickets.index', ['status' => 'processing']) }}" class="sc-link"></a>
                 <div class="sc-left">
                     <div class="sc-label"><i class="fas fa-spinner mr-1"></i> Processing Ticket</div>
                     <div class="sc-value" data-stat="processing_tickets">{{ $stats['processing_tickets'] }}</div>
@@ -237,7 +237,7 @@
         </div>
         <div class="col-lg-3 col-md-6 col-6">
             <div class="cust-stat-card" style="background:#2ecc71">
-                <a href="{{ route('client-support.index', ['status' => 'solved']) }}" class="sc-link"></a>
+                <a href="{{ route('tickets.index', ['status' => 'solved']) }}" class="sc-link"></a>
                 <div class="sc-left">
                     <div class="sc-label"><i class="fas fa-check-circle mr-1"></i> Solved Ticket</div>
                     <div class="sc-value" data-stat="solved_tickets">{{ $stats['solved_tickets'] }}</div>
@@ -247,7 +247,7 @@
         </div>
         <div class="col-lg-3 col-md-6 col-6">
             <div class="cust-stat-card" style="background:#7f8c8d">
-                <a href="{{ route('client-support.index', ['status' => 'closed']) }}" class="sc-link"></a>
+                <a href="{{ route('tickets.index', ['status' => 'closed']) }}" class="sc-link"></a>
                 <div class="sc-left">
                     <div class="sc-label"><i class="fas fa-lock mr-1"></i> Close Ticket</div>
                     <div class="sc-value" data-stat="closed_tickets">{{ $stats['closed_tickets'] }}</div>
@@ -285,7 +285,7 @@
                     <li class="list-group-item">
                         <div class="d-flex justify-content-between">
                             <span>
-                                <a href="{{ route('client-support.chat', $ticket) }}">{{ Str::limit($ticket->subject, 30) }}</a>
+                                <a href="{{ route('tickets.show', $ticket) }}">{{ Str::limit($ticket->subject, 30) }}</a>
                                 <br><small class="text-muted">{{ $ticket->customer->name }}</small>
                             </span>
                             <span class="badge badge-{{ $ticket->priority === 'urgent' ? 'danger' : ($ticket->priority === 'high' ? 'warning' : 'secondary') }}">
