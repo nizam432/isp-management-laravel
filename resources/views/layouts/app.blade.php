@@ -3,6 +3,17 @@
 @section('title', config('adminlte.title'))
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 
+{{-- ── Notification Bell — navbar-এর ডান পাশে, user menu-এর ঠিক আগে ──
+     @parent দিয়ে prepend করা হচ্ছে যাতে AdminLTE-এর default right-nav
+     item (যেমন user dropdown) অক্ষত থাকে, override না হয়ে যায়। --}}
+@section('content_top_nav_right')
+    @auth
+        @include('partials.language-switcher')
+        @include('partials.notification-bell')
+    @endauth
+    @parent
+@stop
+
 @section('content_header')
 
     <div class="d-flex justify-content-between align-items-center">
@@ -67,8 +78,18 @@
     .swal2-html-container {
         font-size: 0.9rem !important;
         margin: 0.3rem !important;
-    }        
-        
+    }
+
+    {{-- ── RTL Support (Arabic) ───────────────────────── --}}
+    @if(app()->getLocale() === 'ar')
+    body { direction: rtl; text-align: right; }
+    .content-wrapper { margin-right: 250px !important; margin-left: 0 !important; }
+    .navbar-nav { flex-direction: row-reverse; }
+    .dropdown-menu-right, .lang-dropdown, .notif-dropdown { right: auto !important; left: 0 !important; }
+    .ml-1, .ml-2, .ml-3 { margin-left: 0 !important; margin-right: .25rem !important; }
+    .mr-1, .mr-2, .mr-3 { margin-right: 0 !important; margin-left: .25rem !important; }
+    @endif
+
     </style>
     @yield('extra_css')
     @stack('css')

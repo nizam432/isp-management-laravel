@@ -319,13 +319,19 @@ return [
             'icon_color' => 'yellow',
             'can'        => 'super-admin',
         ],
-        ['text' => 'SMS Gateways',     'url' => 'super-admin/sms',              'icon' => 'fas fa-fw fa-sms',         'icon_color' => 'green',  'can' => 'super-admin'],
-        ['text' => 'Payment Gateways', 'url' => 'super-admin/payment-gateways', 'icon' => 'fas fa-fw fa-credit-card', 'icon_color' => 'purple', 'can' => 'super-admin'],
+        ['text' => 'SMS Gateways', 'url' => 'super-admin/sms', 'icon' => 'fas fa-fw fa-sms', 'icon_color' => 'green', 'can' => 'super-admin'],
         [
             'text'       => 'Permissions',
             'url'        => 'super-admin/permissions',
             'icon'       => 'fas fa-fw fa-key',
             'icon_color' => 'orange',
+            'can'        => 'super-admin',
+        ],
+        [
+            'text'       => 'ISP Admin Permissions',
+            'url'        => 'super-admin/roles/isp-admin',
+            'icon'       => 'fas fa-fw fa-user-shield',
+            'icon_color' => 'red',
             'can'        => 'super-admin',
         ],
         
@@ -473,6 +479,13 @@ return [
         'icon_color' => 'blue',
         'can'        => 'report.revenue.view',
         'submenu'    => [
+            ['text' => 'Bill Collection', 'url' => 'reports/bill/receive-history', 'icon' => 'fas fa-fw fa-receipt', 'icon_color' => 'green'],
+            [
+                'text' => 'Daily Collection',    
+                'url' => 'reports/bill/daily-collection', 
+                'icon' => 'fas fa-fw fa-cash-register',   
+                'icon_color' => 'green'
+            ],
             [
                 'text' => 'Revenue',
                 'url'  => 'reports/revenue',
@@ -546,12 +559,12 @@ return [
         [
             'text' => 'System Settings',
             'icon' => 'fas fa-fw fa-cog',
-           'can'  => 'settings.manage',
+            'can'  => 'settings.manage',
             'submenu' => [
                 ['text' => 'General Settings', 'url' => 'settings/general', 'icon' => 'fas fa-fw fa-sliders-h'],
                 ['text' => 'Zone',     'url' => 'settings/zones',     'icon' => 'fas fa-fw fa-map-marked-alt'],
                 ['text' => 'Sub Zone', 'url' => 'settings/sub-zones', 'icon' => 'fas fa-fw fa-map-pin'],
-                ['text' => 'Connection Type', 'url' => 'settings/connection-types', 'icon' => 'fas fa-fw fa-plug'],
+                ['text' => 'Box',      'url' => 'settings/box',       'icon' => 'fas fa-fw fa-box'],                ['text' => 'Connection Type', 'url' => 'settings/connection-types', 'icon' => 'fas fa-fw fa-plug'],
                 ['text' => 'Client Type',     'url' => 'settings/client-types',     'icon' => 'fas fa-fw fa-user-tag'],           
                 ['text' => 'Protocol Type', 'url' => 'settings/protocol-types', 'icon' => 'fas fa-fw fa-network-wired'],
                 ['text' => 'OLT Type',      'url' => 'settings/olt-types',      'icon' => 'fas fa-fw fa-server'],
@@ -611,62 +624,6 @@ return [
                 ],
             ],
         ],        
-        // ── MAC Reseller Module ───────────────────────────────────
-        ['header' => 'MAC RESELLER', 'can' => 'isp-admin'],
-        [
-            'text'       => 'MACReseller',
-            'icon'       => 'fas fa-fw fa-users-cog',
-            'icon_color' => 'teal',
-            'can'        => 'isp-admin',
-            'submenu'    => [
-                [
-                    'text' => 'Package',
-                    'url'  => 'mac-reseller/package',
-                    'icon' => 'fas fa-fw fa-box',
-                ],
-                [
-                    'text' => 'Tariff Config',
-                    'url'  => 'mac-reseller/tariff',
-                    'icon' => 'fas fa-fw fa-tags',
-                ],
-                [
-                    'text' => 'Add MAC Reseller',
-                    'url'  => 'mac-reseller/list/create',
-                    'icon' => 'fas fa-fw fa-user-plus',
-                ],
-                [
-                    'text' => 'MAC Reseller List',
-                    'url'  => 'mac-reseller/list',
-                    'icon' => 'fas fa-fw fa-list',
-                ],
-                [
-                    'text' => 'Reseller Funding',
-                    'url'  => 'mac-reseller/funding',
-                    'icon' => 'fas fa-fw fa-money-bill-wave',
-                ],
-                [
-                    'text' => 'Client PGW Payments',
-                    'url'  => 'mac-reseller/pgw-payments',
-                    'icon' => 'fas fa-fw fa-credit-card',
-                ],
-                [
-                    'text' => 'PGW Transaction Settlement',
-                    'url'  => 'mac-reseller/settlement',
-                    'icon' => 'fas fa-fw fa-exchange-alt',
-                ],
-                [
-                    'text' => 'MACReseller Notice',
-                    'url'  => 'mac-reseller/notice',
-                    'icon' => 'fas fa-fw fa-bell',
-                ],
-                [
-                    'text' => 'Reseller Tutorials',
-                    'url'  => 'mac-reseller/tutorial',
-                    'icon' => 'fas fa-fw fa-graduation-cap',
-                ],
-            ],
-        ],
-
          ['header' => 'RESELLER', 'can' => 'create-reseller'],
         [
             'text'       => 'My Resellers',
@@ -797,18 +754,7 @@ return [
                 ],
             ],
         ],
-        ['header' => 'REPORTS', 'can' => 'report.revenue.view'],
-        [
-            'text'       => 'Reports',
-            'icon'       => 'fas fa-fw fa-chart-bar',
-            'icon_color' => 'blue',
-            'can'        => 'report.revenue.view',
-            'submenu'    => [
-                ['text' => 'Revenue',   'url' => 'reports/revenue',   'icon' => 'fas fa-fw fa-dollar-sign', 'icon_color' => 'green'],
-                ['text' => 'Due',       'url' => 'reports/due',       'icon' => 'fas fa-fw fa-exclamation', 'icon_color' => 'red'],
-                ['text' => 'Customers', 'url' => 'reports/customers', 'icon' => 'fas fa-fw fa-users',       'icon_color' => 'blue'],
-            ],
-        ],
+  
     ],
 
 ];

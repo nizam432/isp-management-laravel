@@ -32,6 +32,57 @@ class TenantController extends Controller
         return view('super-admin.dashboard', compact('stats', 'recentTenants'));
     }
 
+    /**
+     * AJAX endpoint — date filter অনুযায়ী stats reload
+     * GET /super-admin/dashboard/stats
+     */
+    public function dashboardStats(Request $request)
+    {
+        [$from, $to] = $this->resolveDateRange($request->range, $request->from, $request->to);
+
+        $query = Tenant::query();
+        if ($from && $to) {
+            $query->whereBetween('created_at', [$from, $to]);
+        }
+
+        $stats = [
+            'total_isp'       => (clone $query)->count(),
+            'active_isp'      => (clone $query)->where('is_active', true)->count(),
+            'pure_isp'        => (clone $query)->where('is_reseller', 1)->count(),
+            'master_reseller' => (clone $query)->where('is_reseller', 2)->count(),
+            'sub_reseller'    => (clone $query)->where('is_reseller', 3)->count(),
+            'total_plans'     => Plan::count(), // plans not date-bound
+        ];
+
+        return response()->json(['success' => true, 'stats' => $stats]);
+    }
+
+    /**
+     * Resolve a named date range (or custom from/to) into [start, end] Carbon dates.
+     */
+    private function resolveDateRange(?string $range, ?string $from, ?string $to): array
+    {
+        $now = now();
+
+        return match ($range) {
+            'today'                  => [$now->copy()->startOfDay(), $now->copy()->endOfDay()],
+            'yesterday'              => [$now->copy()->subDay()->startOfDay(), $now->copy()->subDay()->endOfDay()],
+            'last_7_days'            => [$now->copy()->subDays(6)->startOfDay(), $now->copy()->endOfDay()],
+            'last_30_days'           => [$now->copy()->subDays(29)->startOfDay(), $now->copy()->endOfDay()],
+            'this_month'             => [$now->copy()->startOfMonth(), $now->copy()->endOfMonth()],
+            'last_month'             => [$now->copy()->subMonth()->startOfMonth(), $now->copy()->subMonth()->endOfMonth()],
+            'this_month_last_year'   => [$now->copy()->subYear()->startOfMonth(), $now->copy()->subYear()->endOfMonth()],
+            'this_year'              => [$now->copy()->startOfYear(), $now->copy()->endOfYear()],
+            'last_year'              => [$now->copy()->subYear()->startOfYear(), $now->copy()->subYear()->endOfYear()],
+            'current_financial_year' => [$now->month >= 7 ? $now->copy()->month(7)->startOfMonth() : $now->copy()->subYear()->month(7)->startOfMonth(),
+                                          $now->month >= 7 ? $now->copy()->addYear()->month(6)->endOfMonth() : $now->copy()->month(6)->endOfMonth()],
+            'last_financial_year'    => [$now->month >= 7 ? $now->copy()->subYear()->month(7)->startOfMonth() : $now->copy()->subYears(2)->month(7)->startOfMonth(),
+                                          $now->month >= 7 ? $now->copy()->month(6)->endOfMonth() : $now->copy()->subYear()->month(6)->endOfMonth()],
+            'custom'                 => [$from ? \Carbon\Carbon::parse($from)->startOfDay() : null, $to ? \Carbon\Carbon::parse($to)->endOfDay() : null],
+            default                  => [null, null], // all_time
+        };
+    }
+
     // ══════════════════════════════════════════════
     // ISP Management
     // ══════════════════════════════════════════════
