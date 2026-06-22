@@ -28,8 +28,8 @@
 
 <h2>Profit & Loss Report</h2>
 <div class="subtitle">
-    {{ \Carbon\Carbon::parse($fromMonth.'-01')->format('F Y') }}
-    — {{ \Carbon\Carbon::parse($toMonth.'-01')->format('F Y') }}
+    {{ \Carbon\Carbon::parse($from)->format('d M Y') }}
+    — {{ \Carbon\Carbon::parse($to)->format('d M Y') }}
     &nbsp;|&nbsp; Generated: {{ now()->format('d M Y h:i A') }}
 </div>
 

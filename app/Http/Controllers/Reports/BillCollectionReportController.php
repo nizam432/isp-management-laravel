@@ -630,4 +630,137 @@ class BillCollectionReportController extends Controller
 
         return $query->where('status', 'active')->orderByDesc('paid_at');
     }
+
+    /**
+     * 7. Date-to-Date Income & Discount Report
+     * Shows invoices in a date range with billed, collected, discount, due breakdown.
+     */
+    public function incomeDiscount(Request $request)
+    {
+        $from = $request->get('from_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
+        $to   = $request->get('to_date',   Carbon::now()->format('Y-m-d'));
+
+        $query = Invoice::query()
+            ->with(['customer.zone', 'customer.package', 'customer.agent'])
+            ->whereBetween('due_date', [$from, $to]);
+
+        if ($zoneId = $request->get('zone_id'))
+            $query->whereHas('customer', fn($q) => $q->where('zone_id', $zoneId));
+        if ($packageId = $request->get('package_id'))
+            $query->where('package_id', $packageId);
+        if ($status = $request->get('status'))
+            $query->where('status', $status);
+
+        $perPage  = (int) $request->get('show', 25);
+        $invoices = $query->paginate($perPage)->withQueryString();
+
+        // Grand totals across full filtered set
+        $allQuery   = Invoice::query()->whereBetween('due_date', [$from, $to]);
+        if ($zoneId = $request->get('zone_id'))
+            $allQuery->whereHas('customer', fn($q) => $q->where('zone_id', $zoneId));
+        if ($packageId = $request->get('package_id'))
+            $allQuery->where('package_id', $packageId);
+        if ($status = $request->get('status'))
+            $allQuery->where('status', $status);
+
+        $all        = $allQuery->selectRaw('SUM(amount) as total_billed, SUM(discount) as total_discount, SUM(amount - due_amount) as total_collected, SUM(due_amount) as total_due, COUNT(*) as total_count')->first();
+
+        $grandTotal = [
+            'billed'    => $all->total_billed ?? 0,
+            'discount'  => $all->total_discount ?? 0,
+            'collected' => $all->total_collected ?? 0,
+            'due'       => $all->total_due ?? 0,
+            'count'     => $all->total_count ?? 0,
+        ];
+
+        $zones    = Zone::orderBy('name')->get();
+        $packages = Package::orderBy('name')->get();
+
+        return view('reports.bill.income-discount', compact(
+            'invoices', 'grandTotal', 'from', 'to', 'zones', 'packages', 'perPage'
+        ));
+    }
+
+    public function exportIncomeDiscountPdf(Request $request)
+    {
+        $from     = $request->get('from_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
+        $to       = $request->get('to_date',   Carbon::now()->format('Y-m-d'));
+        $invoices = Invoice::query()->with(['customer.zone', 'customer.package'])
+            ->whereBetween('due_date', [$from, $to])->get();
+
+        $grandTotal = [
+            'billed'    => $invoices->sum('amount'),
+            'discount'  => $invoices->sum('discount'),
+            'collected' => $invoices->sum(fn($i) => $i->amount - $i->due_amount),
+            'due'       => $invoices->sum('due_amount'),
+        ];
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView(
+            'reports.bill.income-discount-pdf',
+            compact('invoices', 'grandTotal', 'from', 'to')
+        )->setPaper('a4', 'landscape');
+
+        return $pdf->download('income-discount-' . $from . '-to-' . $to . '.pdf');
+    }
+
+    public function exportIncomeDiscountXlsx(Request $request)
+    {
+        $from     = $request->get('from_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
+        $to       = $request->get('to_date',   Carbon::now()->format('Y-m-d'));
+        $invoices = Invoice::query()->with(['customer.zone', 'customer.package'])
+            ->whereBetween('due_date', [$from, $to])->get();
+
+        $filename    = 'income-discount-' . $from . '-to-' . $to . '.xlsx';
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet       = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Income vs Discount');
+
+        $headers = ['#', 'Invoice No', 'Customer', 'Package', 'Zone', 'Due Date', 'Status', 'Billed', 'Discount', 'Collected', 'Due'];
+        $sheet->fromArray($headers, null, 'A1');
+        $sheet->getStyle('A1:K1')->applyFromArray([
+            'font'      => ['bold' => true, 'color' => ['argb' => 'FFFFFFFF']],
+            'fill'      => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['argb' => 'FF1F3864']],
+            'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER],
+        ]);
+
+        $row = 2;
+        foreach ($invoices as $i => $inv) {
+            $sheet->fromArray([
+                $i + 1,
+                $inv->invoice_no,
+                $inv->customer->name ?? '-',
+                $inv->customer->package->name ?? '-',
+                $inv->customer->zone->name ?? '-',
+                $inv->due_date ? Carbon::parse($inv->due_date)->format('d M Y') : '-',
+                ucfirst($inv->status),
+                $inv->amount,
+                $inv->discount ?? 0,
+                $inv->amount - $inv->due_amount,
+                $inv->due_amount,
+            ], null, 'A' . $row);
+            $row++;
+        }
+
+        $sheet->fromArray([
+            '', '', '', '', '', '', 'TOTAL',
+            $invoices->sum('amount'),
+            $invoices->sum('discount'),
+            $invoices->sum(fn($i) => $i->amount - $i->due_amount),
+            $invoices->sum('due_amount'),
+        ], null, 'A' . $row);
+        $sheet->getStyle('A' . $row . ':K' . $row)->applyFromArray([
+            'font' => ['bold' => true],
+            'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFDCE6F1']],
+        ]);
+
+        foreach (range('A', 'K') as $col) { $sheet->getColumnDimension($col)->setAutoSize(true); }
+
+        $writer   = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $tempFile = tempnam(sys_get_temp_dir(), 'xlsx_');
+        $writer->save($tempFile);
+
+        return response()->download($tempFile, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
+    }
 }

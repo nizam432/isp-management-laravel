@@ -2,7 +2,7 @@
 @extends('layouts.app')
 @section('page_title', 'Profit & Loss Report')
 @section('page_actions')
-    <a href="{{ route('expenses.profit-loss.pdf', ['from_month' => $fromMonth, 'to_month' => $toMonth]) }}"
+    <a href="{{ route('expenses.profit-loss.pdf', ['from_date' => $from, 'to_date' => $to]) }}"
        class="btn btn-danger btn-sm">
         <i class="fas fa-file-pdf mr-1"></i> PDF Export
     </a>
@@ -14,11 +14,11 @@
     <div class="card-body py-2">
         <form method="GET" class="form-inline flex-wrap">
             <label class="mr-2 font-weight-bold">From:</label>
-            <input type="month" name="from_month" class="form-control form-control-sm mr-3"
-                   value="{{ $fromMonth }}">
+            <input type="date" name="from_date" class="form-control form-control-sm mr-3"
+                   value="{{ $from }}">
             <label class="mr-2 font-weight-bold">To:</label>
-            <input type="month" name="to_month" class="form-control form-control-sm mr-3"
-                   value="{{ $toMonth }}">
+            <input type="date" name="to_date" class="form-control form-control-sm mr-3"
+                   value="{{ $to }}">
             <button class="btn btn-sm btn-primary mr-2">
                 <i class="fas fa-search mr-1"></i> Filter
             </button>
@@ -26,8 +26,8 @@
                 <i class="fas fa-redo mr-1"></i> Reset
             </a>
             <span class="ml-3 text-muted small">
-                {{ \Carbon\Carbon::parse($fromMonth.'-01')->format('M Y') }}
-                — {{ \Carbon\Carbon::parse($toMonth.'-01')->format('M Y') }}
+                {{ \Carbon\Carbon::parse($from)->format('d M Y') }}
+                — {{ \Carbon\Carbon::parse($to)->format('d M Y') }}
                 ({{ count($rows) }} month{{ count($rows) > 1 ? 's' : '' }})
             </span>
         </form>

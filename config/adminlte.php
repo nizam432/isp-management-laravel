@@ -481,6 +481,10 @@ return [
         'submenu'    => [
             ['text' => 'Bill Collection', 'url' => 'reports/bill/receive-history', 'icon' => 'fas fa-fw fa-receipt', 'icon_color' => 'green'],
             ['text' => 'Monthly Billing', 'url' => 'reports/bill/monthly-billing', 'icon' => 'fas fa-fw fa-calendar-alt', 'icon_color' => 'blue'],
+            ['text' => 'Income Report',  'url' => 'reports/bill/income',  'icon' => 'fas fa-fw fa-arrow-circle-up',   'icon_color' => 'green'],
+            ['text' => 'Expense Report', 'url' => 'reports/bill/expense', 'icon' => 'fas fa-fw fa-arrow-circle-down', 'icon_color' => 'red'],            
+            ['text' => 'Customer Report',   'url' => 'reports/bill/customer',  'icon' => 'fas fa-fw fa-users',    'icon_color' => 'teal'],
+            ['text' => 'POP Wise Clients',  'url' => 'reports/bill/pop-wise',  'icon' => 'fas fa-fw fa-sitemap',  'icon_color' => 'blue'],            
             [
                 'text' => 'Daily Collection',    
                 'url' => 'reports/bill/daily-collection', 

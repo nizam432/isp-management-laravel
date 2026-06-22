@@ -247,53 +247,50 @@ class ExpenseController extends Controller
 
     public function profitLoss(Request $request)
     {
-        $fromMonth = $request->from_month ?? now()->format('Y-m');
-        $toMonth   = $request->to_month   ?? now()->format('Y-m');
+        $from = $request->get('from_date', now()->startOfMonth()->format('Y-m-d'));
+        $to   = $request->get('to_date',   now()->format('Y-m-d'));
 
-        if ($fromMonth > $toMonth) {
-            [$fromMonth, $toMonth] = [$toMonth, $fromMonth];
-        }
+        if ($from > $to) [$from, $to] = [$to, $from];
 
-        // Generate list of months in range
-        $months = [];
-        $cursor = \Carbon\Carbon::parse($fromMonth . '-01');
-        $end    = \Carbon\Carbon::parse($toMonth   . '-01');
-        while ($cursor->lte($end)) {
-            $months[] = $cursor->format('Y-m');
-            $cursor->addMonth();
-        }
+        // Monthly breakdown within date range
+        $months  = [];
+        $cursor  = \Carbon\Carbon::parse($from)->startOfMonth();
+        $endDate = \Carbon\Carbon::parse($to);
 
         $rows         = [];
         $grandIncome  = 0;
         $grandExpense = 0;
 
-        foreach ($months as $m) {
-            [$y, $mo] = explode('-', $m);
+        while ($cursor->lte($endDate)) {
+            // Clamp month to actual from/to dates
+            $mFrom = $cursor->copy()->startOfMonth()->lt(\Carbon\Carbon::parse($from))
+                ? $from
+                : $cursor->copy()->startOfMonth()->format('Y-m-d');
+            $mTo = $cursor->copy()->endOfMonth()->gt($endDate)
+                ? $to
+                : $cursor->copy()->endOfMonth()->format('Y-m-d');
 
             $monthlyBill = (float) Payment::active()
-                ->whereYear('payment_date', $y)
-                ->whereMonth('payment_date', $mo)
+                ->whereBetween('payment_date', [$mFrom, $mTo])
                 ->sum('amount');
 
             $manualIncome = class_exists(\App\Models\Income::class)
                 ? (float) \App\Models\Income::active()
-                    ->whereYear('income_date', $y)
-                    ->whereMonth('income_date', $mo)
+                    ->whereBetween('income_date', [$mFrom, $mTo])
                     ->sum('amount')
                 : 0;
 
             $totalIncome  = $monthlyBill + $manualIncome;
             $totalExpense = (float) Expense::active()
-                ->whereYear('expense_date', $y)
-                ->whereMonth('expense_date', $mo)
+                ->whereBetween('expense_date', [$mFrom, $mTo])
                 ->sum('amount');
 
             $netProfit = $totalIncome - $totalExpense;
             $margin    = $totalIncome > 0 ? round(($netProfit / $totalIncome) * 100, 1) : 0;
 
             $rows[] = [
-                'month'         => $m,
-                'month_label'   => \Carbon\Carbon::parse($m . '-01')->format('M Y'),
+                'month'         => $cursor->format('Y-m'),
+                'month_label'   => $cursor->format('M Y'),
                 'monthly_bill'  => $monthlyBill,
                 'manual_income' => $manualIncome,
                 'total_income'  => $totalIncome,
@@ -304,6 +301,7 @@ class ExpenseController extends Controller
 
             $grandIncome  += $totalIncome;
             $grandExpense += $totalExpense;
+            $cursor->addMonth();
         }
 
         $grandProfit = $grandIncome - $grandExpense;
@@ -317,7 +315,7 @@ class ExpenseController extends Controller
         ])->values();
 
         return view('accounting.profit-loss', compact(
-            'fromMonth', 'toMonth', 'rows',
+            'from', 'to', 'rows',
             'grandIncome', 'grandExpense', 'grandProfit', 'grandMargin',
             'chartData'
         ));
@@ -329,45 +327,46 @@ class ExpenseController extends Controller
 
     public function profitLossPdf(Request $request)
     {
-        $fromMonth = $request->from_month ?? now()->format('Y-m');
-        $toMonth   = $request->to_month   ?? now()->format('Y-m');
+        $from = $request->get('from_date', now()->startOfMonth()->format('Y-m-d'));
+        $to   = $request->get('to_date',   now()->format('Y-m-d'));
 
-        if ($fromMonth > $toMonth) {
-            [$fromMonth, $toMonth] = [$toMonth, $fromMonth];
-        }
-
-        $months = [];
-        $cursor = \Carbon\Carbon::parse($fromMonth . '-01');
-        $end    = \Carbon\Carbon::parse($toMonth   . '-01');
-        while ($cursor->lte($end)) {
-            $months[] = $cursor->format('Y-m');
-            $cursor->addMonth();
-        }
+        if ($from > $to) [$from, $to] = [$to, $from];
 
         $rows = []; $grandIncome = 0; $grandExpense = 0;
+        $cursor  = \Carbon\Carbon::parse($from)->startOfMonth();
+        $endDate = \Carbon\Carbon::parse($to);
 
-        foreach ($months as $m) {
-            [$y, $mo] = explode('-', $m);
-            $monthlyBill  = (float) Payment::active()->whereYear('payment_date', $y)->whereMonth('payment_date', $mo)->sum('amount');
-            $manualIncome = class_exists(\App\Models\Income::class) ? (float) \App\Models\Income::active()->whereYear('income_date', $y)->whereMonth('income_date', $mo)->sum('amount') : 0;
+        while ($cursor->lte($endDate)) {
+            $mFrom = $cursor->copy()->startOfMonth()->lt(\Carbon\Carbon::parse($from))
+                ? $from : $cursor->copy()->startOfMonth()->format('Y-m-d');
+            $mTo = $cursor->copy()->endOfMonth()->gt($endDate)
+                ? $to : $cursor->copy()->endOfMonth()->format('Y-m-d');
+
+            $monthlyBill  = (float) Payment::active()->whereBetween('payment_date', [$mFrom, $mTo])->sum('amount');
+            $manualIncome = class_exists(\App\Models\Income::class) ? (float) \App\Models\Income::active()->whereBetween('income_date', [$mFrom, $mTo])->sum('amount') : 0;
             $totalIncome  = $monthlyBill + $manualIncome;
-            $totalExpense = (float) Expense::active()->whereYear('expense_date', $y)->whereMonth('expense_date', $mo)->sum('amount');
+            $totalExpense = (float) Expense::active()->whereBetween('expense_date', [$mFrom, $mTo])->sum('amount');
             $netProfit    = $totalIncome - $totalExpense;
             $margin       = $totalIncome > 0 ? round(($netProfit / $totalIncome) * 100, 1) : 0;
-            $rows[]       = ['month' => $m, 'month_label' => \Carbon\Carbon::parse($m . '-01')->format('M Y'), 'monthly_bill' => $monthlyBill, 'manual_income' => $manualIncome, 'total_income' => $totalIncome, 'total_expense' => $totalExpense, 'net_profit' => $netProfit, 'margin' => $margin];
-            $grandIncome  += $totalIncome;
-            $grandExpense += $totalExpense;
+
+            $rows[] = [
+                'month' => $cursor->format('Y-m'), 'month_label' => $cursor->format('M Y'),
+                'monthly_bill' => $monthlyBill, 'manual_income' => $manualIncome,
+                'total_income' => $totalIncome, 'total_expense' => $totalExpense,
+                'net_profit' => $netProfit, 'margin' => $margin,
+            ];
+            $grandIncome += $totalIncome; $grandExpense += $totalExpense;
+            $cursor->addMonth();
         }
 
         $grandProfit = $grandIncome - $grandExpense;
         $grandMargin = $grandIncome > 0 ? round(($grandProfit / $grandIncome) * 100, 1) : 0;
 
         $pdf = Pdf::loadView('accounting.profit-loss-pdf', compact(
-            'fromMonth', 'toMonth', 'rows',
-            'grandIncome', 'grandExpense', 'grandProfit', 'grandMargin'
+            'from', 'to', 'rows', 'grandIncome', 'grandExpense', 'grandProfit', 'grandMargin'
         ))->setPaper('a4', 'landscape');
 
-        return $pdf->download('profit-loss-' . $fromMonth . '-to-' . $toMonth . '.pdf');
+        return $pdf->download('profit-loss-' . $from . '-to-' . $to . '.pdf');
     }
 
     // =========================================================================
