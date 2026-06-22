@@ -32,7 +32,7 @@
             @forelse($payments as $i => $pay)
             <tr>
                 <td>{{ $i + 1 }}</td>
-                <td>{{ $pay->paid_at ? $pay->paid_at->format('d M Y h:i A') : '-' }}</td>
+                <td>{{ $pay->paid_at ? \Carbon\Carbon::parse($pay->paid_at)->format('d M Y h:i A') : '-' }}</td>
                 <td>{{ $pay->customer->customer_code ?? '-' }}</td>
                 <td>{{ $pay->customer->pppoe_username ?? $pay->customer->ip_address ?? '-' }}</td>
                 <td>{{ $pay->customer->name ?? '-' }}</td>

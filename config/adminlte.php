@@ -480,6 +480,7 @@ return [
         'can'        => 'report.revenue.view',
         'submenu'    => [
             ['text' => 'Bill Collection', 'url' => 'reports/bill/receive-history', 'icon' => 'fas fa-fw fa-receipt', 'icon_color' => 'green'],
+            ['text' => 'Monthly Billing', 'url' => 'reports/bill/monthly-billing', 'icon' => 'fas fa-fw fa-calendar-alt', 'icon_color' => 'blue'],
             [
                 'text' => 'Daily Collection',    
                 'url' => 'reports/bill/daily-collection', 

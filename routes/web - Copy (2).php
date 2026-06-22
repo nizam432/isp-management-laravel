@@ -5,8 +5,8 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\PackageController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\Reports\BillCollectionReportController;
 use App\Http\Controllers\PaymentController;
-use App\Http\Controllers\TicketController;
 use App\Http\Controllers\AgentController;
 use App\Http\Controllers\MikrotikController;
 use App\Http\Controllers\InventoryController;
@@ -142,9 +142,6 @@ Route::middleware(['auth'])->group(function () {
     Route::get('payments/customer-due/{customer}',  [PaymentController::class, 'customerDue'])->name('payments.customer-due')->middleware('can:payment.view');
     Route::post('payments/{payment}/void',          [PaymentController::class, 'void'])->name('payments.void')->middleware('can:payment.void');
 
-    // ── Tickets (legacy — dashboard & customers/show reference) ───
-    Route::resource('tickets', TicketController::class)->except(['edit']);
-    Route::post('tickets/{ticket}/reply', [TicketController::class, 'reply'])->name('tickets.reply');
 
     // ── Support & Ticketing ────────────────────
 
@@ -394,6 +391,15 @@ Route::middleware(['auth'])->group(function () {
         Route::post  ('sub-zones',           [SubZoneController::class, 'store'])  ->name('sub-zones.store');
         Route::put   ('sub-zones/{subZone}', [SubZoneController::class, 'update']) ->name('sub-zones.update');
         Route::delete('sub-zones/{subZone}', [SubZoneController::class, 'destroy'])->name('sub-zones.destroy');
+
+        // Box
+        Route::get   ('box',              [App\Http\Controllers\Settings\BoxController::class, 'index'])      ->name('box.index');
+        Route::get   ('box/sub-zones',    [App\Http\Controllers\Settings\BoxController::class, 'getSubZones']) ->name('box.sub-zones');
+        Route::post  ('box',              [App\Http\Controllers\Settings\BoxController::class, 'store'])      ->name('box.store');
+        Route::get   ('box/{box}/edit',   [App\Http\Controllers\Settings\BoxController::class, 'edit'])       ->name('box.edit');
+        Route::put   ('box/{box}',        [App\Http\Controllers\Settings\BoxController::class, 'update'])     ->name('box.update');
+        Route::delete('box/{box}',        [App\Http\Controllers\Settings\BoxController::class, 'destroy'])    ->name('box.destroy');
+        Route::post  ('box/{box}/toggle', [App\Http\Controllers\Settings\BoxController::class, 'toggle'])     ->name('box.toggle');
 
         // Connection Types
         Route::get   ('connection-types',                         [ConnectionTypeController::class, 'index'])  ->name('connection-types.index');
@@ -676,4 +682,15 @@ Route::prefix('client/payment')->group(function () {
     Route::post('stripe/webhook', [OnlinePaymentController::class, 'stripeWebhook'])
          ->name('client.payment.stripe-webhook')
          ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+});
+
+ // ── Bill / Collection Reports (Tier 1) ──────
+Route::prefix('reports/bill')->name('reports.bill.')->group(function () {
+    Route::get('renewal',          [BillCollectionReportController::class, 'renewal'])->name('renewal')->middleware('can:report.revenue.view');
+    Route::get('aging-due',        [BillCollectionReportController::class, 'agingDue'])->name('aging-due')->middleware('can:report.revenue.view');
+    Route::get('daily-collection', [BillCollectionReportController::class, 'dailyCollection'])->name('daily-collection')->middleware('can:report.collection.view');
+    Route::get('package-revenue',  [BillCollectionReportController::class, 'packageRevenue'])->name('package-revenue')->middleware('can:report.revenue.view');
+    Route::get('receive-history',  [BillCollectionReportController::class, 'receiveHistory'])->name('receive-history')->middleware('can:report.collection.view');
+    Route::get('receive-history/pdf', [BillCollectionReportController::class, 'exportReceiveHistoryPdf'])->name('receive-history.pdf')->middleware('can:report.collection.view');
+    Route::get('receive-history/csv', [BillCollectionReportController::class, 'exportReceiveHistoryCsv'])->name('receive-history.csv')->middleware('can:report.collection.view');
 });

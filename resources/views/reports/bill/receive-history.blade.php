@@ -5,7 +5,7 @@
         <i class="fas fa-file-pdf mr-1"></i> Generate PDF
     </a>
     <a href="{{ route('reports.bill.receive-history.csv', request()->query()) }}" class="btn btn-success btn-sm">
-        <i class="fas fa-file-csv mr-1"></i> Generate CSV
+        <i class="fas fa-file-excel mr-1"></i> Generate Excel
     </a>
 @endsection
 @section('page_content')
@@ -219,8 +219,6 @@
                 </a>
                 @if(request()->hasAny(['search','package_id','zone_id','sub_zone_id','billing_status','mac_reseller_id','method','received_by','creation_from','creation_to','paid_from','paid_to']))
                     <span class="badge badge-warning ml-2">Filtered: {{ $payments->total() }} results</span>
-                @elseif(!request('creation_from') && !request('creation_to') && !request('paid_from') && !request('paid_to'))
-                    <span class="badge badge-light text-muted ml-2"><i class="fas fa-info-circle"></i> Showing today's entries by default</span>
                 @endif
             </div>
         </form>
@@ -238,7 +236,7 @@
                 @endforeach
                 <label class="mr-2 mb-0 small">Show</label>
                 <select name="show" class="form-control form-control-sm mr-1" style="width:auto" onchange="this.form.submit()">
-                    @foreach([10,25,50,100] as $n)
+                    @foreach([10,25,50,100,500,1000,2000,5000] as $n)
                         <option value="{{ $n }}" {{ $perPage == $n ? 'selected' : '' }}>{{ $n }}</option>
                     @endforeach
                 </select>
@@ -258,7 +256,9 @@
                     <th>Package</th>
                     <th>Agent</th>
                     <th>TrxId</th>
+                    <th>Monthly Bill</th>
                     <th>Received</th>
+                    <th>Creation Date</th>
                     <th>Received By</th>
                     <th>Gateway</th>
                     <th>Note</th>
@@ -269,8 +269,8 @@
                 <tr>
                     <td class="text-muted small">{{ $payments->firstItem() + $i }}</td>
                     <td>
-                        {{ $pay->paid_at ? $pay->paid_at->format('d M Y') : '-' }}
-                        <br><small class="text-muted">{{ $pay->paid_at ? $pay->paid_at->format('h:i A') : '' }}</small>
+                        {{ $pay->paid_at ? \Carbon\Carbon::parse($pay->paid_at)->format('d M Y') : '-' }}
+                        <br><small class="text-muted">{{ $pay->paid_at ? \Carbon\Carbon::parse($pay->paid_at)->format('h:i A') : '' }}</small>
                     </td>
                     <td>
                         <span class="font-weight-bold d-block">{{ $pay->customer->name ?? '-' }}</span>
@@ -291,7 +291,12 @@
                     <td>{{ $pay->customer->package->name ?? '-' }}</td>
                     <td>{{ $pay->customer->agent->name ?? '-' }}</td>
                     <td><small>{{ $pay->transaction_id ?? '-' }}</small></td>
+                    <td>৳{{ number_format($pay->customer->monthly_bill_amount ?? 0, 0) }}</td>
                     <td class="font-weight-bold text-success">৳{{ number_format($pay->amount, 0) }}</td>
+                    <td>
+                        {{ $pay->created_at ? \Carbon\Carbon::parse($pay->created_at)->format('d M Y') : '-' }}
+                        <br><small class="text-muted">{{ $pay->created_at ? \Carbon\Carbon::parse($pay->created_at)->format('h:i A') : '' }}</small>
+                    </td>
                     <td>{{ $pay->receivedBy->name ?? '-' }}</td>
                     <td>
                         @php
@@ -305,15 +310,16 @@
                     <td><small class="text-muted">{{ $pay->remarks ?? '-' }}</small></td>
                 </tr>
                 @empty
-                <tr><td colspan="12" class="text-center text-muted py-4">No collections found for the selected filters.</td></tr>
+                <tr><td colspan="14" class="text-center text-muted py-4">No collections found for the selected filters.</td></tr>
                 @endforelse
             </tbody>
             @if($payments->count())
             <tfoot>
                 <tr class="font-weight-bold">
                     <td colspan="8" class="text-right">Total</td>
+                    <td>৳{{ number_format($grandTotal['monthly_bill'], 0) }}</td>
                     <td>৳{{ number_format($grandTotal['received'], 0) }}</td>
-                    <td colspan="3"></td>
+                    <td colspan="4"></td>
                 </tr>
             </tfoot>
             @endif

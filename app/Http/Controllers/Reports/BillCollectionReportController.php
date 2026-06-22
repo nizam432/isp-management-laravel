@@ -312,57 +312,249 @@ class BillCollectionReportController extends Controller
     }
 
     /**
-     * 5b. Bill Receive History — CSV export
-     * Streams the same filtered result set as a CSV file (no extra package required).
+     * 5b. Bill Receive History — XLSX export
      */
     public function exportReceiveHistoryCsv(Request $request)
     {
-        $payments = $this->buildReceiveHistoryQuery($request)->get();
+        $payments  = $this->buildReceiveHistoryQuery($request)->get();
+        $filename  = 'bill-collection-' . now()->format('Y-m-d') . '.xlsx';
 
-        $filename = 'bill-collection-' . now()->format('Y-m-d') . '.csv';
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet       = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Bill Collection');
 
+        // ── Header row ──
         $headers = [
-            'Content-Type'        => 'text/csv',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'R.Date', 'C.Code', 'Name', 'Mobile', 'Zone',
+            'Package', 'Agent', 'TrxId', 'Monthly Bill', 'Received',
+            'Creation Date', 'Received By', 'Gateway', 'Note',
+        ];
+        $sheet->fromArray($headers, null, 'A1');
+
+        // Bold + background for header
+        $headerStyle = [
+            'font'      => ['bold' => true, 'color' => ['argb' => 'FFFFFFFF']],
+            'fill'      => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['argb' => 'FF1F3864']],
+            'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER],
+        ];
+        $sheet->getStyle('A1:N1')->applyFromArray($headerStyle);
+
+        // ── Data rows ──
+        $row = 2;
+        foreach ($payments as $pay) {
+            $sheet->fromArray([
+                $pay->paid_at ? \Carbon\Carbon::parse($pay->paid_at)->format('d M Y h:i A') : '-',
+                $pay->customer->customer_code ?? '-',
+                $pay->customer->name ?? '-',
+                $pay->customer->phone ?? '-',
+                $pay->customer->zone->name ?? '-',
+                $pay->customer->package->name ?? '-',
+                $pay->customer->agent->name ?? '-',
+                $pay->transaction_id ?? '-',
+                $pay->customer->monthly_bill_amount ?? 0,
+                $pay->amount,
+                $pay->created_at ? \Carbon\Carbon::parse($pay->created_at)->format('d M Y h:i A') : '-',
+                $pay->receivedBy->name ?? '-',
+                strtoupper($pay->method),
+                $pay->remarks ?? '-',
+            ], null, 'A' . $row);
+            $row++;
+        }
+
+        // ── Grand total row ──
+        $sheet->fromArray(['', '', '', '', '', '', '', 'TOTAL', $payments->sum(fn($p) => $p->customer->monthly_bill_amount ?? 0), $payments->sum('amount'), '', '', '', ''], null, 'A' . $row);
+        $sheet->getStyle('A' . $row . ':N' . $row)->applyFromArray([
+            'font' => ['bold' => true],
+            'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFDCE6F1']],
+        ]);
+
+        // ── Auto column width ──
+        foreach (range('A', 'N') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        // ── Output ──
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $tempFile = tempnam(sys_get_temp_dir(), 'xlsx_');
+        $writer->save($tempFile);
+
+        return response()->download($tempFile, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
+    }
+
+    /**
+     * 6. Monthly Billing Report
+     * Month-wise invoice list with customer details, generated/received/due amounts.
+     * Mirrors the "Monthly Billing Report" screen (Monthwise advance & due report).
+     */
+    public function monthlyBilling(Request $request)
+    {
+        $month    = $request->get('month', Carbon::now()->format('Y-m'));
+        $perPage  = (int) $request->get('show', 25);
+        $invoices = $this->buildMonthlyBillingQuery($request)->paginate($perPage)->withQueryString();
+
+        $allInvoices = $this->buildMonthlyBillingQuery($request)->get();
+        $grandTotal  = [
+            'generated' => $allInvoices->sum('amount'),
+            'received'  => $allInvoices->sum(fn ($inv) => $inv->amount - $inv->due_amount),
+            'due'       => $allInvoices->sum('due_amount'),
+            'advance'   => $allInvoices->sum(fn ($inv) => $inv->customer->advance_balance ?? 0),
         ];
 
-        $callback = function () use ($payments) {
-            $handle = fopen('php://output', 'w');
+        $zones           = Zone::orderBy('name')->get();
+        $packages        = Package::orderBy('name')->get();
+        $clientTypes     = \App\Models\ClientType::orderBy('name')->get();
+        $connectionTypes = \App\Models\ConnectionType::orderBy('name')->get();
+        $protocolTypes   = \App\Models\ProtocolType::orderBy('name')->get();
+        $routers         = \App\Models\MikrotikRouter::orderBy('name')->get();
 
-            // Header row
-            fputcsv($handle, [
-                'R.Date', 'C.Code', 'ID/IP', 'Name', 'Mobile', 'Zone', 'SubZone',
-                'Package', 'B.Status', 'Agent', 'TrxId', 'Monthly Bill', 'Received',
-                'Created By', 'Creation Date', 'Received By', 'Payment Gateway', 'Note/Remarks',
-            ]);
+        return view('reports.bill.monthly-billing', compact(
+            'invoices', 'grandTotal', 'month', 'perPage',
+            'zones', 'packages', 'clientTypes', 'connectionTypes', 'protocolTypes', 'routers'
+        ));
+    }
 
-            foreach ($payments as $pay) {
-                fputcsv($handle, [
-                    $pay->paid_at ? $pay->paid_at->format('d M Y h:i A') : '-',
-                    $pay->customer->customer_code ?? '-',
-                    $pay->customer->pppoe_username ?? $pay->customer->ip_address ?? '-',
-                    $pay->customer->name ?? '-',
-                    $pay->customer->phone ?? '-',
-                    $pay->customer->zone->name ?? '-',
-                    $pay->customer->subZone->name ?? '-',
-                    $pay->customer->package->name ?? '-',
-                    ucfirst($pay->customer->billing_status ?? '-'),
-                    $pay->customer->agent->name ?? '-',
-                    $pay->transaction_id ?? '-',
-                    number_format($pay->customer->monthly_bill_amount ?? 0, 2, '.', ''),
-                    number_format($pay->amount, 2, '.', ''),
-                    $pay->receivedBy->name ?? '-',
-                    $pay->created_at ? $pay->created_at->format('d M Y h:i A') : '-',
-                    $pay->receivedBy->name ?? '-',
-                    strtoupper($pay->method),
-                    $pay->remarks ?? '-',
-                ]);
-            }
+    /**
+     * 6a. Monthly Billing Report — PDF Export
+     */
+    public function exportMonthlyBillingPdf(Request $request)
+    {
+        $month    = $request->get('month', Carbon::now()->format('Y-m'));
+        $invoices = $this->buildMonthlyBillingQuery($request)->get();
 
-            fclose($handle);
-        };
+        $grandTotal = [
+            'generated' => $invoices->sum('amount'),
+            'received'  => $invoices->sum(fn ($inv) => $inv->amount - $inv->due_amount),
+            'due'       => $invoices->sum('due_amount'),
+            'advance'   => $invoices->sum(fn ($inv) => $inv->customer->advance_balance ?? 0),
+        ];
 
-        return response()->stream($callback, 200, $headers);
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView(
+            'reports.bill.monthly-billing-pdf',
+            compact('invoices', 'grandTotal', 'month')
+        )->setPaper('a4', 'landscape');
+
+        return $pdf->download('monthly-billing-' . $month . '.pdf');
+    }
+
+    /**
+     * 6b. Monthly Billing Report — XLSX Export
+     */
+    public function exportMonthlyBillingCsv(Request $request)
+    {
+        $month    = $request->get('month', Carbon::now()->format('Y-m'));
+        $invoices = $this->buildMonthlyBillingQuery($request)->get();
+        $filename = 'monthly-billing-' . $month . '.xlsx';
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet       = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Monthly Billing');
+
+        // ── Header row ──
+        $headers = [
+            '#', 'C.Code', 'ID/IP', 'Name', 'Mobile', 'Zone', 'Cus.Type',
+            'Conn.Type', 'R.Address', 'Package', 'Speed',
+            'Generated', 'Received', 'Balance Due', 'Advance', 'Payment Date', 'Server',
+        ];
+        $sheet->fromArray($headers, null, 'A1');
+
+        $headerStyle = [
+            'font'      => ['bold' => true, 'color' => ['argb' => 'FFFFFFFF']],
+            'fill'      => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['argb' => 'FF1F3864']],
+            'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER],
+        ];
+        $sheet->getStyle('A1:Q1')->applyFromArray($headerStyle);
+
+        // ── Data rows ──
+        $row = 2;
+        foreach ($invoices as $i => $inv) {
+            $cust = $inv->customer;
+            $sheet->fromArray([
+                $i + 1,
+                $cust->customer_code ?? '-',
+                $cust->pppoe_username ?? $cust->ip_address ?? '-',
+                $cust->name ?? '-',
+                $cust->phone ?? '-',
+                $cust->zone->name ?? '-',
+                $cust->clientType->name ?? '-',
+                $cust->connectionType->name ?? '-',
+                $cust->address ?? '-',
+                $cust->package->name ?? '-',
+                ($cust->package->speed_download ?? '-') . 'Mbps',
+                $inv->amount,
+                $inv->amount - $inv->due_amount,
+                $inv->due_amount,
+                $cust->advance_balance ?? 0,
+                $cust->last_payment_date ? \Carbon\Carbon::parse($cust->last_payment_date)->format('d M Y') : '-',
+                $cust->router->name ?? '-',
+            ], null, 'A' . $row);
+            $row++;
+        }
+
+        // ── Grand total row ──
+        $sheet->fromArray([
+            '', '', '', '', '', '', '', '', '', '', 'TOTAL',
+            $invoices->sum('amount'),
+            $invoices->sum(fn ($inv) => $inv->amount - $inv->due_amount),
+            $invoices->sum('due_amount'),
+            $invoices->sum(fn ($inv) => $inv->customer->advance_balance ?? 0),
+            '', '',
+        ], null, 'A' . $row);
+        $sheet->getStyle('A' . $row . ':Q' . $row)->applyFromArray([
+            'font' => ['bold' => true],
+            'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFDCE6F1']],
+        ]);
+
+        // ── Auto column width ──
+        foreach (range('A', 'Q') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        // ── Output ──
+        $writer   = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $tempFile = tempnam(sys_get_temp_dir(), 'xlsx_');
+        $writer->save($tempFile);
+
+        return response()->download($tempFile, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
+    }
+
+    /**
+     * Shared filter query builder for Monthly Billing Report.
+     */
+    private function buildMonthlyBillingQuery(Request $request)
+    {
+        $month = $request->get('month', Carbon::now()->format('Y-m'));
+
+        $query = Invoice::query()
+            ->with([
+                'customer.zone', 'customer.clientType', 'customer.connectionType',
+                'customer.protocolType', 'customer.package', 'customer.router',
+            ])
+            ->where('month', $month);
+
+        if ($zoneId = $request->get('zone_id'))
+            $query->whereHas('customer', fn ($q) => $q->where('zone_id', $zoneId));
+        if ($packageId = $request->get('package_id'))
+            $query->where('package_id', $packageId);
+        if ($clientTypeId = $request->get('client_type_id'))
+            $query->whereHas('customer', fn ($q) => $q->where('client_type_id', $clientTypeId));
+        if ($connectionTypeId = $request->get('connection_type_id'))
+            $query->whereHas('customer', fn ($q) => $q->where('connection_type_id', $connectionTypeId));
+        if ($protocolTypeId = $request->get('protocol_type_id'))
+            $query->whereHas('customer', fn ($q) => $q->where('protocol_type_id', $protocolTypeId));
+        if ($billingStatus = $request->get('billing_status'))
+            $query->whereHas('customer', fn ($q) => $q->where('billing_status', $billingStatus));
+        if ($paymentStatus = $request->get('payment_status'))
+            $query->where('status', $paymentStatus);
+        if ($mikrotikStatus = $request->get('mikrotik_status'))
+            $query->whereHas('customer', fn ($q) => $q->where('mikrotik_status', $mikrotikStatus));
+        if ($routerId = $request->get('router_id'))
+            $query->whereHas('customer', fn ($q) => $q->where('router_id', $routerId));
+
+        return $query;
     }
 
     /**
@@ -433,11 +625,8 @@ class BillCollectionReportController extends Controller
             $query->whereDate('paid_at', '<=', Carbon::parse($paidTo));
         }
 
-        // Default: show today's entries if absolutely no date filter given,
-        // so the page never loads the full lifetime history by accident.
-        if (!$creationFrom && !$creationTo && !$paidFrom && !$paidTo) {
-            $query->whereDate('paid_at', Carbon::today());
-        }
+        // No default date filter — show all payments when no filter is applied.
+        // Users can narrow results using the date range filters above.
 
         return $query->where('status', 'active')->orderByDesc('paid_at');
     }

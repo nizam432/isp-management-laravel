@@ -644,9 +644,22 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('recurring/{bwsInvoice}',      [BwsInvoiceController::class, 'recurringDestroy'])->name('recurring.destroy');
 
     }); // end bandwidth-sale
-   
-}); // end auth
 
+    // ── Bill / Collection Reports (Tier 1) ──────
+    Route::prefix('reports/bill')->name('reports.bill.')->group(function () {
+        Route::get('renewal',             [BillCollectionReportController::class, 'renewal'])->name('renewal')->middleware('can:report.revenue.view');
+        Route::get('aging-due',           [BillCollectionReportController::class, 'agingDue'])->name('aging-due')->middleware('can:report.revenue.view');
+        Route::get('daily-collection',    [BillCollectionReportController::class, 'dailyCollection'])->name('daily-collection')->middleware('can:report.collection.view');
+        Route::get('package-revenue',     [BillCollectionReportController::class, 'packageRevenue'])->name('package-revenue')->middleware('can:report.revenue.view');
+        Route::get('receive-history',     [BillCollectionReportController::class, 'receiveHistory'])->name('receive-history')->middleware('can:report.collection.view');
+        Route::get('receive-history/pdf', [BillCollectionReportController::class, 'exportReceiveHistoryPdf'])->name('receive-history.pdf')->middleware('can:report.collection.view');
+        Route::get('receive-history/csv', [BillCollectionReportController::class, 'exportReceiveHistoryCsv'])->name('receive-history.csv')->middleware('can:report.collection.view');
+        Route::get('monthly-billing',     [BillCollectionReportController::class, 'monthlyBilling'])->name('monthly-billing')->middleware('can:report.revenue.view');
+        Route::get('monthly-billing/pdf', [BillCollectionReportController::class, 'exportMonthlyBillingPdf'])->name('monthly-billing.pdf')->middleware('can:report.revenue.view');
+        Route::get('monthly-billing/csv', [BillCollectionReportController::class, 'exportMonthlyBillingCsv'])->name('monthly-billing.csv')->middleware('can:report.revenue.view');
+    });
+
+}); // end auth
 // ─────────────────────────────────────────────
 // Client Portal Routes (নিজস্ব guard — auth এর বাইরে)
 // ─────────────────────────────────────────────
@@ -682,15 +695,4 @@ Route::prefix('client/payment')->group(function () {
     Route::post('stripe/webhook', [OnlinePaymentController::class, 'stripeWebhook'])
          ->name('client.payment.stripe-webhook')
          ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
-});
-
- // ── Bill / Collection Reports (Tier 1) ──────
-Route::prefix('reports/bill')->name('reports.bill.')->group(function () {
-    Route::get('renewal',          [BillCollectionReportController::class, 'renewal'])->name('renewal')->middleware('can:report.revenue.view');
-    Route::get('aging-due',        [BillCollectionReportController::class, 'agingDue'])->name('aging-due')->middleware('can:report.revenue.view');
-    Route::get('daily-collection', [BillCollectionReportController::class, 'dailyCollection'])->name('daily-collection')->middleware('can:report.collection.view');
-    Route::get('package-revenue',  [BillCollectionReportController::class, 'packageRevenue'])->name('package-revenue')->middleware('can:report.revenue.view');
-    Route::get('receive-history',  [BillCollectionReportController::class, 'receiveHistory'])->name('receive-history')->middleware('can:report.collection.view');
-    Route::get('receive-history/pdf', [BillCollectionReportController::class, 'exportReceiveHistoryPdf'])->name('receive-history.pdf')->middleware('can:report.collection.view');
-    Route::get('receive-history/csv', [BillCollectionReportController::class, 'exportReceiveHistoryCsv'])->name('receive-history.csv')->middleware('can:report.collection.view');
 });
