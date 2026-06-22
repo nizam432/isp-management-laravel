@@ -485,22 +485,14 @@ return [
             ['text' => 'Expense Report', 'url' => 'reports/bill/expense', 'icon' => 'fas fa-fw fa-arrow-circle-down', 'icon_color' => 'red'],            
             ['text' => 'Customer Report',   'url' => 'reports/bill/customer',  'icon' => 'fas fa-fw fa-users',    'icon_color' => 'teal'],
             ['text' => 'POP Wise Clients',  'url' => 'reports/bill/pop-wise',  'icon' => 'fas fa-fw fa-sitemap',  'icon_color' => 'blue'],            
+            ['text' => 'Profit & Loss', 'url' => 'reports/bill/profit', 'icon' => 'fas fa-fw fa-chart-line', 'icon_color' => 'green'],
             [
                 'text' => 'Daily Collection',    
                 'url' => 'reports/bill/daily-collection', 
                 'icon' => 'fas fa-fw fa-cash-register',   
                 'icon_color' => 'green'
             ],
-            [
-                'text' => 'Revenue',
-                'url'  => 'reports/revenue',
-                'icon' => 'fas fa-fw fa-chart-line',
-            ],
-            [
-                'text' => 'Collection',
-                'url'  => 'reports/customers',
-                'icon' => 'fas fa-fw fa-users',
-            ],
+
             [
                 'text' => 'SMS Reports',
                 'url'  => 'sms/reports',

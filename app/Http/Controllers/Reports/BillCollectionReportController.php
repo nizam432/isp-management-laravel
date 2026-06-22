@@ -763,4 +763,160 @@ class BillCollectionReportController extends Controller
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ])->deleteFileAfterSend(true);
     }
+
+    /**
+     * 8. Profit & Loss Report
+     * Income (payments + manual) - Expense = Net Profit, for a date range.
+     */
+    public function profitReport(Request $request)
+    {
+        $from = $request->get('from_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
+        $to   = $request->get('to_date',   Carbon::now()->format('Y-m-d'));
+
+        $paymentIncome = \App\Models\Payment::query()
+            ->where('status', 'active')
+            ->whereBetween('paid_at', [$from . ' 00:00:00', $to . ' 23:59:59'])
+            ->sum('amount');
+
+        $manualIncome = \App\Models\Income::query()
+            ->where('status', 'active')
+            ->whereBetween('income_date', [$from, $to])
+            ->sum('amount');
+
+        $totalIncome  = $paymentIncome + $manualIncome;
+
+        $totalExpense = \App\Models\Expense::query()
+            ->whereIn('status', ['approved', 'pending'])
+            ->whereBetween('expense_date', [$from, $to])
+            ->sum('amount');
+
+        $netProfit = $totalIncome - $totalExpense;
+
+        // Monthly breakdown
+        $months  = [];
+        $current = Carbon::parse($from)->startOfMonth();
+        $end     = Carbon::parse($to)->startOfMonth();
+
+        while ($current->lte($end)) {
+            $mFrom = $current->copy()->startOfMonth()->format('Y-m-d');
+            $mTo   = $current->copy()->endOfMonth()->format('Y-m-d');
+
+            $mPayment = \App\Models\Payment::query()->where('status','active')->whereBetween('paid_at',[$mFrom.' 00:00:00',$mTo.' 23:59:59'])->sum('amount');
+            $mManual  = \App\Models\Income::query()->where('status','active')->whereBetween('income_date',[$mFrom,$mTo])->sum('amount');
+            $mExpense = \App\Models\Expense::query()->whereIn('status',['approved','pending'])->whereBetween('expense_date',[$mFrom,$mTo])->sum('amount');
+            $mIncome  = $mPayment + $mManual;
+
+            $months[] = [
+                'month'   => $current->format('M Y'),
+                'income'  => $mIncome,
+                'expense' => $mExpense,
+                'profit'  => $mIncome - $mExpense,
+            ];
+            $current->addMonth();
+        }
+
+        // Expense by category
+        $expenseByCategory = \App\Models\Expense::query()
+            ->with('category')->whereIn('status',['approved','pending'])->whereBetween('expense_date',[$from,$to])->get()
+            ->groupBy('category_id')
+            ->map(fn($items) => ['name' => $items->first()->category->name ?? 'Unknown', 'amount' => $items->sum('amount')])
+            ->sortByDesc('amount')->values();
+
+        // Income by category
+        $incomeByCategory = \App\Models\Income::query()
+            ->with('category')->where('status','active')->whereBetween('income_date',[$from,$to])->get()
+            ->groupBy('category_id')
+            ->map(fn($items) => ['name' => $items->first()->category->name ?? 'Unknown', 'amount' => $items->sum('amount')])
+            ->sortByDesc('amount')->values();
+
+        if ($paymentIncome > 0) {
+            $incomeByCategory->prepend(['name' => 'Monthly Bill (Payments)', 'amount' => $paymentIncome]);
+        }
+
+        return view('reports.bill.profit-report', compact(
+            'from', 'to', 'totalIncome', 'totalExpense', 'netProfit',
+            'paymentIncome', 'manualIncome', 'months', 'expenseByCategory', 'incomeByCategory'
+        ));
+    }
+
+    public function exportProfitPdf(Request $request)
+    {
+        $from = $request->get('from_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
+        $to   = $request->get('to_date',   Carbon::now()->format('Y-m-d'));
+
+        $paymentIncome = \App\Models\Payment::query()->where('status','active')->whereBetween('paid_at',[$from.' 00:00:00',$to.' 23:59:59'])->sum('amount');
+        $manualIncome  = \App\Models\Income::query()->where('status','active')->whereBetween('income_date',[$from,$to])->sum('amount');
+        $totalIncome   = $paymentIncome + $manualIncome;
+        $totalExpense  = \App\Models\Expense::query()->whereIn('status',['approved','pending'])->whereBetween('expense_date',[$from,$to])->sum('amount');
+        $netProfit     = $totalIncome - $totalExpense;
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView(
+            'reports.bill.profit-report-pdf',
+            compact('from','to','totalIncome','totalExpense','netProfit','paymentIncome','manualIncome')
+        )->setPaper('a4', 'portrait');
+
+        return $pdf->download('profit-report-' . $from . '-to-' . $to . '.pdf');
+    }
+
+    public function exportProfitXlsx(Request $request)
+    {
+        $from = $request->get('from_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
+        $to   = $request->get('to_date',   Carbon::now()->format('Y-m-d'));
+
+        $paymentIncome = \App\Models\Payment::query()->where('status','active')->whereBetween('paid_at',[$from.' 00:00:00',$to.' 23:59:59'])->sum('amount');
+        $manualIncome  = \App\Models\Income::query()->where('status','active')->whereBetween('income_date',[$from,$to])->sum('amount');
+        $totalIncome   = $paymentIncome + $manualIncome;
+        $totalExpense  = \App\Models\Expense::query()->whereIn('status',['approved','pending'])->whereBetween('expense_date',[$from,$to])->sum('amount');
+        $netProfit     = $totalIncome - $totalExpense;
+
+        $filename    = 'profit-report-' . $from . '-to-' . $to . '.xlsx';
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet       = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Profit & Loss');
+
+        $sheet->setCellValue('A1', 'Profit & Loss Report');
+        $sheet->setCellValue('A2', 'Period: ' . Carbon::parse($from)->format('d M Y') . ' — ' . Carbon::parse($to)->format('d M Y'));
+        $sheet->getStyle('A1')->applyFromArray(['font' => ['bold' => true, 'size' => 14]]);
+        $sheet->getStyle('A2')->applyFromArray(['font' => ['italic' => true]]);
+
+        $sheet->fromArray(['Item', 'Amount (BDT)'], null, 'A4');
+        $sheet->getStyle('A4:B4')->applyFromArray([
+            'font' => ['bold' => true, 'color' => ['argb' => 'FFFFFFFF']],
+            'fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['argb' => 'FF1F3864']],
+        ]);
+
+        $dataRows = [
+            ['Monthly Bill (Payments)', $paymentIncome, 'FFD5F5E3'],
+            ['Other Manual Income',     $manualIncome,  'FFD5F5E3'],
+            ['TOTAL INCOME',            $totalIncome,   'FF1E8449'],
+            ['', '', ''],
+            ['TOTAL EXPENSE',           $totalExpense,  'FFFADBD8'],
+            ['', '', ''],
+            ['NET PROFIT / LOSS',       $netProfit,     $netProfit >= 0 ? 'FF27AE60' : 'FFC0392B'],
+        ];
+
+        $row = 5;
+        foreach ($dataRows as $r) {
+            $sheet->setCellValue('A' . $row, $r[0]);
+            $sheet->setCellValue('B' . $row, $r[1] ?: '');
+            if ($r[2]) {
+                $isBold = in_array($r[0], ['TOTAL INCOME', 'TOTAL EXPENSE', 'NET PROFIT / LOSS']);
+                $style = ['fill' => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID, 'startColor' => ['argb' => $r[2]]]];
+                if ($isBold) $style['font'] = ['bold' => true, 'color' => ['argb' => in_array($r[0], ['TOTAL INCOME','NET PROFIT / LOSS']) ? 'FFFFFFFF' : 'FF000000']];
+                $sheet->getStyle('A' . $row . ':B' . $row)->applyFromArray($style);
+            }
+            $row++;
+        }
+
+        $sheet->getColumnDimension('A')->setWidth(35);
+        $sheet->getColumnDimension('B')->setWidth(20);
+
+        $writer   = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $tempFile = tempnam(sys_get_temp_dir(), 'xlsx_');
+        $writer->save($tempFile);
+
+        return response()->download($tempFile, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
+    }
 }

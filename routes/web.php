@@ -684,6 +684,11 @@ Route::middleware(['auth'])->group(function () {
         Route::get('income-discount',      [BillCollectionReportController::class, 'incomeDiscount'])->name('income-discount')->middleware('can:report.revenue.view');
         Route::get('income-discount/pdf',  [BillCollectionReportController::class, 'exportIncomeDiscountPdf'])->name('income-discount.pdf')->middleware('can:report.revenue.view');
         Route::get('income-discount/xlsx', [BillCollectionReportController::class, 'exportIncomeDiscountXlsx'])->name('income-discount.xlsx')->middleware('can:report.revenue.view');
+
+        // ── Profit & Loss Report ──
+        Route::get('profit',      [BillCollectionReportController::class, 'profitReport'])->name('profit')->middleware('can:report.revenue.view');
+        Route::get('profit/pdf',  [BillCollectionReportController::class, 'exportProfitPdf'])->name('profit.pdf')->middleware('can:report.revenue.view');
+        Route::get('profit/xlsx', [BillCollectionReportController::class, 'exportProfitXlsx'])->name('profit.xlsx')->middleware('can:report.revenue.view');
     });
 
 }); // end auth
