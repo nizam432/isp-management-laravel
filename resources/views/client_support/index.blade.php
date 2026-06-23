@@ -250,6 +250,7 @@
                             </option>
                         @endforeach
                     </select>
+                    <div class="invalid-feedback" id="ticket_customer_id_err"></div>
                 </div>
                 <input type="hidden" id="ticket_customer_id">
 
@@ -373,6 +374,7 @@
                     <textarea id="ticket_remarks" class="form-control" rows="4"></textarea>
                     <div class="invalid-feedback" id="ticket_remarks_err"></div>
                 </div>
+                <div id="ticketMessage" class="alert alert-danger d-none" role="alert"></div>
             </div>
             <div class="modal-footer justify-content-between">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -499,6 +501,7 @@ $(function () {
         width: '100%',
         placeholder: '— Type name or phone to search —',
         allowClear: true,
+        dropdownParent: $('#ticketModal'),
     });
 
     $('#customerSelect2').on('change', function () {
@@ -540,8 +543,19 @@ $('#btnNewTicket').click(() => {
     $('#ticketModal').modal('show');
 });
 
+function showTicketMessage(message, type = 'danger') {
+    $('#ticketMessage')
+        .removeClass('d-none alert-danger alert-success alert-warning')
+        .addClass(`alert-${type}`)
+        .text(message);
+}
+
+function clearTicketMessage() {
+    $('#ticketMessage').addClass('d-none').text('');
+}
+
 function clearTicketForm() {
-    $('#customerSelect2').val('').trigger('change');
+    $('#customerSelect2').val('').trigger('change').select2('close').removeClass('is-invalid');
     $('#ticket_customer_id').val('');
     $('#customerInfo').addClass('d-none');
     $('#ticket_category').val('').removeClass('is-invalid');
@@ -549,9 +563,16 @@ function clearTicketForm() {
     $('#ticket_complained_no').val('').removeClass('is-invalid');
     $('#ticket_remarks').val('').removeClass('is-invalid');
     $('#ticket_send_sms').prop('checked', false);
+    $('#ticket_customer_id_err').text('');
+    clearTicketMessage();
 }
 
 $('#btnTicketClear').click(clearTicketForm);
+
+$('#ticketModal').on('hidden.bs.modal', function () {
+    $('#customerSelect2').select2('close');
+    clearTicketMessage();
+});
 
 $('#btnTicketSave').click(function () {
     const id   = $('#ticket_id').val();
@@ -571,8 +592,11 @@ $('#btnTicketSave').click(function () {
     if (file) formData.append('attachment', file);
 
     $.ajax({
-        url, method: 'POST', data: formData,
-        processData: false, contentType: false,
+        url,
+        method: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
         success(res) {
             if (res.success) {
                 if (id) {
@@ -582,18 +606,48 @@ $('#btnTicketSave').click(function () {
                     $('#ticketBody').prepend(buildRow(res.ticket));
                 }
                 $('#ticketModal').modal('hide');
-                toastr.success(res.message);
+                toastr.success(res.message || 'Ticket submitted successfully.');
+                clearTicketForm();
+                return;
             }
+
+            toastr.error(res.message || 'Unable to save the ticket.');
         },
         error(xhr) {
-            const errors = xhr.responseJSON?.errors ?? {};
-            ['category', 'priority', 'complained_no', 'remarks'].forEach(f => {
-                const key = f === 'category' ? 'support_category_id' : (f === 'complained_no' ? 'complained_no' : f);
-                $(`#ticket_${f}`).toggleClass('is-invalid', !!errors[key]);
-                $(`#ticket_${f}_err`).text(errors[key]?.[0] ?? '');
+            const body   = xhr.responseJSON ?? {};
+            const errors = body.errors || {};
+
+            clearTicketMessage();
+
+            // Clear previous feedback
+            ['category', 'priority', 'complained_no', 'remarks', 'customer_id'].forEach(f => {
+                const inputId = f === 'category' ? '#ticket_category' : (f === 'customer_id' ? '#customerSelect2' : `#ticket_${f}`);
+                const errId   = f === 'category' ? '#ticket_category_err' : (f === 'customer_id' ? '#ticket_customer_id_err' : `#ticket_${f}_err`);
+                $(inputId).toggleClass('is-invalid', !!errors[f]);
+                $(errId).text(errors[f]?.[0] ?? '');
             });
+
+            if (Object.keys(errors).length > 0) {
+                const firstError = Object.values(errors)[0][0] ?? 'Please fix the errors and try again.';
+                showTicketMessage(firstError, 'warning');
+                return;
+            }
+
+            if (body.message) {
+                showTicketMessage(body.message, 'danger');
+                return;
+            }
+
+            if (xhr.status === 419) {
+                showTicketMessage('Session expired. Please refresh the page and try again.', 'danger');
+                return;
+            }
+
+            showTicketMessage('An unexpected error occurred while submitting the ticket.', 'danger');
         },
-        complete() { btn.prop('disabled', false).html('Submit'); }
+        complete() {
+            btn.prop('disabled', false).html('Submit');
+        }
     });
 });
 
@@ -609,6 +663,7 @@ $(document).on('click', '.btn-ticket-edit', function () {
 
             // Set Select2
             $('#customerSelect2').val(t.customer_id).trigger('change');
+            $('#ticket_customer_id').val(t.customer_id);
 
             // Override fields from DB (more accurate than data attributes)
             $('#ci_name').val(t.customer.name);
@@ -804,6 +859,8 @@ function buildRow(t) {
     const statusColors   = { pending: 'danger', processing: 'warning', solved: 'success', closed: 'secondary' };
     const pColor = priorityColors[t.priority] || 'secondary';
     const sColor = statusColors[t.status]     || 'secondary';
+    const priorityLabel = t.priority ? t.priority.charAt(0).toUpperCase() + t.priority.slice(1) : '—';
+    const statusLabel   = t.status ? t.status.charAt(0).toUpperCase() + t.status.slice(1) : '—';
 
     return `<tr id="ticket-row-${t.id}">
         <td><small>${t.ticket_no}</small></td>
@@ -815,13 +872,13 @@ function buildRow(t) {
         <td><small>${t.zone}</small></td>
         <td><small>${t.sub_zone}</small></td>
         <td><small>${t.category}</small></td>
-        <td><span class="badge badge-${pColor}">${t.priority.charAt(0).toUpperCase()+t.priority.slice(1)}</span></td>
+        <td><span class="badge badge-${pColor}">${priorityLabel}</span></td>
         <td><small>${t.created_at}</small></td>
         <td><small>${t.created_by}</small></td>
         <td class="status-badge">
             ${t.status === 'processing'
                 ? `<span class="badge badge-warning btn-ticket-solve" data-id="${t.id}" data-mac="${t.mac_address??''}" data-ip="${t.ip_address??''}" style="cursor:pointer;">Processing</span>`
-                : `<span class="badge badge-${sColor}">${t.status.charAt(0).toUpperCase()+t.status.slice(1)}</span>`
+                : `<span class="badge badge-${sColor}">${statusLabel}</span>`
             }
         </td>
         <td class="assign-cell"><small>${t.assignees.map(a=>a.name).join(', ') || '—'}</small></td>

@@ -139,7 +139,7 @@
     </div>
 
     {{-- ── STEP 2: Service Lines ────────────────────────────────────────────── --}}
-    <div class="card border-0 shadow-sm" style="border-radius:12px; overflow:hidden;">
+    <div class="card border-0 shadow-sm service-lines-card" style="border-radius:12px; overflow:visible;">
         {{-- step header --}}
         <div class="card-header border-0 py-3 px-4"
              style="background:linear-gradient(135deg,#1b5e20,#388e3c);">
@@ -161,14 +161,19 @@
                     </button>
                     <div class="dropdown-menu dropdown-menu-right shadow"
                          aria-labelledby="addSvcDropdown"
-                         style="border-radius:10px; min-width:180px; border:none;">
+                         style="z-index: 2100; border-radius:10px; min-width:220px; max-height:320px; overflow-y:auto; border:none;">
                         <h6 class="dropdown-header" style="font-size:11px;">SELECT SERVICE</h6>
                         @foreach($services as $svc)
-                        <a class="dropdown-item svc-pick py-2"
+                        <a class="dropdown-item svc-pick py-2 {{ $svc->is_active ? '' : 'inactive-svc' }}"
                            data-id="{{ $svc->id }}" data-name="{{ $svc->name }}"
                            href="javascript:void(0)"
-                           style="font-size:13px; font-weight:600;">
-                            <i class="fas fa-wifi mr-2 text-primary" style="font-size:11px;"></i>{{ $svc->name }}
+                           style="font-size:13px; font-weight:600; display:flex; align-items:center; justify-content:space-between;">
+                            <span>
+                                <i class="fas fa-wifi mr-2 text-primary" style="font-size:11px;"></i>{{ $svc->name }}
+                            </span>
+                            @if(!$svc->is_active)
+                                <span class="service-status">inactive</span>
+                            @endif
                         </a>
                         @endforeach
                     </div>
@@ -434,7 +439,16 @@
 #toast-container { z-index: 99999 !important; }
 
 /* ── Dropdown menu ───────────────────────────────────────────────── */
+.service-lines-card { overflow: visible !important; }
+.dropdown-menu.show {
+    z-index: 2100 !important;
+}
 .svc-pick:hover { background: #e8f5e9 !important; }
+.inactive-svc { color: #999 !important; background: #fcfcfc; }
+.inactive-svc .service-status {
+    font-size: 11px; color: #888; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .4px;
+}
 
 </style>
 @stop
@@ -532,8 +546,9 @@ $(function () {
         if (billingVal) {
             const p = billingVal.split('/');
             if (p.length === 3) {
-                fromDate = p[0] + '-01-' + p[2];
-                toDate   = p[0] + '-' + p[1] + '-' + p[2];
+                // Use slash-separated dates (MM/DD/YYYY) so PHP strtotime accepts them reliably
+                fromDate = p[0] + '/01/' + p[2];
+                toDate   = p[0] + '/' + p[1] + '/' + p[2];
             }
         }
 
@@ -549,14 +564,14 @@ $(function () {
                 <input type="hidden" name="lines[${idx}][service_id]" value="${id}">
             </td>
             <td>
-                <input type="text" name="lines[${idx}][from_date]"
-                       class="form-control form-control-sm datepicker line-date"
-                       value="${fromDate}" required autocomplete="off" placeholder="MM-DD-YYYY">
+                  <input type="text" name="lines[${idx}][from_date]"
+                      class="form-control form-control-sm datepicker line-date"
+                      value="${fromDate}" required autocomplete="off" placeholder="MM/DD/YYYY">
             </td>
             <td>
-                <input type="text" name="lines[${idx}][to_date]"
-                       class="form-control form-control-sm datepicker line-date"
-                       value="${toDate}" required autocomplete="off" placeholder="MM-DD-YYYY">
+                  <input type="text" name="lines[${idx}][to_date]"
+                      class="form-control form-control-sm datepicker line-date"
+                      value="${toDate}" required autocomplete="off" placeholder="MM/DD/YYYY">
             </td>
             <td>
                 <input type="number" name="lines[${idx}][quantity_mb]"
@@ -591,7 +606,7 @@ $(function () {
 
         // Init datepicker on newly added inputs
         $('#linesBody .datepicker:not(.hasDatepicker)').datepicker({
-            format: 'mm-dd-yyyy', autoclose: true
+            format: 'mm/dd/yyyy', autoclose: true
         });
 
         recalc();

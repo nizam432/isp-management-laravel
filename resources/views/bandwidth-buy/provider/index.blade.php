@@ -17,28 +17,6 @@
 
 @section('content')
 
-{{-- ── Summary Cards ──────────────────────────────────────────────────────── --}}
-<div class="row mb-3">
-    <div class="col-md-3 col-sm-6">
-        <div class="info-box shadow-sm mb-0">
-            <span class="info-box-icon bg-primary elevation-1"><i class="fas fa-building"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">Total Providers</span>
-                <span class="info-box-number" id="statTotal">{{ $providers->count() }}</span>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 col-sm-6">
-        <div class="info-box shadow-sm mb-0">
-            <span class="info-box-icon bg-success elevation-1"><i class="fas fa-check-circle"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">Active</span>
-                <span class="info-box-number" id="statActive">{{ $providers->where('is_active',1)->count() }}</span>
-            </div>
-        </div>
-    </div>
-</div>
-
 {{-- ── Table Card ──────────────────────────────────────────────────────────── --}}
 <div class="card shadow-sm">
     <div class="card-header py-2 d-flex justify-content-between align-items-center"
@@ -62,7 +40,6 @@
                         <th>Email</th>
                         <th>Phone</th>
                         <th>Address</th>
-                        <th class="text-center">Logo</th>
                         <th class="text-center" style="width:100px;">Action</th>
                     </tr>
                 </thead>
@@ -72,11 +49,17 @@
                         <td class="text-center text-muted small">{{ $i + 1 }}</td>
                         <td>
                             <div class="d-flex align-items-center">
-                                <div class="provider-avatar mr-2"
-                                     style="width:38px;height:38px;border-radius:50%;background:{{ ['#1976D2','#388E3C','#F57C00','#7B1FA2','#C62828','#00838F'][($p->id - 1) % 6] }};
-                                            display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;flex-shrink:0;">
-                                    {{ strtoupper(substr($p->company_name, 0, 1)) }}
-                                </div>
+                                @if($p->document)
+                                    <img src="{{ asset('storage/'.$p->document) }}"
+                                         alt="logo"
+                                         style="height:38px;width:38px;object-fit:contain;border-radius:6px;border:1px solid #eee;padding:2px;background:#fff;margin-right:10px;">
+                                @else
+                                    <div class="provider-avatar mr-2"
+                                         style="width:38px;height:38px;border-radius:50%;background:{{ ['#1976D2','#388E3C','#F57C00','#7B1FA2','#C62828','#00838F'][($p->id - 1) % 6] }};
+                                                display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;flex-shrink:0;">
+                                        {{ strtoupper(substr($p->company_name, 0, 1)) }}
+                                    </div>
+                                @endif
                                 <div>
                                     <div class="font-weight-bold text-dark">{{ $p->company_name }}</div>
                                 </div>
@@ -98,15 +81,6 @@
                             {{ $p->address ?: '—' }}
                         </td>
                         <td class="text-center">
-                            @if($p->document)
-                                <img src="{{ asset('storage/'.$p->document) }}"
-                                     alt="logo"
-                                     style="height:44px;width:70px;object-fit:contain;border-radius:6px;border:1px solid #eee;padding:2px;background:#fff;">
-                            @else
-                                <span class="badge badge-light border text-muted">No Logo</span>
-                            @endif
-                        </td>
-                        <td class="text-center">
                             <button class="btn btn-sm btn-warning btn-edit px-3"
                                     data-id="{{ $p->id }}"
                                     data-company="{{ $p->company_name }}"
@@ -118,11 +92,19 @@
                                     title="Edit">
                                 <i class="fas fa-edit"></i>
                             </button>
+                            @if($p->purchases_count === 0)
+                                <button class="btn btn-sm btn-danger btn-delete px-3 ml-1"
+                                        data-id="{{ $p->id }}"
+                                        data-name="{{ $p->company_name }}"
+                                        title="Delete">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            @endif
                         </td>
                     </tr>
                     @empty
                     <tr id="emptyRow">
-                        <td colspan="8" class="text-center py-5 text-muted">
+                        <td colspan="7" class="text-center py-5 text-muted">
                             <i class="fas fa-building fa-3x mb-3 d-block opacity-25"></i>
                             No providers found. Click <strong>+ Add Provider</strong> to get started.
                         </td>
@@ -222,14 +204,14 @@
                     <div class="col-md-6">
                         <div class="form-group">
                             <label class="font-weight-bold text-dark">
-                                Phone No <span class="text-danger">* (11 digits)</span>
+                                Phone No <span class="text-danger">*</span>
                             </label>
                             <div class="input-group">
                                 <div class="input-group-prepend">
                                     <span class="input-group-text bg-light"><i class="fas fa-phone text-primary"></i></span>
                                 </div>
                                 <input type="text" id="fPhone" class="form-control"
-                                       placeholder="01XXXXXXXXX" maxlength="11">
+                                       placeholder="Enter phone number">
                             </div>
                             <small class="text-danger d-none" id="err_phone_no"></small>
                         </div>
@@ -255,7 +237,7 @@
                     <div class="col-md-6">
                         <div class="form-group">
                             <label class="font-weight-bold text-dark">
-                                Logo / Document <span class="text-muted font-weight-normal">(optional, max 5MB)</span>
+                                Logo <span class="text-muted font-weight-normal">(optional, max 5MB)</span>
                             </label>
                             <div class="custom-file">
                                 <input type="file" class="custom-file-input" id="fDocument"
@@ -304,7 +286,6 @@
     }
     #providerTable tbody td { padding: 10px 12px; vertical-align: middle; }
 
-    /* Search input */
     #searchInput:focus { box-shadow: 0 0 0 3px rgba(26,35,126,.15); border-color: #1a237e; }
 
     /* Modal */
@@ -445,6 +426,7 @@ $(function () {
                 if (!res.success) return;
 
                 $('#providerModal').modal('hide');
+                resetModal();
 
                 // toastr modal hide হওয়ার পরে show করতে হবে — নইলে backdrop এর নিচে চলে যায়
                 setTimeout(function () {
@@ -458,6 +440,10 @@ $(function () {
                     addRow(p);
                     updateStats(1);
                 }
+
+                setTimeout(function () {
+                    window.location.reload();
+                }, 700);
             },
             error: function (xhr) {
                 const errors = xhr.responseJSON?.errors || {};
@@ -475,7 +461,6 @@ $(function () {
                     .html(id
                         ? '<i class="fas fa-save mr-1"></i> Update Provider'
                         : '<i class="fas fa-save mr-1"></i> Save Provider');
-                        toastr.success('Successfully Saved Provider');
             }
         });
     });
@@ -521,20 +506,31 @@ $(function () {
 
     function addRow(p) {
         const rowCount = $('#providerTableBody tr[data-id]').length + 1;
+        const deleteButton = (p.purchases_count ?? 0) === 0
+            ? `<button class="btn btn-sm btn-danger btn-delete px-3 ml-1"
+                        data-id="${p.id}"
+                        data-name="${p.company_name}"
+                        title="Delete">
+                    <i class="fas fa-trash-alt"></i>
+              </button>`
+            : '';
+
         const html = `
         <tr data-id="${p.id}">
             <td class="text-center text-muted small">${rowCount}</td>
             <td>
                 <div class="d-flex align-items-center">
-                    ${makeAvatar(p.company_name, p.id)}
-                    <div><div class="font-weight-bold text-dark">${p.company_name}</div></div>
+                    ${p.document_url
+                        ? `<img src="${p.document_url}" alt="logo"
+                                style="height:38px;width:38px;object-fit:contain;border-radius:6px;border:1px solid #eee;padding:2px;background:#fff;margin-right:10px;">`
+                        : makeAvatar(p.company_name, p.id)}
+                    <div class="font-weight-bold text-dark">${p.company_name}</div>
                 </div>
             </td>
             <td><i class="fas fa-user-tie text-muted mr-1"></i>${p.contact_person}</td>
             <td><a href="mailto:${p.email}" class="text-primary"><i class="fas fa-envelope mr-1 text-muted"></i>${p.email}</a></td>
             <td><i class="fas fa-phone text-muted mr-1"></i>${p.phone_no}</td>
             <td class="text-muted small">${p.address || '—'}</td>
-            <td class="text-center">${docCell(p)}</td>
             <td class="text-center">
                 <button class="btn btn-sm btn-warning btn-edit px-3"
                         data-id="${p.id}"
@@ -547,6 +543,7 @@ $(function () {
                         title="Edit">
                     <i class="fas fa-edit"></i>
                 </button>
+                ${deleteButton}
             </td>
         </tr>`;
 
@@ -559,14 +556,16 @@ $(function () {
         const $row = $(`#providerTableBody tr[data-id="${p.id}"]`);
         $row.find('td:eq(1)').html(`
             <div class="d-flex align-items-center">
-                ${makeAvatar(p.company_name, p.id)}
-                <div><div class="font-weight-bold text-dark">${p.company_name}</div></div>
+                ${p.document_url
+                    ? `<img src="${p.document_url}" alt="logo"
+                            style="height:38px;width:38px;object-fit:contain;border-radius:6px;border:1px solid #eee;padding:2px;background:#fff;margin-right:10px;">`
+                    : makeAvatar(p.company_name, p.id)}
+                <div class="font-weight-bold text-dark">${p.company_name}</div>
             </div>`);
         $row.find('td:eq(2)').html(`<i class="fas fa-user-tie text-muted mr-1"></i>${p.contact_person}`);
         $row.find('td:eq(3)').html(`<a href="mailto:${p.email}" class="text-primary"><i class="fas fa-envelope mr-1 text-muted"></i>${p.email}</a>`);
         $row.find('td:eq(4)').html(`<i class="fas fa-phone text-muted mr-1"></i>${p.phone_no}`);
         $row.find('td:eq(5)').text(p.address || '—');
-        $row.find('td:eq(6)').html(docCell(p));
 
         // Update data attributes on edit button so next edit gets fresh data
         $row.find('.btn-edit')
@@ -589,9 +588,48 @@ $(function () {
     }
 
     function updateFooter() {
-        $('#footerCount').text($('#providerTableBody tr[data-id]').length);
-    }
+            $('#footerCount').text($('#providerTableBody tr[data-id]').length);
+        }
 
-});
+        // ══════════════════════════════════════════════
+        // Delete provider
+        // ══════════════════════════════════════════════
+        $(document).on('click', '.btn-delete', function () {
+            const $button = $(this);
+            const providerId = $button.data('id');
+            const providerName = $button.data('name');
+
+            Swal.fire({
+                title: 'Delete provider?',
+                text: `Delete ${providerName} only if it has no purchase records.`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, delete',
+                cancelButtonText: 'Cancel',
+            }).then((result) => {
+                if (!result.isConfirmed) return;
+
+                $.ajax({
+                    url: `/bandwidth-buy/provider/${providerId}`,
+                    method: 'POST',
+                    data: {
+                        _token: CSRF,
+                        _method: 'DELETE',
+                    },
+                    success: function (res) {
+                        if (!res.success) return;
+
+                        $(`#providerTableBody tr[data-id="${providerId}"]`).remove();
+                        updateFooter();
+                        toastr.success(res.message);
+                    },
+                    error: function (xhr) {
+                        toastr.error(xhr.responseJSON?.message || 'Delete failed.');
+                    }
+                });
+            });
+        });
+
+    });
 </script>
 @stop

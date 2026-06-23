@@ -92,4 +92,29 @@ class ClientSupportTicket extends Model
             default      => 'secondary',
         };
     }
+
+    public function getDurationAttribute(): ?string
+    {
+        if (! $this->created_at || ! $this->solved_at) {
+            return null;
+        }
+
+        $interval = $this->created_at->diff($this->solved_at);
+        $segments = [];
+
+        if ($interval->d) {
+            $segments[] = "{$interval->d}d";
+        }
+        if ($interval->h) {
+            $segments[] = "{$interval->h}h";
+        }
+        if ($interval->i) {
+            $segments[] = "{$interval->i}m";
+        }
+        if (empty($segments) && $interval->s) {
+            $segments[] = "{$interval->s}s";
+        }
+
+        return $segments ? implode(' ', $segments) : '0s';
+    }
 }

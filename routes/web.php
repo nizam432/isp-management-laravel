@@ -574,6 +574,7 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/',                   [BandwidthProviderController::class, 'store'])  ->name('store');
             Route::get('/{provider}/edit',     [BandwidthProviderController::class, 'edit'])   ->name('edit');
             Route::put('/{provider}',          [BandwidthProviderController::class, 'update']) ->name('update');
+            Route::delete('/{provider}',       [BandwidthProviderController::class, 'destroy'])->name('destroy');
         });
 
         // Service
@@ -597,6 +598,7 @@ Route::middleware(['auth'])->group(function () {
 
         // Purchase Report
         Route::get('report', [BandwidthReportController::class, 'index'])->name('report');
+        Route::get('report/datatables', [BandwidthReportController::class, 'datatables'])->name('report.datatables');
 
     }); // end bandwidth-buy
 

@@ -113,7 +113,8 @@ class BandwidthPurchaseController extends Controller
     public function create()
     {
         $providers = BandwidthProvider::active()->orderBy('company_name')->get();
-        $services  = BandwidthService::active()->orderBy('name')->get();
+        // Provide all services (including inactive) for selection when creating a purchase
+        $services  = BandwidthService::orderBy('name')->get();
 
         return view('bandwidth-buy.purchase.create', compact('providers', 'services'));
     }

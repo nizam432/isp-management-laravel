@@ -26,7 +26,15 @@ class BandwidthServiceController extends Controller
             'description' => 'nullable|string',
         ]);
 
-        BandwidthService::create($request->only('name', 'description'));
+        $service = BandwidthService::create($request->only('name', 'description'));
+
+        if ($request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Service added successfully.',
+                'service' => $service,
+            ]);
+        }
 
         return redirect()->route('bandwidth-buy.service.index')
             ->with('success', 'Service added successfully.');
@@ -34,6 +42,13 @@ class BandwidthServiceController extends Controller
 
     public function edit(BandwidthService $service)
     {
+        if (request()->ajax()) {
+            return response()->json([
+                'success' => true,
+                'service' => $service,
+            ]);
+        }
+
         return view('bandwidth-buy.service.edit', compact('service'));
     }
 
@@ -45,6 +60,15 @@ class BandwidthServiceController extends Controller
         ]);
 
         $service->update($request->only('name', 'description'));
+        $service->refresh();
+
+        if ($request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Service updated successfully.',
+                'service' => $service,
+            ]);
+        }
 
         return redirect()->route('bandwidth-buy.service.index')
             ->with('success', 'Service updated successfully.');

@@ -17,28 +17,6 @@
 
 @section('content')
 
-{{-- ── Summary Cards ──────────────────────────────────────────────────────── --}}
-<div class="row mb-3">
-    <div class="col-md-3 col-sm-6">
-        <div class="info-box shadow-sm mb-0">
-            <span class="info-box-icon bg-primary elevation-1"><i class="fas fa-network-wired"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">Total Services</span>
-                <span class="info-box-number" id="statTotal">{{ $services->count() }}</span>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 col-sm-6">
-        <div class="info-box shadow-sm mb-0">
-            <span class="info-box-icon bg-success elevation-1"><i class="fas fa-check-circle"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">Active</span>
-                <span class="info-box-number" id="statActive">{{ $services->where('is_active', 1)->count() }}</span>
-            </div>
-        </div>
-    </div>
-</div>
-
 {{-- ── Table Card ──────────────────────────────────────────────────────────── --}}
 <div class="card shadow-sm">
     <div class="card-header py-2 d-flex justify-content-between align-items-center"
@@ -271,16 +249,25 @@ $(function () {
             method: 'POST',
             data:   data,
             success: function (res) {
-                if (!res.success) return;
-                toastr.success(res.message);
-                $('#serviceModal').modal('hide');
+                    if (!res.success) {
+                        toastr.error(res.message || 'Save failed.');
+                        return;
+                    }
 
-                if (id) {
-                    updateRow(res.service);
-                } else {
-                    addRow(res.service);
-                }
-            },
+                    resetModal();
+                    $('#serviceModal').modal('hide');
+                    toastr.success(res.message);
+
+                    if (id) {
+                        updateRow(res.service);
+                    } else {
+                        addRow(res.service);
+                    }
+
+                    setTimeout(function () {
+                        window.location.reload();
+                    }, 700);
+                },
             error: function (xhr) {
                 const errors = xhr.responseJSON?.errors || {};
                 if (errors.name) {
@@ -294,7 +281,6 @@ $(function () {
                     .html(id
                         ? '<i class="fas fa-save mr-1"></i> Update Service'
                         : '<i class="fas fa-save mr-1"></i> Save Service');
-                        toastr.success('Successfully Save Provider');
             }
         });
     });

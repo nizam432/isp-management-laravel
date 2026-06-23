@@ -24,42 +24,73 @@
     </div>
 @endif
 
-{{-- ── Summary Cards ──────────────────────────────────────────────────────── --}}
+{{-- ── Summary Cards (Customer-style) ─────────────────────────────────────── --}}
+<style>
+.cust-stat-card {
+    border-radius: 4px;
+    color: #fff;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    overflow: hidden;
+}
+.cust-stat-card .sc-left .sc-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: rgba(255,255,255,.85);
+    margin-bottom: 4px;
+}
+.cust-stat-card .sc-left .sc-value {
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+}
+.cust-stat-card .sc-icon {
+    font-size: 52px;
+    color: rgba(255,255,255,.18);
+}
+</style>
 <div class="row mb-3">
     <div class="col-md-3 col-sm-6">
-        <div class="info-box shadow-sm mb-0">
-            <span class="info-box-icon bg-primary elevation-1"><i class="fas fa-file-invoice"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">Total Bills</span>
-                <span class="info-box-number">{{ $purchases->total() }}</span>
+        <div class="cust-stat-card" style="background:#17a2b8;">
+            <div class="sc-left">
+                <div class="sc-label"><i class="fas fa-file-invoice mr-1"></i> Total Bills</div>
+                <div class="sc-value">{{ $purchases->total() }}</div>
             </div>
+            <div class="sc-icon"><i class="fas fa-file-invoice"></i></div>
         </div>
     </div>
     <div class="col-md-3 col-sm-6">
-        <div class="info-box shadow-sm mb-0">
-            <span class="info-box-icon bg-success elevation-1"><i class="fas fa-check-circle"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">Total Paid</span>
-                <span class="info-box-number">৳ {{ number_format($purchases->sum('paid')) }}</span>
+        <div class="cust-stat-card" style="background:#00a65a;">
+            <div class="sc-left">
+                <div class="sc-label"><i class="fas fa-check-circle mr-1"></i> Total Paid</div>
+                <div class="sc-value">৳ {{ number_format($purchases->sum('paid')) }}</div>
             </div>
+            <div class="sc-icon"><i class="fas fa-check-circle"></i></div>
         </div>
     </div>
     <div class="col-md-3 col-sm-6">
-        <div class="info-box shadow-sm mb-0">
-            <span class="info-box-icon bg-danger elevation-1"><i class="fas fa-exclamation-circle"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">Total Due</span>
-                <span class="info-box-number">৳ {{ number_format($purchases->sum('due')) }}</span>
+        <div class="cust-stat-card" style="background:#dd4b39;">
+            <div class="sc-left">
+                <div class="sc-label"><i class="fas fa-exclamation-circle mr-1"></i> Total Due</div>
+                <div class="sc-value">৳ {{ number_format($purchases->sum('due')) }}</div>
             </div>
+            <div class="sc-icon"><i class="fas fa-exclamation-circle"></i></div>
         </div>
     </div>
     <div class="col-md-3 col-sm-6">
-        <div class="info-box shadow-sm mb-0">
-            <span class="info-box-icon bg-warning elevation-1"><i class="fas fa-money-bill-wave"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">Grand Total</span>
-                <span class="info-box-number">৳ {{ number_format($purchases->sum('sub_total')) }}</span>
+        <div class="cust-stat-card" style="background:#f39c12;">
+            <div class="sc-left">
+                <div class="sc-label"><i class="fas fa-money-bill-wave mr-1"></i> Grand Total</div>
+                <div class="sc-value">৳ {{ number_format($purchases->sum('sub_total')) }}</div>
             </div>
+            <div class="sc-icon"><i class="fas fa-money-bill-wave"></i></div>
         </div>
     </div>
 </div>
