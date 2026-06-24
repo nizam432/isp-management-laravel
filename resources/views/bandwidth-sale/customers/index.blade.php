@@ -43,16 +43,24 @@
     <div class="card-header d-flex justify-content-between align-items-center py-2">
         <h6 class="mb-0 font-weight-bold">
             <i class="fas fa-users mr-1"></i> Customer List
+            <span class="badge badge-info ml-1">{{ $customers->total() }}</span>
         </h6>
-        <div class="d-flex align-items-center">
-            <input type="text" id="tableSearch" class="form-control form-control-sm mr-2"
-                   placeholder="Search..." style="width:200px;" autocomplete="off">
-            <select id="perPage" class="form-control form-control-sm" style="width:70px;">
-                @foreach([10,25,50,100] as $pp)
-                    <option value="{{ $pp }}" {{ request('per_page',10)==$pp?'selected':'' }}>{{ $pp }}</option>
-                @endforeach
-            </select>
-        </div>
+   <div class="d-flex align-items-center">
+    <input type="text" 
+           id="tableSearch" 
+           class="form-control form-control-sm mr-2"
+           placeholder="Search..." 
+           style="width:200px;" 
+           autocomplete="new-password"   {{-- "off" এর বদলে এটা দিন --}}
+           name="search_{{ rand() }}"
+           readonly
+           onfocus="this.removeAttribute('readonly');">  {{-- focus করলে editable হবে --}}
+    <select id="perPage" class="form-control form-control-sm" style="width:70px;">
+        @foreach([10,25,50,100] as $pp)
+            <option value="{{ $pp }}" {{ request('per_page',10)==$pp?'selected':'' }}>{{ $pp }}</option>
+        @endforeach
+    </select>
+</div>
     </div>
 
     <div class="card-body p-0">
@@ -374,39 +382,6 @@
         </div>
     </div>
 </div>
-<style>
-.bws-stat { border-radius:8px; padding:14px 18px; color:#fff;
-    display:flex; align-items:center; justify-content:space-between;
-    margin-bottom:16px; box-shadow:0 3px 10px rgba(0,0,0,.15); }
-.bs-label { font-size:11px; font-weight:700; text-transform:uppercase;
-    letter-spacing:.6px; color:rgba(255,255,255,.85); margin-bottom:4px; }
-.bs-val   { font-size:26px; font-weight:700; line-height:1.1; }
-.bws-stat .bs-icon { font-size:44px; color:rgba(255,255,255,.18); }
-
-#custTable thead th { font-size:12px; font-weight:700; white-space:nowrap; padding:10px; }
-#custTable tbody td { font-size:13px; padding:9px 10px; vertical-align:middle; }
-#custTable tbody tr:hover { background:#f0f7ff; }
-
-.section-title {
-    font-size: 13px;
-    font-weight: 700;
-    color: #2c3e50;
-    padding: 7px 12px;
-    background: #f0f4f8;
-    border-left: 4px solid #0073b7;
-    border-radius: 4px;
-    margin-bottom: 12px;
-}
-
-.callout { border-left:4px solid #17a2b8; padding:10px 14px; background:#f8f9fa; border-radius:4px; }
-    background: #f8f9fa;
-    border-radius: 5px;
-    padding: 6px 10px;
-    margin-bottom: 5px;
-    display: flex;
-    align-items: center;
-}
-</style>
 @endsection
 
 
@@ -414,6 +389,8 @@
 <script>
 const CSRF = '{{ csrf_token() }}';
 let editId = null;
+
+$(function () { $('#tableSearch').val('').attr('autocomplete', 'off'); });
 
 function toastOk(msg)  { Swal.fire({toast:true,position:'top-end',icon:'success',title:msg,showConfirmButton:false,timer:2500}); }
 function toastErr(msg) { Swal.fire({toast:true,position:'top-end',icon:'error',  title:msg,showConfirmButton:false,timer:3500}); }
@@ -667,35 +644,42 @@ $('#btnSaveCustomer').on('click', function () {
         if (v) ips.push(v);
     });
 
+    var emailVal    = $('#f_email').val().trim();
+    var usernameVal = $('#f_username').val().trim();
+    var pwVal       = $('#f_password').val();
+
     var payload = {
         _token:          CSRF,
         customer_name:   name,
         contact_person:  $('#f_contact_person').val().trim(),
-        email:           $('#f_email').val().trim(),
+        email:           emailVal    || null,   // খালি হলে null পাঠাও
         mobile_number:   mobile,
-        phone_number:    $('#f_phone_number').val().trim(),
+        phone_number:    $('#f_phone_number').val().trim()   || null,
         pop_status:      $('#f_pop_status').val(),
-        reference_by:    $('#f_reference_by').val().trim(),
-        address:         $('#f_address').val().trim(),
-        facebook_url:    $('#f_facebook_url').val().trim(),
-        skype_id:        $('#f_skype_id').val().trim(),
-        website:         $('#f_website').val().trim(),
-        remarks:         $('#f_remarks').val().trim(),
-        attn_info:       $('#f_attn_info').val().trim(),
-        bzr_dr_nas_id:   $('#f_bzr_dr_nas_id').val().trim(),
-        activation_date: $('#f_activation_date').val(),
-        pop_info:        $('#f_pop_info').val().trim(),
+        reference_by:    $('#f_reference_by').val().trim()   || null,
+        address:         $('#f_address').val().trim()         || null,
+        facebook_url:    $('#f_facebook_url').val().trim()   || null,
+        skype_id:        $('#f_skype_id').val().trim()        || null,
+        website:         $('#f_website').val().trim()         || null,
+        remarks:         $('#f_remarks').val().trim()         || null,
+        attn_info:       $('#f_attn_info').val().trim()       || null,
+        bzr_dr_nas_id:   $('#f_bzr_dr_nas_id').val().trim()  || null,
+        activation_date: $('#f_activation_date').val()        || null,
+        pop_info:        $('#f_pop_info').val().trim()         || null,
         vlan_info:       JSON.stringify(vlans),
         ip_addresses:    JSON.stringify(ips),
-        username:        $('#f_username').val().trim(),
-        password:        $('#f_password').val(),
+        username:        usernameVal || null,   // খালি হলে null পাঠাও
         activity_status: $('#f_activity_status').val(),
     };
 
-    if (editId) payload['_method'] = 'PUT';
+    // password শুধু তখনই পাঠাও যখন কিছু টাইপ করা হয়েছে
+    if (pwVal) payload['password'] = pwVal;
 
-    var url = editId
-        ? '/bandwidth-sale/customers/' + editId
+    var currentEditId = editId; // snapshot নাও — complete() তে ব্যবহারের জন্য
+    if (currentEditId) payload['_method'] = 'PUT';
+
+    var url = currentEditId
+        ? '/bandwidth-sale/customers/' + currentEditId
         : '/bandwidth-sale/customers';
 
     var $btn = $(this).prop('disabled', true)
@@ -713,12 +697,16 @@ $('#btnSaveCustomer').on('click', function () {
             }
         },
         error: function (xhr) {
-            var errors = xhr.responseJSON?.errors;
-            toastErr(errors ? Object.values(errors).flat()[0] : (xhr.responseJSON?.message || 'Error.'));
+            var json   = xhr.responseJSON;
+            var errors = json?.errors;
+            var msg    = errors
+                ? Object.values(errors).flat()[0]
+                : (json?.message || 'Something went wrong. (HTTP ' + xhr.status + ')');
+            toastErr(msg);
         },
         complete: function () {
             $btn.prop('disabled', false)
-                .html(editId
+                .html(currentEditId
                     ? '<i class="fas fa-save mr-1"></i> Update Customer'
                     : '<i class="fas fa-save mr-1"></i> Save Customer');
         }
@@ -759,4 +747,40 @@ $(document).on('click', '.btn-delete', function () {
     });
 });
 </script>
+@endsection
+
+@section('extra_css')
+<style>
+.bws-stat { border-radius:8px; padding:14px 18px; color:#fff;
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:16px; box-shadow:0 3px 10px rgba(0,0,0,.15); }
+.bs-label { font-size:11px; font-weight:700; text-transform:uppercase;
+    letter-spacing:.6px; color:rgba(255,255,255,.85); margin-bottom:4px; }
+.bs-val   { font-size:26px; font-weight:700; line-height:1.1; }
+.bws-stat .bs-icon { font-size:44px; color:rgba(255,255,255,.18); }
+
+#custTable thead th { font-size:11px; font-weight:700; white-space:nowrap; padding:9px 8px; }
+#custTable tbody td { font-size:13px; padding:9px 10px; vertical-align:middle; }
+#custTable tbody tr:hover { background:#f0f7ff; }
+
+.section-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #2c3e50;
+    padding: 7px 12px;
+    background: #f0f4f8;
+    border-left: 4px solid #0073b7;
+    border-radius: 4px;
+    margin-bottom: 12px;
+}
+.callout { border-left:4px solid #17a2b8; padding:10px 14px; background:#f8f9fa; border-radius:4px; }
+.vlan-row, .ip-row {
+    background: #f8f9fa;
+    border-radius: 5px;
+    padding: 6px 10px;
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+}
+</style>
 @endsection

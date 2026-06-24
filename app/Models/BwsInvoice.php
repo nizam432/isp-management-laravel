@@ -1,7 +1,5 @@
 <?php
-// ═══════════════════════════════════════════════════
-// app/Models/BwsInvoice.php
-// ═══════════════════════════════════════════════════
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -30,7 +28,7 @@ class BwsInvoice extends Model
         'recurring_end'   => 'date',
     ];
 
-    // ── Relations ─────────────────────────────────────────────────
+    // ── Relations ──────────────────────────────────────────────
     public function bwsCustomer()
     {
         return $this->belongsTo(BandwidthSaleCustomer::class, 'bws_customer_id');
@@ -57,7 +55,7 @@ class BwsInvoice extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    // ── Auto-number ───────────────────────────────────────────────
+    // ── Auto-number ────────────────────────────────────────────
     public static function generateNumber(): string
     {
         $prefix = 'BWS';
@@ -70,25 +68,35 @@ class BwsInvoice extends Model
         return $prefix . '-' . $year . '-' . str_pad($seq, 4, '0', STR_PAD_LEFT);
     }
 
-    // ── Helpers ───────────────────────────────────────────────────
+    // ── Helpers ────────────────────────────────────────────────
     public function isPaid(): bool   { return $this->status === 'paid'; }
     public function isUnpaid(): bool { return in_array($this->status, ['unpaid', 'overdue']); }
 
     /**
      * Recalculate received_amount & due_amount from active payments.
-     * Call this after any payment insert/void.
+     *
+     * Logic:
+     *  - grand_total = invoice total after invoice-level discount (already stored)
+     *  - received    = sum of payment received_amount
+     *  - pay_discount= sum of payment-level discount (additional off on payment)
+     *  - due         = grand_total - received - pay_discount
+     *
+     * Invoice-level discount is already baked into grand_total.
+     * Payment-level discount is an additional discount given at collection time.
      */
     public function recalcDue(): void
     {
-        $received = $this->activePayments()->sum('received_amount');
-        $discount = $this->activePayments()->sum('discount');
-        $due      = max(0, $this->grand_total - $received - $discount);
+        $received   = (float) $this->activePayments()->sum('received_amount');
+        $payDiscount= (float) $this->activePayments()->sum('discount');
+
+        // due = what's left after received cash + payment-level discounts
+        $due = max(0, $this->grand_total - $received - $payDiscount);
 
         $status = match(true) {
-            $due <= 0              => 'paid',
-            $received > 0         => 'partial',
-            now() > $this->payment_due => 'overdue',
-            default                => 'unpaid',
+            $due <= 0                                          => 'paid',
+            $received > 0 || $payDiscount > 0                 => 'partial',
+            $this->payment_due && now() > $this->payment_due  => 'overdue',
+            default                                            => 'unpaid',
         };
 
         $this->update([

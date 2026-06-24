@@ -43,13 +43,15 @@ class BandwidthReportController extends Controller
 
         $query->when($request->service_id, fn($q) =>
                     $q->where('service_id', $request->service_id))
-              ->when($request->provider_id, fn($q) =>
-                    $q->whereHas('purchase', fn($q2) =>
-                        $q2->where('provider_id', $request->provider_id)))
-              ->when($fromDate, fn($q) =>
-                    $q->whereDate('from_date', '>=', $fromDate))
-              ->when($toDate, fn($q) =>
-                    $q->whereDate('to_date', '<=', $toDate));
+              ->when($request->provider_id || $fromDate || $toDate, fn($q) =>
+                    $q->whereHas('purchase', function ($q2) use ($request, $fromDate, $toDate) {
+                        $q2->when($request->provider_id, fn($q3) =>
+                                $q3->where('provider_id', $request->provider_id))
+                           ->when($fromDate, fn($q3) =>
+                                $q3->whereDate('billing_date', '>=', $fromDate))
+                           ->when($toDate, fn($q3) =>
+                                $q3->whereDate('billing_date', '<=', $toDate));
+                    }));
         // Compute overall summary from the full filtered set (no pagination)
         $all = (clone $query)->orderByDesc('created_at')->get();
 
@@ -108,13 +110,15 @@ class BandwidthReportController extends Controller
         // Apply filters
         $query->when($request->service_id, fn($q) =>
                     $q->where('service_id', $request->service_id))
-              ->when($request->provider_id, fn($q) =>
-                    $q->whereHas('purchase', fn($q2) =>
-                        $q2->where('provider_id', $request->provider_id)))
-              ->when($fromDate, fn($q) =>
-                    $q->whereDate('from_date', '>=', $fromDate))
-              ->when($toDate, fn($q) =>
-                    $q->whereDate('to_date', '<=', $toDate));
+              ->when($request->provider_id || $fromDate || $toDate, fn($q) =>
+                    $q->whereHas('purchase', function ($q2) use ($request, $fromDate, $toDate) {
+                        $q2->when($request->provider_id, fn($q3) =>
+                                $q3->where('provider_id', $request->provider_id))
+                           ->when($fromDate, fn($q3) =>
+                                $q3->whereDate('billing_date', '>=', $fromDate))
+                           ->when($toDate, fn($q3) =>
+                                $q3->whereDate('billing_date', '<=', $toDate));
+                    }));
 
         // Global search
         if ($searchValue) {

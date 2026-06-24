@@ -617,6 +617,8 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('customers/{customer}', [BwsCustomerController::class, 'destroy']) ->name('customers.destroy');
 
         // ── Invoices — static routes BEFORE {bwsInvoice} ──
+        Route::get('invoices/export-pdf',                  [BwsInvoiceController::class, 'exportPdf'])      ->name('invoices.export-pdf');
+        Route::get('invoices/export-xlsx',                 [BwsInvoiceController::class, 'exportXlsx'])     ->name('invoices.export-xlsx');
         Route::get('invoices/next-no',                     [BwsInvoiceController::class, 'nextNo'])         ->name('invoices.next-no');
         Route::get('invoices/due-for-customer/{customer}', [BwsInvoiceController::class, 'dueForCustomer']) ->name('invoices.due-for-customer');
 

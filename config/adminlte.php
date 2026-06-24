@@ -666,11 +666,7 @@ return [
             'icon_color' => 'cyan',
             'can'        => 'bandwidth.sale.view',
             'submenu'    => [
-                [
-                    'text' => 'Dashboard',
-                    'url'  => 'bandwidth-sale/dashboard',
-                    'icon' => 'fas fa-fw fa-tachometer-alt',
-                ],
+
                 [
                     'text' => 'Customers',
                     'url'  => 'bandwidth-sale/customers',
@@ -680,11 +676,6 @@ return [
                     'text' => 'Invoices',
                     'url'  => 'bandwidth-sale/invoices',
                     'icon' => 'fas fa-fw fa-file-invoice',
-                ],
-                [
-                    'text' => 'Create Invoice',
-                    'url'  => 'bandwidth-sale/invoices/create',
-                    'icon' => 'fas fa-fw fa-plus-circle',
                 ],
                 [
                     'text' => 'Daily Bill',

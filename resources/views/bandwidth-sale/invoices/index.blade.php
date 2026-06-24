@@ -3,7 +3,15 @@
 @section('page_title', 'Bandwidth Sale — Invoices')
 
 @section('page_actions')
-    <button class="btn btn-primary btn-sm" id="btnAddInvoice">
+    <a href="{{ route('bandwidth-sale.invoices.export-pdf') }}?{{ http_build_query(request()->all()) }}"
+       class="btn btn-danger btn-sm" target="_blank">
+        <i class="fas fa-file-pdf mr-1"></i> PDF
+    </a>
+    <a href="{{ route('bandwidth-sale.invoices.export-xlsx') }}?{{ http_build_query(request()->all()) }}"
+       class="btn btn-success btn-sm ml-1">
+        <i class="fas fa-file-excel mr-1"></i> XLSX
+    </a>
+    <button class="btn btn-primary btn-sm ml-1" id="btnAddInvoice">
         <i class="fas fa-plus mr-1"></i> Create Invoice
     </button>
 @endsection
@@ -145,6 +153,7 @@
                         <th>Bill No</th>
                         <th>Month</th>
                         <th class="text-right">Total</th>
+                        <th class="text-right">VAT</th>
                         <th class="text-right">Received</th>
                         <th class="text-right">Discount</th>
                         <th class="text-right">Due</th>
@@ -186,6 +195,7 @@
                             </span>
                         </td>
                         <td class="text-right font-weight-bold">{{ number_format($inv->total_amount,2) }}</td>
+                        <td class="text-right text-info">{{ number_format($inv->vat_amount,2) }}</td>
                         <td class="text-right text-success">{{ number_format($inv->received_amount,2) }}</td>
                         <td class="text-right text-warning">{{ number_format($inv->discount,2) }}</td>
                         <td class="text-right {{ $inv->due_amount > 0 ? 'text-danger font-weight-bold' : 'text-success' }}">
@@ -215,7 +225,7 @@
                                 <i class="fas fa-eye text-info"></i>
                             </button>
                             {{-- Edit --}}
-                            @if($inv->status !== 'paid')
+                            @if(in_array($inv->status, ['unpaid', 'overdue']))
                             <button class="btn btn-xs btn-light border btn-edit-inv"
                                     data-id="{{ $inv->id }}" title="Edit">
                                 <i class="fas fa-edit text-success"></i>
@@ -227,7 +237,7 @@
                                 <i class="fas fa-file-pdf text-danger"></i>
                             </a>
                             {{-- Delete --}}
-                            @if($inv->status !== 'paid')
+                            @if(in_array($inv->status, ['unpaid', 'overdue']))
                             <button class="btn btn-xs btn-light border btn-del-inv"
                                     data-id="{{ $inv->id }}"
                                     data-no="{{ $inv->invoice_no }}"
@@ -366,15 +376,6 @@
                             </select>
                         </div>
                     </div>
-                    <div class="col-md-12">
-                        <div class="custom-control custom-checkbox mb-2">
-                            <input type="checkbox" class="custom-control-input"
-                                   id="inv_daily" value="1" checked>
-                            <label class="custom-control-label small font-weight-bold" for="inv_daily">
-                                Daily Basis Calculation
-                            </label>
-                        </div>
-                    </div>
                 </div>
 
                 {{-- ── Invoice Items (Full Width) ───────────────── --}}
@@ -471,8 +472,24 @@
                                                        class="form-control form-control-sm text-right"
                                                        style="max-width:100px;"
                                                        value="0" min="0" step="0.01"
-                                                       oninput="recalcAll()" autocomplete="off">
+                                                       oninput="recalcAll();togglePayMethod()" autocomplete="off">
                                             </div>
+                                        </td>
+                                    </tr>
+                                    <tr id="inv_pay_method_row" style="display:none;">
+                                        <td class="text-muted pl-3 small">
+                                            Payment Method <span class="text-danger">*</span>
+                                        </td>
+                                        <td class="text-right pr-3">
+                                            <select id="inv_pay_method" class="form-control form-control-sm">
+                                                <option value="cash">Cash</option>
+                                                <option value="bkash">bKash</option>
+                                                <option value="nagad">Nagad</option>
+                                                <option value="rocket">Rocket</option>
+                                                <option value="bank">Bank</option>
+                                                <option value="cheque">Cheque</option>
+                                                <option value="card">Card</option>
+                                            </select>
                                         </td>
                                     </tr>
                                     <tr>
@@ -547,6 +564,7 @@
                             <option value="rocket">Rocket</option>
                             <option value="bank">Bank</option>
                             <option value="cheque">Cheque</option>
+                            <option value="card">Card</option>
                         </select>
                     </div>
                 </div>
@@ -563,6 +581,10 @@
                         <tr>
                             <td>Previously Paid</td>
                             <td class="text-right text-success" id="pay_prev">0.00</td>
+                        </tr>
+                        <tr>
+                            <td>Previous Discount</td>
+                            <td class="text-right text-warning" id="pay_prev_disc">0.00</td>
                         </tr>
                         <tr class="table-warning">
                             <td class="font-weight-bold">Balance Due</td>
@@ -663,7 +685,7 @@ function toastErr(msg) { Swal.fire({toast:true,position:'top-end',icon:'error', 
 function onServiceChange(i) {
     var opt = $(`#irow-${i} .item-service option:selected`);
     var unit = opt.data('unit') || '';
-    $(`#irow-${i} .item-unit`).val(unit);
+    // unit always MB
     recalcRow(i);
 }
 
@@ -714,9 +736,8 @@ function fetchNextNo() {
 
 // ── toggle daily cols ─────────────────────────────────────────
 function toggleDailyCols() {
-    var on = $('#inv_daily').is(':checked');
-    $('.daily-col').toggle(on);
-    $('#totalLabel').attr('colspan', on ? 8 : 6);
+    // Daily cols always visible - daily basis checkbox removed
+    $('#totalLabel').attr('colspan', 8);
 }
 
 // ── add item row ──────────────────────────────────────────────
@@ -745,9 +766,6 @@ function addItemRow(data) {
         </td>
         <td><input type="text" class="form-control form-control-sm item-desc"
                    value="${data.description||''}" placeholder="Description" autocomplete="off"></td>
-        <td><input type="text" class="form-control form-control-sm item-unit"
-                   value="${data.unit||''}" placeholder="Unit" autocomplete="off"
-                   style="min-width:55px;"></td>
         <td><input type="number" class="form-control form-control-sm item-qty text-right"
                    value="${data.quantity||1}" min="0" step="any"
                    oninput="recalcRow(${i})" autocomplete="off"
@@ -760,10 +778,12 @@ function addItemRow(data) {
                    value="${data.vat_percent||0}" min="0" max="100" step="any"
                    oninput="recalcRow(${i})" autocomplete="off"
                    style="min-width:55px;"></td>
-        <td class="daily-col"><input type="date" class="form-control form-control-sm item-from"
-                   value="${data.from_date||''}" oninput="recalcRow(${i})"></td>
-        <td class="daily-col"><input type="date" class="form-control form-control-sm item-to"
-                   value="${data.to_date||''}" oninput="recalcRow(${i})"></td>
+        <td><input type="date" class="form-control form-control-sm item-from"
+                   value="${data.from_date||''}" data-row="${i}"
+                   onchange="onFromDateChange(${i})"></td>
+        <td><input type="date" class="form-control form-control-sm item-to"
+                   value="${data.to_date||''}" data-row="${i}"
+                   onchange="onToDateChange(${i})"></td>
         <td><input type="text" class="form-control form-control-sm item-total text-right font-weight-bold"
                    value="${parseFloat(data.total||0).toFixed(2)}" readonly
                    style="background:#f8f9fa;color:#0073b7;min-width:80px;"></td>
@@ -775,46 +795,80 @@ function addItemRow(data) {
         </td>
     </tr>`;
     $('#itemsBody').append(row);
-    var on = $('#inv_daily').is(':checked');
-    $(`#irow-${i} .daily-col`).toggle(on);
     recalcRow(i);
+    setDatePickerBounds();
 }
 
 function recalcRow(i) {
     var qty  = parseFloat($(`#irow-${i} .item-qty`).val())  || 0;
     var rate = parseFloat($(`#irow-${i} .item-rate`).val()) || 0;
     var vat  = parseFloat($(`#irow-${i} .item-vat`).val())  || 0;
-    if ($('#inv_daily').is(':checked')) {
-        var from = $(`#irow-${i} .item-from`).val();
-        var to   = $(`#irow-${i} .item-to`).val();
-        if (from && to) {
-            qty = Math.max(0, (new Date(to)-new Date(from))/86400000+1);
-            $(`#irow-${i} .item-qty`).val(qty);
-        }
+    var from = $(`#irow-${i} .item-from`).val();
+    var to   = $(`#irow-${i} .item-to`).val();
+
+    var total;
+    if (from && to) {
+        var fromDate    = new Date(from);
+        var daysInMonth = new Date(fromDate.getFullYear(), fromDate.getMonth()+1, 0).getDate();
+        var daysUsed    = Math.max(0, (new Date(to) - fromDate) / 86400000 + 1);
+        // pro-rata: Total = qty × rate / daysInMonth × daysUsed
+        var sub  = qty * rate / daysInMonth * daysUsed;
+        var vatA = sub * (vat / 100);
+        total = sub + vatA;
+    } else {
+        var sub  = qty * rate;
+        var vatA = sub * (vat / 100);
+        total = sub + vatA;
     }
-    var sub   = qty * rate;
-    var total = sub + sub*(vat/100);
+
     $(`#irow-${i} .item-total`).val(total.toFixed(2));
     recalcAll();
 }
 
 function recalcAll() {
-    var sub=0, vat=0;
+    var grandFromRows = 0;
+    var subTotal = 0;
+    var vatTotal = 0;
+
     $('#itemsBody tr').each(function() {
-        var q = parseFloat($(this).find('.item-qty').val())  || 0;
-        var r = parseFloat($(this).find('.item-rate').val()) || 0;
-        var v = parseFloat($(this).find('.item-vat').val())  || 0;
-        var s = q*r; sub+=s; vat+=s*(v/100);
+        var rowTotal = parseFloat($(this).find('.item-total').val()) || 0;
+        var qty  = parseFloat($(this).find('.item-qty').val())  || 0;
+        var rate = parseFloat($(this).find('.item-rate').val()) || 0;
+        var vat  = parseFloat($(this).find('.item-vat').val())  || 0;
+        var from = $(this).find('.item-from').val();
+        var to   = $(this).find('.item-to').val();
+
+        // Sub = row total before VAT
+        var vatRate = vat / 100;
+        var rowSub  = (vatRate > 0) ? rowTotal / (1 + vatRate) : rowTotal;
+        var rowVat  = rowTotal - rowSub;
+
+        subTotal      += rowSub;
+        vatTotal      += rowVat;
+        grandFromRows += rowTotal;
     });
+
     var disc  = parseFloat($('#inv_discount').val()) || 0;
+    var grand = Math.max(0, grandFromRows - disc);
     var recv  = parseFloat($('#inv_received').val()) || 0;
-    var grand = sub + vat - disc;
     var due   = Math.max(0, grand - recv);
-    $('#invTotal').text(grand.toFixed(2));
-    $('#sumSub').text('৳ '+sub.toFixed(2));
-    $('#sumVat').text('৳ '+vat.toFixed(2));
+
+    $('#invTotal').text(grandFromRows.toFixed(2));
+    $('#sumSub').text('৳ '+subTotal.toFixed(2));
+    $('#sumVat').text('৳ '+vatTotal.toFixed(2));
     $('#sumGrand').text('৳ '+grand.toFixed(2));
     $('#sumDue').text('৳ '+due.toFixed(2));
+
+    // ── Auto status ───────────────────────────────────────────
+    if (recv > 0 && recv >= grand) {
+        $('#inv_status').val('paid');
+    } else if (recv > 0 && recv < grand) {
+        $('#inv_status').val('partial');
+    } else {
+        if ($('#inv_status').val() !== 'overdue') {
+            $('#inv_status').val('unpaid');
+        }
+    }
 }
 
 function removeRow(i) {
@@ -824,6 +878,110 @@ function removeRow(i) {
 
 $('#btnAddItem').on('click', function() { addItemRow(); toggleDailyCols(); });
 
+// ── Date picker helpers ───────────────────────────────────────
+// Set min/max of all date pickers to billing month range
+function setDatePickerBounds() {
+    var month = $('#inv_month').val(); // e.g. 2026-06
+    if (!month) return;
+    var parts = month.split('-');
+    var y = parseInt(parts[0]);
+    var m = parseInt(parts[1]);
+    var firstDay = y + '-' + String(m).padStart(2,'0') + '-01';
+    var lastDay  = new Date(y, m, 0); // last day of month
+    var lastStr  = y + '-' + String(m).padStart(2,'0') + '-' + String(lastDay.getDate()).padStart(2,'0');
+
+    $('#itemsBody .item-from, #itemsBody .item-to').each(function() {
+        $(this).attr('min', firstDay).attr('max', lastStr);
+    });
+}
+
+// Billing month change → update all date bounds
+$('#inv_month').on('change', function() {
+    setDatePickerBounds();
+    // Reset to dates if they exceed new month
+    $('#itemsBody tr').each(function(i) {
+        $(this).find('.item-from').val('');
+        $(this).find('.item-to').val('');
+        $(this).find('.item-to').removeData('manual');
+    });
+    recalcAll();
+});
+
+// ── From date change ─────────────────────────────────────────
+function onFromDateChange(i) {
+    var from  = $(`#irow-${i} .item-from`).val();
+    var $to   = $(`#irow-${i} .item-to`);
+    if (!from) return;
+
+    // Auto-fill To only if not manually changed
+    if (!$to.data('manual')) {
+        var d       = new Date(from);
+        var lastDay = new Date(d.getFullYear(), d.getMonth()+1, 0);
+        var lastStr = lastDay.getFullYear() + '-'
+            + String(lastDay.getMonth()+1).padStart(2,'0') + '-'
+            + String(lastDay.getDate()).padStart(2,'0');
+        $to.val(lastStr);
+    }
+    recalcRow(i);
+}
+
+// ── To date manual change ─────────────────────────────────────
+function onToDateChange(i) {
+    $(`#irow-${i} .item-to`).data('manual', true);
+    recalcRow(i);
+}
+
+// ── Toggle payment method dropdown ───────────────────────────
+function togglePayMethod() {
+    var recv = parseFloat($('#inv_received').val()) || 0;
+    if (recv > 0) {
+        $('#inv_pay_method_row').show();
+    } else {
+        $('#inv_pay_method_row').hide();
+        $('#inv_pay_method').val('cash');
+    }
+}
+
+// ── Discount validation ───────────────────────────────────────
+$('#inv_discount').on('input', function() {
+    var disc  = parseFloat($(this).val()) || 0;
+    var grand = getGrandBeforeDiscount();
+    if (disc > grand) {
+        toastErr('Discount cannot be more than invoice amount.');
+        $(this).val(0);
+    }
+    recalcAll();
+});
+
+// ── Status change → auto fill received ───────────────────────
+$('#inv_status').on('change', function() {
+    if ($(this).val() === 'paid') {
+        var grand = getCurrentGrand();
+        $('#inv_received').val(grand.toFixed(2));
+        recalcAll();
+    }
+});
+
+// ── Received change → auto status ────────────────────────────
+$('#inv_received').on('input', function() {
+    recalcAll();
+});
+
+// helper: grand total before discount (from row totals)
+function getGrandBeforeDiscount() {
+    var total = 0;
+    $('#itemsBody tr').each(function() {
+        total += parseFloat($(this).find('.item-total').val()) || 0;
+    });
+    return total;
+}
+
+// helper: current grand total (after discount)
+function getCurrentGrand() {
+    var disc = parseFloat($('#inv_discount').val()) || 0;
+    return Math.max(0, getGrandBeforeDiscount() - disc);
+}
+
 // ── collect items JSON ────────────────────────────────────────
 function collectItems() {
     var items=[];
@@ -831,7 +989,7 @@ function collectItems() {
         items.push({
             item_name:   $(this).find('.item-service').val(),
             description: $(this).find('.item-desc').val(),
-            unit:        $(this).find('.item-unit').val(),
+            unit:        'MB',
             quantity:    $(this).find('.item-qty').val(),
             rate:        $(this).find('.item-rate').val(),
             vat:         $(this).find('.item-vat').val(),
@@ -857,10 +1015,13 @@ function resetInvoiceModal() {
     $('#inv_daily').prop('checked',true);
     $('#inv_discount').val(0);
     $('#inv_received').val(0);
+    $('#inv_pay_method').val('cash');
+    $('#inv_pay_method_row').hide();
     $('#inv_notes').val('');
     $('#itemsBody').empty(); rowIdx=0;
     addItemRow(); toggleDailyCols();
     fetchNextNo(); recalcAll();
+    setDatePickerBounds();
 }
 
 // ── OPEN ADD ──────────────────────────────────────────────────
@@ -917,10 +1078,39 @@ $('#btnSaveInvoice').on('click', function() {
     if (!$('#inv_customer').val()) { toastErr('Customer is required.'); return; }
     if (!$('#inv_month').val())    { toastErr('Billing Month is required.'); return; }
 
-    var grand = parseFloat($('#sumGrand').text().replace('৳ ','')) || 0;
-    var due   = parseFloat($('#sumDue').text().replace('৳ ',''))   || 0;
-    var sub   = parseFloat($('#sumSub').text().replace('৳ ',''))   || 0;
-    var vat   = parseFloat($('#sumVat').text().replace('৳ ',''))   || 0;
+    // ── Validate item rows ────────────────────────────────────
+    var hasItemError = false;
+    var errorMsg = '';
+    $('#itemsBody tr').each(function(idx) {
+        var rowNum  = idx + 1;
+        var item    = $(this).find('.item-service').val();
+        var qty     = parseFloat($(this).find('.item-qty').val()) || 0;
+        var rate    = parseFloat($(this).find('.item-rate').val()) || 0;
+        var from    = $(this).find('.item-from').val();
+        var to      = $(this).find('.item-to').val();
+
+        if (!item)   { errorMsg = `Row ${rowNum}: Item/Service select করুন।`; hasItemError = true; return false; }
+        if (qty <= 0){ errorMsg = `Row ${rowNum}: Qty (MB) must be > 0.`; hasItemError = true; return false; }
+        if (rate <= 0){ errorMsg = `Row ${rowNum}: Rate must be > 0.`; hasItemError = true; return false; }
+        if (!from)   { errorMsg = `Row ${rowNum}: From Date select করুন।`; hasItemError = true; return false; }
+        if (!to)     { errorMsg = `Row ${rowNum}: To Date select করুন।`; hasItemError = true; return false; }
+    });
+    if (hasItemError) { toastErr(errorMsg); return; }
+
+    // Calculate directly from row totals
+    var grandFromRows = 0, subTotal = 0, vatTotal = 0;
+    $('#itemsBody tr').each(function() {
+        var rowTotal = parseFloat($(this).find('.item-total').val()) || 0;
+        var v = parseFloat($(this).find('.item-vat').val()) || 0;
+        var rowSub = (v > 0) ? rowTotal / (1 + v/100) : rowTotal;
+        subTotal += rowSub;
+        vatTotal += rowTotal - rowSub;
+        grandFromRows += rowTotal;
+    });
+    var disc  = parseFloat($('#inv_discount').val()) || 0;
+    var grand = Math.max(0, grandFromRows - disc);
+    var recv  = parseFloat($('#inv_received').val()) || 0;
+    var due   = Math.max(0, grand - recv);
 
     var payload = {
         _token:           CSRF,
@@ -928,15 +1118,16 @@ $('#btnSaveInvoice').on('click', function() {
         billing_month:    $('#inv_month').val(),
         payment_due:      $('#inv_due').val(),
         status:           $('#inv_status').val(),
-        daily_basis:      $('#inv_daily').is(':checked') ? 1 : 0,
-        total_amount:     sub.toFixed(2),
-        vat_amount:       vat.toFixed(2),
-        discount:         $('#inv_discount').val(),
+        daily_basis:      1,
+        total_amount:     subTotal.toFixed(2),
+        vat_amount:       vatTotal.toFixed(2),
+        discount:         disc.toFixed(2),
         grand_total:      grand.toFixed(2),
-        received_amount:  $('#inv_received').val(),
+        received_amount:  recv.toFixed(2),
         due_amount:       due.toFixed(2),
         notes:            $('#inv_notes').val(),
         items_json:       collectItems(),
+        payment_method:   $('#inv_pay_method').val() || 'cash',
     };
 
     if (editInvId) payload['_method'] = 'PUT';
@@ -996,28 +1187,55 @@ $(document).on('click', '.btn-view-inv', function(e) {
                 </span>`
             );
 
+            // item_name: if numeric id → lookup service name
+            function resolveItemName(name) {
+                if (!name) return '—';
+                if (!isNaN(name)) {
+                    var svc = BWS_SERVICES.find(s => s.id == name);
+                    return svc ? svc.name : name;
+                }
+                return name;
+            }
+
+            // billing_month format: 2026-06 → June 2026
+            function formatMonth(ym) {
+                if (!ym) return '—';
+                var parts = ym.split('-');
+                var months = ['January','February','March','April','May','June',
+                              'July','August','September','October','November','December'];
+                return months[parseInt(parts[1])-1] + ' ' + parts[0];
+            }
+
             var itemRows = (inv.items||[]).map((it,i) => `
                 <tr>
                     <td>${i+1}</td>
-                    <td>${it.item_name||'—'}</td>
+                    <td>${resolveItemName(it.item_name)}</td>
                     <td>${it.description||'—'}</td>
-                    <td class="text-center">${it.unit||'—'}</td>
-                    <td class="text-right">${parseFloat(it.quantity).toFixed(2)}</td>
-                    <td class="text-right">${parseFloat(it.rate).toFixed(2)}</td>
-                    <td class="text-right">${it.vat_percent}%</td>
-                    ${inv.daily_basis ? `<td>${it.from_date||'—'}</td><td>${it.to_date||'—'}</td>` : ''}
-                    <td class="text-right font-weight-bold">${parseFloat(it.total).toFixed(2)}</td>
-                </tr>`).join('') || '<tr><td colspan="10" class="text-center text-muted">No items</td></tr>';
+                    <td class="text-right">${parseFloat(it.quantity||0).toFixed(2)}</td>
+                    <td class="text-right">${parseFloat(it.rate||0).toFixed(2)}</td>
+                    <td class="text-right">${it.vat_percent||0}%</td>
+                    <td>${it.from_date||'—'}</td>
+                    <td>${it.to_date||'—'}</td>
+                    <td class="text-right font-weight-bold">${parseFloat(it.total||0).toFixed(2)}</td>
+                </tr>`).join('') || '<tr><td colspan="9" class="text-center text-muted">No items</td></tr>';
 
+            var viewInvId = id;
             var payRows = (inv.payments||[]).map((p,i) => `
                 <tr class="${p.status==='void'?'text-muted':''}">
                     <td>${i+1}</td>
                     <td><code>${p.payment_no}</code></td>
                     <td>${p.received_date||'—'}</td>
                     <td><span class="badge badge-secondary">${(p.payment_method||'').toUpperCase()}</span></td>
-                    <td class="text-right text-success font-weight-bold">৳ ${parseFloat(p.received_amount).toFixed(2)}</td>
+                    <td class="text-right text-success font-weight-bold">৳ ${parseFloat(p.received_amount||0).toFixed(2)}</td>
                     <td><span class="badge badge-${p.status==='void'?'secondary':'success'}">${p.status}</span></td>
-                </tr>`).join('') || '<tr><td colspan="6" class="text-center text-muted py-2">No payments yet.</td></tr>';
+                    <td>
+                        ${p.status !== 'void' ? `
+                        <button class="btn btn-xs btn-outline-danger btn-void-pay-view"
+                                data-id="${p.id}" data-no="${p.payment_no}">
+                            <i class="fas fa-ban"></i>
+                        </button>` : ''}
+                    </td>
+                </tr>`).join('') || '<tr><td colspan="7" class="text-center text-muted py-2">No payments yet.</td></tr>';
 
             $('#vm_body').html(`
                 <div class="row mb-3">
@@ -1032,10 +1250,8 @@ $(document).on('click', '.btn-view-inv', function(e) {
                     <div class="col-md-6">
                         <table class="table table-sm table-borderless" style="font-size:13px;">
                             <tr><td class="text-muted" style="width:45%">Billing Month</td>
-                                <td class="font-weight-bold">${inv.billing_month||'—'}</td></tr>
+                                <td class="font-weight-bold">${formatMonth(inv.billing_month)}</td></tr>
                             <tr><td class="text-muted">Payment Due</td><td>${inv.payment_due||'—'}</td></tr>
-                            <tr><td class="text-muted">Daily Basis</td>
-                                <td><span class="badge badge-${inv.daily_basis?'info':'secondary'}">${inv.daily_basis?'Yes':'No'}</span></td></tr>
                         </table>
                     </div>
                 </div>
@@ -1044,19 +1260,19 @@ $(document).on('click', '.btn-view-inv', function(e) {
                     <table class="table table-sm table-bordered" style="font-size:12px;">
                         <thead style="background:#2c3e50;color:#fff;">
                             <tr>
-                                <th>#</th><th>Item</th><th>Desc</th><th>Unit</th>
-                                <th class="text-right">Qty</th><th class="text-right">Rate</th>
+                                <th>#</th><th>Item</th><th>Desc</th>
+                                <th class="text-right">Qty (MB)</th><th class="text-right">Rate</th>
                                 <th class="text-right">VAT</th>
-                                ${inv.daily_basis ? '<th>From</th><th>To</th>' : ''}
+                                <th>From</th><th>To</th>
                                 <th class="text-right">Total</th>
                             </tr>
                         </thead>
                         <tbody>${itemRows}</tbody>
                         <tfoot style="background:#f8f9fa;">
                             <tr>
-                                <td colspan="${inv.daily_basis?9:7}" class="text-right font-weight-bold">Grand Total</td>
+                                <td colspan="8" class="text-right font-weight-bold">Invoice Total</td>
                                 <td class="text-right font-weight-bold text-primary">
-                                    ৳ ${parseFloat(inv.grand_total).toFixed(2)}
+                                    ৳ ${parseFloat(inv.total_amount + inv.vat_amount).toFixed(2)}
                                 </td>
                             </tr>
                         </tfoot>
@@ -1066,12 +1282,17 @@ $(document).on('click', '.btn-view-inv', function(e) {
                 <div class="row">
                     <div class="col-md-5">
                         <table class="table table-sm table-bordered" style="font-size:13px;">
-                            <tr><td class="text-muted">Total Amount</td>
+                            <tr><td class="text-muted">Sub Total</td>
                                 <td class="text-right">৳ ${parseFloat(inv.total_amount).toFixed(2)}</td></tr>
+                            <tr><td class="text-muted">VAT</td>
+                                <td class="text-right text-info">৳ ${parseFloat(inv.vat_amount).toFixed(2)}</td></tr>
+                            <tr><td class="text-muted">Invoice Total</td>
+                                <td class="text-right font-weight-bold">৳ ${parseFloat(parseFloat(inv.total_amount)+parseFloat(inv.vat_amount)).toFixed(2)}</td></tr>
+                            ${parseFloat(inv.discount) > 0 ? `
                             <tr><td class="text-muted">Discount</td>
-                                <td class="text-right text-warning">(৳ ${parseFloat(inv.discount).toFixed(2)})</td></tr>
-                            <tr><td class="text-muted">Grand Total</td>
-                                <td class="text-right font-weight-bold">৳ ${parseFloat(inv.grand_total).toFixed(2)}</td></tr>
+                                <td class="text-right text-warning">(৳ ${parseFloat(inv.discount).toFixed(2)})</td></tr>` : ''}
+                            <tr style="background:#e8f4fd;"><td class="font-weight-bold">Grand Total</td>
+                                <td class="text-right font-weight-bold text-primary">৳ ${parseFloat(inv.grand_total).toFixed(2)}</td></tr>
                             <tr><td class="text-muted">Received</td>
                                 <td class="text-right text-success font-weight-bold">৳ ${parseFloat(inv.received_amount).toFixed(2)}</td></tr>
                             <tr style="background:#fff3cd;"><td class="font-weight-bold">Balance Due</td>
@@ -1085,7 +1306,7 @@ $(document).on('click', '.btn-view-inv', function(e) {
                         <table class="table table-sm table-bordered" style="font-size:12px;">
                             <thead style="background:#2c3e50;color:#fff;">
                                 <tr><th>#</th><th>No</th><th>Date</th><th>Method</th>
-                                    <th class="text-right">Amount</th><th>Status</th></tr>
+                                    <th class="text-right">Amount</th><th>Status</th><th></th></tr>
                             </thead>
                             <tbody>${payRows}</tbody>
                         </table>
@@ -1095,9 +1316,11 @@ $(document).on('click', '.btn-view-inv', function(e) {
             `);
 
             // show action buttons
-            if (inv.status !== 'paid') {
+            if (inv.status === 'unpaid' || inv.status === 'overdue') {
                 $('#vm_editBtn').show().data('id', id);
-                if (inv.due_amount > 0) $('#vm_payBtn').show().data('id', id);
+            }
+            if (inv.due_amount > 0 && inv.status !== 'paid') {
+                $('#vm_payBtn').show().data('id', id);
             }
         },
         error: () => toastErr('Failed to load invoice.')
@@ -1122,7 +1345,7 @@ $(document).on('click', '.btn-pay', function() {
 function openPayModal(id) {
     payInvId = id;
     $('#pay_inv_no').text('Loading...');
-    $('#pay_grand, #pay_prev, #pay_due').text('0.00');
+    $('#pay_grand, #pay_prev, #pay_prev_disc, #pay_due').text('0.00');
     $('#pay_amount').val(0);
     $('#pay_discount').val(0);
     $('#pay_txn, #pay_remarks').val('');
@@ -1136,6 +1359,7 @@ function openPayModal(id) {
             $('#pay_inv_no').text(res.invoice_no);
             $('#pay_grand').text(parseFloat(res.payable_amount).toFixed(2));
             $('#pay_prev').text(parseFloat(res.previous_paid).toFixed(2));
+            $('#pay_prev_disc').text(parseFloat(res.previous_discount ?? 0).toFixed(2));
             $('#pay_due').text(parseFloat(res.balance_due).toFixed(2));
             $('#pay_amount').val(parseFloat(res.balance_due).toFixed(2));
         }
@@ -1144,8 +1368,26 @@ function openPayModal(id) {
 }
 
 $('#btnSubmitPay').on('click', function() {
-    var amount = parseFloat($('#pay_amount').val());
-    if (!amount || amount<=0) { toastErr('Received amount required.'); return; }
+    var amount   = parseFloat($('#pay_amount').val())   || 0;
+    var discount = parseFloat($('#pay_discount').val()) || 0;
+    var balDue   = parseFloat($('#pay_due').text())     || 0;
+
+    if (!amount || amount <= 0) {
+        toastErr('Received amount required.');
+        return;
+    }
+    if (amount > balDue) {
+        toastErr('Received amount cannot be more than Balance Due (' + balDue.toFixed(2) + ').');
+        return;
+    }
+    if (discount > balDue) {
+        toastErr('Discount cannot be more than Balance Due (' + balDue.toFixed(2) + ').');
+        return;
+    }
+    if ((amount + discount) > balDue) {
+        toastErr('Received + Discount cannot exceed Balance Due (' + balDue.toFixed(2) + ').');
+        return;
+    }
 
     var $btn = $(this).prop('disabled',true)
                       .html('<i class="fas fa-spinner fa-spin mr-1"></i> Saving...');
@@ -1176,6 +1418,41 @@ $('#btnSubmitPay').on('click', function() {
         error: xhr => toastErr(xhr.responseJSON?.message || 'Error.'),
         complete: () => $btn.prop('disabled',false)
                             .html('<i class="fas fa-save mr-1"></i> Submit Payment')
+    });
+});
+
+// ── Void payment from view modal ─────────────────────────────
+$(document).on('click', '.btn-void-pay-view', function() {
+    var id = $(this).data('id');
+    var no = $(this).data('no');
+    Swal.fire({
+        title: 'Void Payment?',
+        html: `<code>${no}</code> void হবে।<br>
+               <strong class="text-success">Income record ও void হবে।</strong>`,
+        icon: 'warning',
+        input: 'text',
+        inputPlaceholder: 'Void reason (required)',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        confirmButtonText: 'Void',
+        preConfirm: val => { if (!val) Swal.showValidationMessage('Reason required.'); }
+    }).then(r => {
+        if (!r.isConfirmed) return;
+        $.ajax({
+            url:    '/bandwidth-sale/payments/'+id+'/void',
+            method: 'POST',
+            data:   { _token: CSRF, reason: r.value },
+            headers: {'X-Requested-With':'XMLHttpRequest'},
+            success: function(res) {
+                toastOk(res.message);
+                // Reload view modal
+                setTimeout(() => {
+                    $('#viewModal').modal('hide');
+                    location.reload();
+                }, 1500);
+            },
+            error: xhr => toastErr(xhr.responseJSON?.message || 'Error.')
+        });
     });
 });
 
