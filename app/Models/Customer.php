@@ -111,7 +111,7 @@ class Customer extends Authenticatable
         return $this->belongsTo(\App\Models\MikrotikRouter::class, 'router_id');
     }
 
-    // MAC Reseller Portal — এই customer কোন reseller (POP) এর অধীনে
+   
     public function macReseller()
     {
         return $this->belongsTo(\App\Models\MacReseller::class, 'mac_reseller_id');
@@ -134,7 +134,7 @@ class Customer extends Authenticatable
         return $query->where('area', $area);
     }
 
-    // Reseller Portal এর Client list এর জন্য — শুধু নিজের customer
+    
     public function scopeForReseller($query, $resellerId)
     {
         return $query->where('mac_reseller_id', $resellerId);
@@ -149,4 +149,9 @@ class Customer extends Authenticatable
         $number = $last ? (intval(substr($last->customer_code, strrpos($last->customer_code, '-') + 1)) + 1) : 1;
         return $prefix . '-' . str_pad($number, 4, '0', STR_PAD_LEFT);
     }
+
+    public function inventoryLedger()
+    {
+        return $this->hasMany(\App\Models\Inventory\ClientLedger::class, 'client_id');
+    }    
 }

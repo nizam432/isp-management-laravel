@@ -700,6 +700,7 @@ Route::middleware(['auth'])->group(function () {
 // Client Portal Routes (নিজস্ব guard — auth এর বাইরে)
 // ─────────────────────────────────────────────
 require __DIR__ . '/client.php';
+require __DIR__.'/inventory.php';
 
 // ─────────────────────────────────────────────
 // Payment Gateway Callbacks — No Auth, No CSRF

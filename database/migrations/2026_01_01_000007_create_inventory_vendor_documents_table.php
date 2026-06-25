@@ -1,0 +1,27 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('inventory_vendor_documents', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('vendor_id')->constrained('inventory_vendors')->cascadeOnDelete();
+            $table->string('document_type');
+            $table->string('file_path');
+            $table->date('expiry_date')->nullable();
+            $table->text('note')->nullable();
+            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('inventory_vendor_documents');
+    }
+};

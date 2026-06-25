@@ -392,8 +392,7 @@
                             <tr>
                                 <th style="min-width:160px;">Item / Service</th>
                                 <th style="min-width:150px;">Description</th>
-                                <th style="width:65px;min-width:60px;">Unit</th>
-                                <th style="width:75px;min-width:65px;">Qty</th>
+                                <th style="width:75px;min-width:65px;">Qty (MB)</th>
                                 <th style="width:90px;min-width:75px;">Rate</th>
                                 <th style="width:70px;min-width:60px;">VAT%</th>
                                 <th class="daily-col" style="width:110px;">From</th>

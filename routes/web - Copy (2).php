@@ -6,6 +6,8 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\PackageController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\Reports\BillCollectionReportController;
+use App\Http\Controllers\Reports\IncomeExpenseReportController;
+use App\Http\Controllers\Reports\CustomerReportController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\AgentController;
 use App\Http\Controllers\MikrotikController;
@@ -572,6 +574,7 @@ Route::middleware(['auth'])->group(function () {
             Route::post('/',                   [BandwidthProviderController::class, 'store'])  ->name('store');
             Route::get('/{provider}/edit',     [BandwidthProviderController::class, 'edit'])   ->name('edit');
             Route::put('/{provider}',          [BandwidthProviderController::class, 'update']) ->name('update');
+            Route::delete('/{provider}',       [BandwidthProviderController::class, 'destroy'])->name('destroy');
         });
 
         // Service
@@ -595,6 +598,7 @@ Route::middleware(['auth'])->group(function () {
 
         // Purchase Report
         Route::get('report', [BandwidthReportController::class, 'index'])->name('report');
+        Route::get('report/datatables', [BandwidthReportController::class, 'datatables'])->name('report.datatables');
 
     }); // end bandwidth-buy
 
@@ -613,6 +617,8 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('customers/{customer}', [BwsCustomerController::class, 'destroy']) ->name('customers.destroy');
 
         // ── Invoices — static routes BEFORE {bwsInvoice} ──
+        Route::get('invoices/export-pdf',                  [BwsInvoiceController::class, 'exportPdf'])      ->name('invoices.export-pdf');
+        Route::get('invoices/export-xlsx',                 [BwsInvoiceController::class, 'exportXlsx'])     ->name('invoices.export-xlsx');
         Route::get('invoices/next-no',                     [BwsInvoiceController::class, 'nextNo'])         ->name('invoices.next-no');
         Route::get('invoices/due-for-customer/{customer}', [BwsInvoiceController::class, 'dueForCustomer']) ->name('invoices.due-for-customer');
 
@@ -657,6 +663,36 @@ Route::middleware(['auth'])->group(function () {
         Route::get('monthly-billing',     [BillCollectionReportController::class, 'monthlyBilling'])->name('monthly-billing')->middleware('can:report.revenue.view');
         Route::get('monthly-billing/pdf', [BillCollectionReportController::class, 'exportMonthlyBillingPdf'])->name('monthly-billing.pdf')->middleware('can:report.revenue.view');
         Route::get('monthly-billing/csv', [BillCollectionReportController::class, 'exportMonthlyBillingCsv'])->name('monthly-billing.csv')->middleware('can:report.revenue.view');
+
+        // ── Income Report ──
+        Route::get('income',      [IncomeExpenseReportController::class, 'incomeReport'])->name('income')->middleware('can:report.revenue.view');
+        Route::get('income/pdf',  [IncomeExpenseReportController::class, 'exportIncomePdf'])->name('income.pdf')->middleware('can:report.revenue.view');
+        Route::get('income/xlsx', [IncomeExpenseReportController::class, 'exportIncomeXlsx'])->name('income.xlsx')->middleware('can:report.revenue.view');
+
+        // ── Expense Report ──
+        Route::get('expense',      [IncomeExpenseReportController::class, 'expenseReport'])->name('expense')->middleware('can:report.revenue.view');
+        Route::get('expense/pdf',  [IncomeExpenseReportController::class, 'exportExpensePdf'])->name('expense.pdf')->middleware('can:report.revenue.view');
+        Route::get('expense/xlsx', [IncomeExpenseReportController::class, 'exportExpenseXlsx'])->name('expense.xlsx')->middleware('can:report.revenue.view');
+
+        // ── Customer Report ──
+        Route::get('customer',      [CustomerReportController::class, 'customerReport'])->name('customer')->middleware('can:report.revenue.view');
+        Route::get('customer/pdf',  [CustomerReportController::class, 'exportCustomerPdf'])->name('customer.pdf')->middleware('can:report.revenue.view');
+        Route::get('customer/xlsx', [CustomerReportController::class, 'exportCustomerXlsx'])->name('customer.xlsx')->middleware('can:report.revenue.view');
+
+        // ── POP Wise Clients ──
+        Route::get('pop-wise',      [CustomerReportController::class, 'popWiseClients'])->name('pop-wise')->middleware('can:report.revenue.view');
+        Route::get('pop-wise/pdf',  [CustomerReportController::class, 'exportPopWisePdf'])->name('pop-wise.pdf')->middleware('can:report.revenue.view');
+        Route::get('pop-wise/xlsx', [CustomerReportController::class, 'exportPopWiseXlsx'])->name('pop-wise.xlsx')->middleware('can:report.revenue.view');
+
+        // ── Income & Discount Report ──
+        Route::get('income-discount',      [BillCollectionReportController::class, 'incomeDiscount'])->name('income-discount')->middleware('can:report.revenue.view');
+        Route::get('income-discount/pdf',  [BillCollectionReportController::class, 'exportIncomeDiscountPdf'])->name('income-discount.pdf')->middleware('can:report.revenue.view');
+        Route::get('income-discount/xlsx', [BillCollectionReportController::class, 'exportIncomeDiscountXlsx'])->name('income-discount.xlsx')->middleware('can:report.revenue.view');
+
+        // ── Profit & Loss Report ──
+        Route::get('profit',      [BillCollectionReportController::class, 'profitReport'])->name('profit')->middleware('can:report.revenue.view');
+        Route::get('profit/pdf',  [BillCollectionReportController::class, 'exportProfitPdf'])->name('profit.pdf')->middleware('can:report.revenue.view');
+        Route::get('profit/xlsx', [BillCollectionReportController::class, 'exportProfitXlsx'])->name('profit.xlsx')->middleware('can:report.revenue.view');
     });
 
 }); // end auth
@@ -664,6 +700,7 @@ Route::middleware(['auth'])->group(function () {
 // Client Portal Routes (নিজস্ব guard — auth এর বাইরে)
 // ─────────────────────────────────────────────
 require __DIR__ . '/client.php';
+require __DIR__.'/inventory.php';
 
 // ─────────────────────────────────────────────
 // Payment Gateway Callbacks — No Auth, No CSRF

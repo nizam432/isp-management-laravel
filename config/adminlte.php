@@ -690,7 +690,7 @@ return [
             ],
         ],
 
-        ['header' => 'MANAGEMENT', 'can' => 'user.view'],
+      //  ['header' => 'MANAGEMENT', 'can' => 'user.view'],
         [
             'text'       => 'User Management',
             'icon'       => 'fas fa-fw fa-users-cog',
@@ -711,38 +711,116 @@ return [
                 ['text' => 'New Role',  'url' => 'roles/create', 'icon' => 'fas fa-fw fa-plus'],
             ],
         ],
-        ['text' => 'Agents',    'url' => 'agents',    'icon' => 'fas fa-fw fa-user-tie', 'icon_color' => 'yellow', 'can' => 'agent.view'],
-        ['text' => 'Inventory', 'url' => 'inventory', 'icon' => 'fas fa-fw fa-boxes',    'icon_color' => 'brown',  'can' => 'isp-admin'],  // inventory permission not defined yet
-      //  ['text' => 'SMS',       'url' => 'sms',       'icon' => 'fas fa-fw fa-sms',      'icon_color' => 'green',  'can' => 'isp-admin'],
+        ['text' => 'Agents', 'url' => 'agents', 'icon' => 'fas fa-fw fa-user-tie', 'icon_color' => 'yellow', 'can' => 'agent.view'],
+
+        // ── Inventory Module ──────────────────────
         [
-            'text'       => 'SMS',
-            'icon'       => 'fas fa-fw fa-sms',
-            'icon_color' => 'green',
-            'can'        => 'sms.view',
+            'text'       => 'Inventory',
+            'icon'       => 'fas fa-fw fa-boxes',
+            'icon_color' => 'brown',
+            'can'        => 'isp-admin',
             'submenu'    => [
+
                 [
-                    'text' => 'Gateway Settings',
-                    'url'  => 'sms/settings',
-                    'icon' => 'fas fa-fw fa-server',
+                    'text' => 'Dashboard',
+                    'url'  => 'inventory',
+                    'icon' => 'fas fa-fw fa-tachometer-alt',
+                    'icon_color' => 'blue',
                 ],
+
+                // ── Products ──────────────────────
                 [
-                    'text' => 'Templates',
-                    'url'  => 'sms/templates',
-                    'icon' => 'fas fa-fw fa-file-alt',
-                ],                
-                [
-                    'text' => 'Send SMS',
-                    'url'  => 'sms',
-                    'icon' => 'fas fa-fw fa-paper-plane',
+                    'text'    => 'Products',
+                    'icon'    => 'fas fa-fw fa-box',
+                    'icon_color' => 'purple',
+                    'submenu' => [
+                        ['text' => 'All Products',   'url' => 'inventory/products',           'icon' => 'fas fa-fw fa-list'],
+                        ['text' => 'Add Product',    'url' => 'inventory/products/create',    'icon' => 'fas fa-fw fa-plus'],
+                        ['text' => 'Categories',     'url' => 'inventory/categories',         'icon' => 'fas fa-fw fa-tags'],
+                        ['text' => 'Store Locations','url' => 'inventory/locations',          'icon' => 'fas fa-fw fa-warehouse'],
+                    ],
                 ],
+
+                // ── Vendors ───────────────────────
                 [
-                    'text' => 'SMS Reports',
-                    'url'  => 'sms/reports',
-                    'icon' => 'fas fa-fw fa-chart-bar',
+                    'text'    => 'Vendors',
+                    'icon'    => 'fas fa-fw fa-truck',
+                    'icon_color' => 'orange',
+                    'submenu' => [
+                        ['text' => 'All Vendors', 'url' => 'inventory/vendors',        'icon' => 'fas fa-fw fa-list'],
+                        ['text' => 'Add Vendor',  'url' => 'inventory/vendors/create', 'icon' => 'fas fa-fw fa-plus'],
+                    ],
                 ],
+
+                // ── Purchase ──────────────────────
+                [
+                    'text'    => 'Purchase',
+                    'icon'    => 'fas fa-fw fa-shopping-cart',
+                    'icon_color' => 'green',
+                    'submenu' => [
+                        ['text' => 'All Purchases',    'url' => 'inventory/purchases',               'icon' => 'fas fa-fw fa-list'],
+                        ['text' => 'New Purchase',     'url' => 'inventory/purchases/create',        'icon' => 'fas fa-fw fa-plus'],
+                        ['text' => 'Purchase Returns', 'url' => 'inventory/purchase-returns',        'icon' => 'fas fa-fw fa-undo'],
+                    ],
+                ],
+
+                // ── Sales ─────────────────────────
+                [
+                    'text'    => 'Sales',
+                    'icon'    => 'fas fa-fw fa-cash-register',
+                    'icon_color' => 'teal',
+                    'submenu' => [
+                        ['text' => 'All Sales',    'url' => 'inventory/sales',               'icon' => 'fas fa-fw fa-list'],
+                        ['text' => 'New Sale',     'url' => 'inventory/sales/create',        'icon' => 'fas fa-fw fa-plus'],
+                        ['text' => 'Sale Returns', 'url' => 'inventory/sale-returns',        'icon' => 'fas fa-fw fa-undo'],
+                    ],
+                ],
+
+                // ── Stock ─────────────────────────
+                [
+                    'text'    => 'Stock',
+                    'icon'    => 'fas fa-fw fa-cubes',
+                    'icon_color' => 'cyan',
+                    'submenu' => [
+                        ['text' => 'Current Stock',      'url' => 'inventory/stock',             'icon' => 'fas fa-fw fa-boxes'],
+                        ['text' => 'Transactions',       'url' => 'inventory/stock/transactions','icon' => 'fas fa-fw fa-exchange-alt'],
+                        ['text' => 'Stock Transfer',     'url' => 'inventory/transfers',         'icon' => 'fas fa-fw fa-truck-moving'],
+                        ['text' => 'Stock Adjustment',   'url' => 'inventory/stock/adjustment',  'icon' => 'fas fa-fw fa-sliders-h'],
+                        ['text' => 'Internal Consumption','url' => 'inventory/consumptions',     'icon' => 'fas fa-fw fa-tools'],
+                    ],
+                ],
+
+                // ── Client ────────────────────────
+                [
+                    'text'    => 'Client',
+                    'icon'    => 'fas fa-fw fa-users',
+                    'icon_color' => 'indigo',
+                    'submenu' => [
+                        ['text' => 'Device Assignments', 'url' => 'inventory/assignments',   'icon' => 'fas fa-fw fa-mobile-alt'],
+                        ['text' => 'Client Ledger',      'url' => 'inventory/client-ledger', 'icon' => 'fas fa-fw fa-book'],
+                    ],
+                ],
+
+                // ── Reports ───────────────────────
+                [
+                    'text'    => 'Reports',
+                    'icon'    => 'fas fa-fw fa-chart-bar',
+                    'icon_color' => 'red',
+                    'submenu' => [
+                        ['text' => 'Stock Report',      'url' => 'inventory/reports/stock',         'icon' => 'fas fa-fw fa-boxes'],
+                        ['text' => 'Purchase Report',   'url' => 'inventory/reports/purchase',      'icon' => 'fas fa-fw fa-shopping-cart'],
+                        ['text' => 'Sale Report',       'url' => 'inventory/reports/sale',          'icon' => 'fas fa-fw fa-cash-register'],
+                        ['text' => 'Consumption Report','url' => 'inventory/reports/consumption',   'icon' => 'fas fa-fw fa-tools'],
+                        ['text' => 'Profit & Loss',     'url' => 'inventory/reports/profit-loss',   'icon' => 'fas fa-fw fa-chart-line'],
+                        ['text' => 'Low Stock Alert',   'url' => 'inventory/reports/low-stock',     'icon' => 'fas fa-fw fa-exclamation-triangle'],
+                        ['text' => 'Vendor Ledger',     'url' => 'inventory/reports/vendor-ledger', 'icon' => 'fas fa-fw fa-truck'],
+                        ['text' => 'Client Ledger',     'url' => 'inventory/reports/client-ledger', 'icon' => 'fas fa-fw fa-users'],
+                    ],
+                ],
+
             ],
         ],
-  
+
     ],
 
 ];
