@@ -110,7 +110,7 @@ class BillingService
 
             // Send payment confirmation notification
             try {
-                (new NotificationService())->paymentConfirm($customer, $totalPaid, $data['method']);
+                //(new NotificationService())->paymentConfirm($customer, $totalPaid, $data['method']);
             } catch (\Exception $e) {
                 \Log::error('Notification failed: ' . $e->getMessage());
             }

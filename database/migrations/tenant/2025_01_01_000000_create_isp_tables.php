@@ -17,18 +17,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // 1. users
-        Schema::create('users', function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 100);
-            $table->string('email', 150)->unique();
-            $table->string('password');
-            $table->string('phone', 20)->nullable();
-            $table->string('avatar', 255)->nullable();
-            $table->boolean('is_active')->default(1);
-            $table->rememberToken();
-            $table->timestamps();
-        });
+    
 
         // 2. password_reset_tokens (Laravel default)
         Schema::create('password_reset_tokens', function (Blueprint $table) {
@@ -300,28 +289,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        // Drop in reverse order to respect FK constraints
-        Schema::dropIfExists('inventory_transactions');
-        Schema::dropIfExists('inventory_items');
-        Schema::dropIfExists('activity_logs');
-        Schema::dropIfExists('sms_logs');
-        Schema::dropIfExists('ticket_replies');
-        Schema::dropIfExists('tickets');
-        Schema::dropIfExists('ip_pools');
-        Schema::dropIfExists('mikrotik_routers');
-        Schema::dropIfExists('agent_commissions');
-        Schema::dropIfExists('payments');
-        Schema::dropIfExists('invoices');
-        Schema::dropIfExists('customers');
-        Schema::dropIfExists('agents');
-        Schema::dropIfExists('packages');
-        Schema::dropIfExists('role_has_permissions');
-        Schema::dropIfExists('model_has_roles');
-        Schema::dropIfExists('model_has_permissions');
-        Schema::dropIfExists('roles');
-        Schema::dropIfExists('permissions');
-        Schema::dropIfExists('sessions');
-        Schema::dropIfExists('password_reset_tokens');
-        Schema::dropIfExists('users');
+
+
     }
 };

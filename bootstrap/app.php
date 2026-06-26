@@ -16,6 +16,11 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\SetLocale::class,
         ]);
 
+        $middleware->prependToGroup('web', [
+            \Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains::class,
+            \Stancl\Tenancy\Middleware\InitializeTenancyByDomain::class,
+        ]);
+
         $middleware->alias([
             'role'               => \Spatie\Permission\Middleware\RoleMiddleware::class,
             'permission'         => \Spatie\Permission\Middleware\PermissionMiddleware::class,
