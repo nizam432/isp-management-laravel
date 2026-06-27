@@ -678,7 +678,7 @@ return [
                     'icon' => 'fas fa-fw fa-file-invoice',
                 ],
                 [
-                    'text' => 'Daily Bill',
+                    'text' => 'Payment History',
                     'url'  => 'bandwidth-sale/daily-bill',
                     'icon' => 'fas fa-fw fa-calendar-day',
                 ],

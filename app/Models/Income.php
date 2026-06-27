@@ -151,7 +151,7 @@ class Income extends Model
         }
 
         return match ($this->source_type) {
-            self::SOURCE_MONTHLY_BILL   => route('billing.show', $this->source_id),
+            self::SOURCE_MONTHLY_BILL   => route('invoices.show', $this->source_invoice_id ?? $this->source_id),
             self::SOURCE_BANDWIDTH_SALE => route('bandwidth-sale.invoices.show',
                 $this->source_invoice_id ?? $this->source_id
             ),

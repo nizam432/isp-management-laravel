@@ -7,6 +7,8 @@ use App\Models\Payment;
 use App\Models\PaymentVoid;
 use App\Models\Customer;
 use App\Models\AdvanceTransaction;
+use App\Models\Income;
+use App\Models\IncomeCategory;
 use App\Models\Setting;
 use App\Services\NotificationService;
 use Illuminate\Support\Facades\DB;
@@ -44,7 +46,7 @@ class BillingService
                     $payAmount = $due;
                     $remaining -= $due;
 
-                    Payment::create([
+                    $payment = Payment::create([
                         'invoice_id'            => $invoice->id,
                         'customer_id'           => $customer->id,
                         'amount'                => $payAmount,
@@ -59,6 +61,8 @@ class BillingService
                         'status'                => 'active',
                         'paid_at'               => now(),
                     ]);
+
+                    $this->createIncomeForPayment($payment, $invoice);
 
                     $invoice->update(['due_amount' => 0, 'status' => 'paid']);
                     $paidInvoices[] = $invoice->invoice_no;
@@ -68,7 +72,7 @@ class BillingService
                     $payAmount = $remaining;
                     $remaining = 0;
 
-                    Payment::create([
+                    $payment = Payment::create([
                         'invoice_id'            => $invoice->id,
                         'customer_id'           => $customer->id,
                         'amount'                => $payAmount,
@@ -83,6 +87,8 @@ class BillingService
                         'status'                => 'active',
                         'paid_at'               => now(),
                     ]);
+
+                    $this->createIncomeForPayment($payment, $invoice);
 
                     $invoice->update([
                         'due_amount' => $due - $payAmount,
@@ -203,6 +209,20 @@ class BillingService
                 'reason'     => $reason,
                 'voided_at'  => now(),
             ]);
+
+            // Income void — source_type=monthly_bill, source_id=payment.id
+            $income = Income::where('source_type', Income::SOURCE_MONTHLY_BILL)
+                ->where('source_id', $payment->id)
+                ->first();
+
+            if ($income) {
+                $income->update([
+                    'status'      => 'void',
+                    'void_reason' => $reason,
+                    'void_date'   => now(),
+                    'void_by'     => auth()->id(),
+                ]);
+            }
 
             $invoice   = $payment->invoice;
             $totalPaid = $invoice->payments()->active()->sum('amount');
@@ -356,6 +376,38 @@ class BillingService
         }
 
         return $count;
+    }
+
+    /**
+     * Create Income record for a monthly bill payment.
+     */
+    private function createIncomeForPayment(Payment $payment, Invoice $invoice): void
+    {
+        $category = IncomeCategory::where('slug', 'monthly-bill')
+            ->orWhere('name', 'Monthly Bill')
+            ->first();
+
+        if (! $category) return;
+
+        $customer = $invoice->customer;
+
+        Income::create([
+            'income_no'         => Income::generateNumber(),
+            'category_id'       => $category->id,
+            'amount'            => $payment->amount,
+            'income_date'       => $payment->payment_date,
+            'payment_method'    => $payment->method,
+            'transaction_id'    => $payment->transaction_id,
+            'customer_id'       => $customer->id,
+            'payer'             => $customer->name,
+            'reference_no'      => $payment->id,
+            'description'       => "Invoice: {$invoice->invoice_no} | Customer: {$customer->name}",
+            'source_type'       => Income::SOURCE_MONTHLY_BILL,
+            'source_id'         => $payment->id,
+            'source_invoice_id' => $invoice->id,
+            'status'            => 'active',
+            'created_by'        => auth()->id(),
+        ]);
     }
 
     /**
