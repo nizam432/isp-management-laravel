@@ -74,20 +74,21 @@ class BwsInvoicePayment extends Model
         $customer = $this->bwsCustomer;
 
         return Income::create([
-            'income_no'      => Income::generateNumber(),
-            'category_id'    => $category->id,
-            'amount'         => $this->received_amount,
-            'income_date'    => $this->received_date,
-            'payment_method' => $this->payment_method,
-            'transaction_id' => $this->receipt_transaction_no,
-            'payer'          => $customer?->customer_name ?? $this->received_from,
-            'reference_no'   => $this->payment_no,
-            'description'    => "BWS Invoice: {$this->bwsInvoice->invoice_no} | " .
-                                "Customer: {$customer?->customer_name}",
-            'source_type'    => 'bandwidth_sale',
-            'source_id'      => $this->id,
-            'status'         => 'active',
-            'created_by'     => $this->created_by,
+            'income_no'         => Income::generateNumber(),
+            'category_id'       => $category->id,
+            'amount'            => $this->received_amount,
+            'income_date'       => $this->received_date,
+            'payment_method'    => $this->payment_method,
+            'transaction_id'    => $this->receipt_transaction_no,
+            'payer'             => $customer?->customer_name ?? $this->received_from,
+            'reference_no'      => $this->payment_no,
+            'description'       => "BWS Invoice: {$this->bwsInvoice->invoice_no} | " .
+                                   "Customer: {$customer?->customer_name}",
+            'source_type'       => 'bandwidth_sale',
+            'source_id'         => $this->id,
+            'source_invoice_id' => $this->bws_invoice_id,
+            'status'            => 'active',
+            'created_by'        => $this->created_by,
         ]);
     }
 

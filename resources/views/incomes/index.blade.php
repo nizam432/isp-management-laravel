@@ -211,20 +211,28 @@
                             <i class="fas fa-eye"></i>
                         </a>
                         @if(!$inc->isVoid())
-                        <button class="btn btn-xs btn-warning btn-edit-income"
-                                data-id="{{ $inc->id }}"
-                                data-url="{{ route('incomes.edit-data', $inc) }}"
-                                data-update-url="{{ route('incomes.update', $inc) }}"
-                                title="Edit">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="btn btn-xs btn-danger btn-void-income"
-                                data-id="{{ $inc->id }}"
-                                data-no="{{ $inc->income_no }}"
-                                data-url="{{ route('incomes.void', $inc) }}"
-                                title="Void">
-                            <i class="fas fa-ban"></i>
-                        </button>
+                            @if($inc->isDirectSource())
+                                <button class="btn btn-xs btn-warning btn-edit-income"
+                                        data-id="{{ $inc->id }}"
+                                        data-url="{{ route('incomes.edit-data', $inc) }}"
+                                        data-update-url="{{ route('incomes.update', $inc) }}"
+                                        title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-xs btn-danger btn-void-income"
+                                        data-id="{{ $inc->id }}"
+                                        data-no="{{ $inc->income_no }}"
+                                        data-url="{{ route('incomes.void', $inc) }}"
+                                        title="Void">
+                                    <i class="fas fa-ban"></i>
+                                </button>
+                            @else
+                                <a href="{{ $inc->sourceUrl }}"
+                                   class="btn btn-xs btn-secondary"
+                                   title="Open {{ $inc->sourceLabel }}">
+                                    <i class="fas fa-external-link-alt mr-1"></i>{{ $inc->sourceLabel }}
+                                </a>
+                            @endif
                         @endif
                     </td>
                 </tr>
@@ -524,6 +532,21 @@ $('#btnConfirmVoidIncome').on('click', function () {
 
 // ── DOM Helpers ───────────────────────────────────────────────
 function prependRow(e) {
+    var actionBtns = '';
+    if (e.is_direct) {
+        actionBtns = `
+            <button class="btn btn-xs btn-warning btn-edit-income"
+                    data-id="${e.id}" data-url="${e.edit_data_url}"
+                    data-update-url="${e.update_url}">
+                <i class="fas fa-edit"></i>
+            </button>
+            <button class="btn btn-xs btn-danger btn-void-income"
+                    data-id="${e.id}" data-no="${e.income_no}"
+                    data-url="${e.void_url}">
+                <i class="fas fa-ban"></i>
+            </button>`;
+    }
+
     $('#incomeTableBody').prepend(`
         <tr id="income-row-${e.id}">
             <td>—</td>
@@ -537,16 +560,7 @@ function prependRow(e) {
             <td>${e.status_badge}</td>
             <td>
                 <a href="${e.show_url}" class="btn btn-xs btn-info"><i class="fas fa-eye"></i></a>
-                <button class="btn btn-xs btn-warning btn-edit-income"
-                        data-id="${e.id}" data-url="${e.edit_data_url}"
-                        data-update-url="${e.update_url}">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn btn-xs btn-danger btn-void-income"
-                        data-id="${e.id}" data-no="${e.income_no}"
-                        data-url="${e.void_url}">
-                    <i class="fas fa-ban"></i>
-                </button>
+                ${actionBtns}
             </td>
         </tr>`);
 }

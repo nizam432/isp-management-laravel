@@ -145,6 +145,7 @@ class BwsInvoiceController extends Controller
                         'total'       => $i->total,
                     ])->toArray(),
                     'payments' => $bwsInvoice->activePayments->map(fn($p) => [
+                        'id'              => $p->id,
                         'payment_no'      => $p->payment_no,
                         'received_date'   => optional($p->received_date)->format('d M Y'),
                         'payment_method'  => $p->payment_method,
@@ -434,6 +435,21 @@ class BwsInvoiceController extends Controller
             'payment_method'  => 'required|in:cash,bkash,nagad,rocket,bank,cheque,card',
         ]);
 
+        // ── Duplicate prevention — same invoice, same amount, same date, within 10 seconds
+        $duplicate = BwsInvoicePayment::where('bws_invoice_id', $bwsInvoice->id)
+            ->where('received_amount', $request->received_amount)
+            ->where('received_date',   $request->received_date)
+            ->where('status', 'active')
+            ->where('created_at', '>=', now()->subSeconds(10))
+            ->exists();
+
+        if ($duplicate) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Duplicate payment detected. Please wait a moment and try again.',
+            ], 422);
+        }
+
         DB::beginTransaction();
         try {
             $payment = BwsInvoicePayment::create([
@@ -476,12 +492,46 @@ class BwsInvoiceController extends Controller
         return response()->json(['success' => true, 'message' => 'Payment voided. Income also voided.']);
     }
 
+    // ── DELETE SELECTED ───────────────────────────────────────────
+    public function deleteSelected(Request $request)
+    {
+        $request->validate(['ids' => 'required|array', 'ids.*' => 'integer']);
+
+        $payments = BwsInvoicePayment::whereIn('id', $request->ids)->get();
+
+        foreach ($payments as $payment) {
+            if ($payment->isVoid()) {
+                $payment->forceDelete();
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => count($request->ids) . ' payment(s) deleted.',
+        ]);
+    }
+
+    // ── APPROVE SELECTED ──────────────────────────────────────────
+    public function approveSelected(Request $request)
+    {
+        $request->validate(['ids' => 'required|array', 'ids.*' => 'integer']);
+
+        BwsInvoicePayment::whereIn('id', $request->ids)
+            ->where('status', 'active')
+            ->update(['approved' => 1, 'approved_by' => auth()->id(), 'approved_at' => now()]);
+
+        return response()->json([
+            'success' => true,
+            'message' => count($request->ids) . ' payment(s) approved.',
+        ]);
+    }
+
     // ── DAILY BILL ────────────────────────────────────────────────
     public function dailyBill(Request $request)
     {
         $query = BwsInvoicePayment::with(['bwsInvoice', 'bwsCustomer', 'receivedBy', 'createdBy'])
-            ->when($request->pop, fn($q) =>
-                $q->whereHas('bwsCustomer', fn($c) => $c->where('pop_info', $request->pop))
+            ->when($request->customer_id, fn($q) =>
+                $q->where('bws_customer_id', $request->customer_id)
             )
             ->when($request->from_month, fn($q) =>
                 $q->whereHas('bwsInvoice', fn($i) => $i->where('billing_month', '>=', $request->from_month))
@@ -492,7 +542,8 @@ class BwsInvoiceController extends Controller
             ->when($request->received_by, fn($q) => $q->where('received_by', $request->received_by))
             ->when($request->created_by,  fn($q) => $q->where('created_by', $request->created_by))
             ->when($request->tx_status,   fn($q) => $q->where('status', $request->tx_status))
-            ->latest('received_date');
+            ->orderByDesc('received_date')
+            ->orderByDesc('id');
 
         $payments  = $query->paginate($request->get('per_page', 100))->withQueryString();
         $customers = BandwidthSaleCustomer::orderBy('customer_name')->get();
@@ -508,7 +559,96 @@ class BwsInvoiceController extends Controller
             compact('payments', 'customers', 'pops', 'employees'));
     }
 
-    // ── RECURRING INDEX ───────────────────────────────────────────
+    // ── DAILY BILL EXPORT XLSX ────────────────────────────────────
+    public function dailyBillExportXlsx(Request $request)
+    {
+        $payments = $this->getFilteredPayments($request);
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Payment History');
+
+        $headers = ['A'=>'#','B'=>'R.Date','C'=>'Customer','D'=>'Contact','E'=>'Mobile',
+                    'F'=>'Invoice No','G'=>'Bill Month','H'=>'Bill Amount',
+                    'I'=>'Received','J'=>'Discount','K'=>'Balance Due',
+                    'L'=>'Received By','M'=>'Created By','N'=>'Created On',
+                    'O'=>'Remarks','P'=>'Status'];
+
+        foreach ($headers as $col => $label) {
+            $sheet->setCellValue($col.'1', $label);
+            $sheet->getStyle($col.'1')->getFont()->setBold(true);
+            $sheet->getStyle($col.'1')->getFill()
+                ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+                ->getStartColor()->setRGB('2C3E50');
+            $sheet->getStyle($col.'1')->getFont()->getColor()->setRGB('FFFFFF');
+        }
+
+        foreach ($payments as $i => $pay) {
+            $row = $i + 2;
+            $sheet->setCellValue('A'.$row, $i + 1);
+            $sheet->setCellValue('B'.$row, optional($pay->received_date)->format('d-m-Y'));
+            $sheet->setCellValue('C'.$row, $pay->bwsCustomer->customer_name ?? '—');
+            $sheet->setCellValue('D'.$row, $pay->bwsCustomer->contact_person ?? '—');
+            $sheet->setCellValue('E'.$row, $pay->bwsCustomer->mobile_number ?? '—');
+            $sheet->setCellValue('F'.$row, $pay->bwsInvoice->invoice_no ?? '—');
+            $sheet->setCellValue('G'.$row, $pay->bwsInvoice->billing_month ?? '—');
+            $sheet->setCellValue('H'.$row, (float)($pay->bwsInvoice->grand_total ?? 0));
+            $sheet->setCellValue('I'.$row, (float)$pay->received_amount);
+            $sheet->setCellValue('J'.$row, (float)$pay->discount);
+            $sheet->setCellValue('K'.$row, (float)($pay->bwsInvoice->due_amount ?? 0));
+            $sheet->setCellValue('L'.$row, $pay->receivedBy->name ?? '—');
+            $sheet->setCellValue('M'.$row, $pay->createdBy->name ?? '—');
+            $sheet->setCellValue('N'.$row, optional($pay->created_at)->format('d/m/Y'));
+            $sheet->setCellValue('O'.$row, $pay->remarks ?? '');
+            $sheet->setCellValue('P'.$row, ucfirst($pay->status));
+        }
+
+        foreach (range('A', 'P') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        $filename = 'payment-history-' . now()->format('Y-m-d') . '.xlsx';
+        $tmpPath  = storage_path('app/' . $filename);
+        (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet))->save($tmpPath);
+
+        return response()->download($tmpPath, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
+    }
+
+    // ── DAILY BILL EXPORT PDF ─────────────────────────────────────
+    public function dailyBillExportPdf(Request $request)
+    {
+        $payments = $this->getFilteredPayments($request);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView(
+            'bandwidth-sale.daily-bill.export-pdf',
+            compact('payments')
+        )->setPaper('a4', 'landscape');
+
+        return $pdf->download('payment-history-' . now()->format('Y-m-d') . '.pdf');
+    }
+
+    // ── PRIVATE: Get filtered payments ────────────────────────────
+    private function getFilteredPayments(Request $request)
+    {
+        return BwsInvoicePayment::with(['bwsInvoice', 'bwsCustomer', 'receivedBy', 'createdBy'])
+            ->when($request->customer_id, fn($q) =>
+                $q->where('bws_customer_id', $request->customer_id)
+            )
+            ->when($request->from_month, fn($q) =>
+                $q->whereHas('bwsInvoice', fn($i) => $i->where('billing_month', '>=', $request->from_month))
+            )
+            ->when($request->to_month, fn($q) =>
+                $q->whereHas('bwsInvoice', fn($i) => $i->where('billing_month', '<=', $request->to_month))
+            )
+            ->when($request->received_by, fn($q) => $q->where('received_by', $request->received_by))
+            ->when($request->created_by,  fn($q) => $q->where('created_by', $request->created_by))
+            ->when($request->tx_status,   fn($q) => $q->where('status', $request->tx_status))
+            ->orderByDesc('received_date')
+            ->orderByDesc('id')
+            ->get();
+    }
     public function recurringIndex()
     {
         $invoices = BwsInvoice::with('bwsCustomer')

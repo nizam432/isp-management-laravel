@@ -432,10 +432,9 @@
 @endsection
 
 
-@section('js')
-@parent
+@push('js')
 <script>
-var CSRF = '{{ csrf_token() }}';
+const CSRF = '{{ csrf_token() }}';
 
 // ── Per page ──────────────────────────────────────────────────
 $('#perPage').on('change', function () {
@@ -454,43 +453,41 @@ $('#tableSearch').on('keyup', function () {
 
 // ── Select All ────────────────────────────────────────────────
 
-// ── select2 — শুধু select2 থাকলে init হবে ────────────────────
-if (typeof $.fn.select2 !== 'undefined') {
-    $('.select2-filter').select2({ width: '100%' });
-    $('#billReceiveModal').on('shown.bs.modal', function () {
-        if (!$('#rc_customer').hasClass('select2-hidden-accessible')) {
-            $('#rc_customer').select2({ dropdownParent: $('#billReceiveModal'), width: '100%' });
-            $('#rc_customer').on('select2:select select2:unselect', function () {
-                $(this).trigger('change.custom');
-            });
-        }
-    });
-}
+// ── select2 filter ────────────────────────────────────────────
+$('.select2-filter').select2({ width: '100%' });
+
+// ── select2 — modal open এর পর init করতে হবে ─────────────────
+$('#billReceiveModal').on('shown.bs.modal', function () {
+    if (!$('#rc_customer').hasClass('select2-hidden-accessible')) {
+        $('#rc_customer').select2({ dropdownParent: $('#billReceiveModal'), width: '100%' });
+    }
+});
 
 // ── Export XLSX ───────────────────────────────────────────────
 $('#btnCSV').on('click', function () {
-    var params = $('#filterForm').serialize();
-    window.location.href = '{{ route("bandwidth-sale.daily-bill.xlsx") }}?' + params;
+    var url = new URL('{{ route("bandwidth-sale.daily-bill.xlsx") }}', window.location.origin);
+    var params = new URLSearchParams(window.location.search);
+    params.forEach(function (val, key) { url.searchParams.set(key, val); });
+    window.location.href = url.toString();
 });
 
 // ── Export PDF ────────────────────────────────────────────────
 $('#btnPDF').on('click', function () {
-    var params = $('#filterForm').serialize();
-    window.open('{{ route("bandwidth-sale.daily-bill.pdf") }}?' + params, '_blank');
+    var url = new URL('{{ route("bandwidth-sale.daily-bill.pdf") }}', window.location.origin);
+    var params = new URLSearchParams(window.location.search);
+    params.forEach(function (val, key) { url.searchParams.set(key, val); });
+    window.open(url.toString(), '_blank');
 });
 
 // ── Customer select → load due invoices ───────────────────────
-$(document).on('change change.custom', '#rc_customer', function () {
+$('#rc_customer').on('change', function () {
+    var opt    = $(this).find(':selected');
     var custId = $(this).val();
-    var opt    = $('#rc_customer option[value="' + custId + '"]');
-    $('#rc_pop_name').val(opt.data('name') || opt.text() || '');
+    $('#rc_pop_name').val(opt.data('name') || '');
     $('#rc_mobile').val(opt.data('mobile') || '');
     $('#rc_invoice').html('<option value="">Loading...</option>');
 
-    if (!custId) {
-        $('#rc_invoice').html('<option value="">— Select Invoice —</option>');
-        return;
-    }
+    if (!custId) return;
 
     $.get('/bandwidth-sale/invoices/due-for-customer/' + custId, function (res) {
         var options = '<option value="">— Select Invoice —</option>';
@@ -501,12 +498,12 @@ $(document).on('change change.custom', '#rc_customer', function () {
                             data-payable="${inv.grand_total}"
                             data-previous="${inv.received_amount}"
                             data-due="${inv.due_amount}">
-                            ${inv.invoice_no} (${inv.billing_month}) — Due: ${inv.due_amount}
+                            Invoice#${inv.invoice_no} (${inv.billing_month}) — Due: ${inv.due_amount}
                         </option>`;
         });
         $('#rc_invoice').html(options);
     }).fail(function () {
-        $('#rc_invoice').html('<option value="">No invoices found</option>');
+        $('#rc_invoice').html('<option value="">No invoices</option>');
     });
 });
 
@@ -530,36 +527,11 @@ $('#rc_invoice').on('change', function () {
 });
 
 // ── Submit Bill Receive ───────────────────────────────────────
-$('#btnSubmitReceive').off('click').on('click', function () {
-    var invoiceId      = $('#rc_invoice').val();
-    var receivedAmount = parseFloat($('#rc_received_amount').val()) || 0;
-    var discount       = parseFloat($('#rc_discount').val())        || 0;
-    var balanceDue     = parseFloat($('#rc_balance_due').text())    || 0;
-    var payable        = parseFloat($('#rc_payable').text())        || 0;
-
+$('#btnSubmitReceive').on('click', function () {
+    var invoiceId = $('#rc_invoice').val();
     if (!invoiceId) {
         Swal.fire({ toast:true, position:'top-end', icon:'warning',
-            title: 'Please select an invoice.', showConfirmButton:false, timer:2000 });
-        return;
-    }
-    if (receivedAmount <= 0) {
-        Swal.fire({ toast:true, position:'top-end', icon:'warning',
-            title: 'Received amount must be greater than 0.', showConfirmButton:false, timer:2500 });
-        return;
-    }
-    if (receivedAmount > balanceDue) {
-        Swal.fire({ toast:true, position:'top-end', icon:'error',
-            title: 'Received amount (' + receivedAmount.toFixed(2) + ') cannot exceed Balance Due (' + balanceDue.toFixed(2) + ').', showConfirmButton:false, timer:3000 });
-        return;
-    }
-    if (discount > payable) {
-        Swal.fire({ toast:true, position:'top-end', icon:'error',
-            title: 'Discount (' + discount.toFixed(2) + ') cannot exceed Payable Amount (' + payable.toFixed(2) + ').', showConfirmButton:false, timer:3000 });
-        return;
-    }
-    if ((receivedAmount + discount) > balanceDue) {
-        Swal.fire({ toast:true, position:'top-end', icon:'error',
-            title: 'Received + Discount (' + (receivedAmount + discount).toFixed(2) + ') cannot exceed Balance Due (' + balanceDue.toFixed(2) + ').', showConfirmButton:false, timer:3000 });
+            title:'Please select an invoice.', showConfirmButton:false, timer:2000 });
         return;
     }
 
@@ -646,4 +618,4 @@ $(document).on('click', '.btn-void', function () {
     });
 });
 </script>
-@endsection
+@endpush

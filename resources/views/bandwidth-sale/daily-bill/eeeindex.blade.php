@@ -1,13 +1,19 @@
 {{-- resources/views/bandwidth-sale/daily-bill/index.blade.php --}}
 @extends('layouts.app')
-@section('page_title', 'Bandwidth Payment History')
+@section('page_title', 'Bandwidth Daily Bill')
 
 @section('page_actions')
-    <button class="btn btn-sm btn-outline-success" id="btnCSV">
-        <i class="fas fa-file-excel mr-1"></i> XLSX
+    <button class="btn btn-sm btn-outline-secondary" id="btnCSV">
+        <i class="fas fa-file-csv mr-1"></i> Generate CSV
     </button>
     <button class="btn btn-sm btn-outline-danger ml-1" id="btnPDF">
-        <i class="fas fa-file-pdf mr-1"></i> PDF
+        <i class="fas fa-file-pdf mr-1"></i> Generate PDF
+    </button>
+    <button class="btn btn-sm btn-danger ml-2" id="btnDeleteSelected" disabled>
+        <i class="fas fa-trash mr-1"></i> Delete Selected
+    </button>
+    <button class="btn btn-sm btn-success ml-1" id="btnApproveSelected" disabled>
+        <i class="fas fa-check mr-1"></i> Approve Selected
     </button>
     <button class="btn btn-sm btn-primary ml-1" id="btnReceiveBill"
             data-toggle="modal" data-target="#billReceiveModal">
@@ -22,36 +28,31 @@
     <div class="card-body py-2">
         <form method="GET" id="filterForm" class="row align-items-end">
             <div class="col-md-2">
-                <label class="small font-weight-bold">Customer</label>
-                <select name="customer_id" class="form-control form-control-sm select2-filter">
-                    <option value="">All Customers</option>
-                    @foreach($customers ?? [] as $c)
-                        <option value="{{ $c->id }}" {{ request('customer_id') == $c->id ? 'selected':'' }}>
-                            {{ $c->customer_name }}
-                        </option>
+                <label class="small font-weight-bold">POP</label>
+                <select name="pop" class="form-control form-control-sm select2">
+                    <option value="">All POPs</option>
+                    @foreach($pops ?? [] as $pop)
+                        <option value="{{ $pop }}" {{ request('pop') == $pop ? 'selected':'' }}>{{ $pop }}</option>
                     @endforeach
                 </select>
             </div>
             <div class="col-md-2">
-                <label class="small font-weight-bold">From Month</label>
-                <input type="month" name="from_month" class="form-control form-control-sm"
-                       value="{{ request('from_month', now()->format('Y-m')) }}"
-                       autocomplete="off">
+                <label class="small font-weight-bold">From Date</label>
+                <input type="date" name="from_date" class="form-control form-control-sm"
+                       value="{{ request('from_date', now()->format('Y-m-d')) }}">
             </div>
             <div class="col-md-2">
-                <label class="small font-weight-bold">To Month</label>
-                <input type="month" name="to_month" class="form-control form-control-sm"
-                       value="{{ request('to_month', now()->format('Y-m')) }}"
-                       autocomplete="off">
+                <label class="small font-weight-bold">To Date</label>
+                <input type="date" name="to_date" class="form-control form-control-sm"
+                       value="{{ request('to_date', now()->format('Y-m-d')) }}">
             </div>
             <div class="col-md-2">
                 <label class="small font-weight-bold">Received By</label>
                 <select name="received_by" class="form-control form-control-sm">
                     <option value="">Select</option>
-                    @foreach($employees ?? [] as $emp)
-                        <option value="{{ $emp->user_id }}"
-                            {{ request('received_by') == $emp->user_id ? 'selected':'' }}>
-                            {{ $emp->name }}
+                    @foreach($users ?? [] as $u)
+                        <option value="{{ $u->id }}" {{ request('received_by') == $u->id ? 'selected':'' }}>
+                            {{ $u->name }}
                         </option>
                     @endforeach
                 </select>
@@ -60,10 +61,9 @@
                 <label class="small font-weight-bold">Created By</label>
                 <select name="created_by" class="form-control form-control-sm">
                     <option value="">Select</option>
-                    @foreach($employees ?? [] as $emp)
-                        <option value="{{ $emp->user_id }}"
-                            {{ request('created_by') == $emp->user_id ? 'selected':'' }}>
-                            {{ $emp->name }}
+                    @foreach($users ?? [] as $u)
+                        <option value="{{ $u->id }}" {{ request('created_by') == $u->id ? 'selected':'' }}>
+                            {{ $u->name }}
                         </option>
                     @endforeach
                 </select>
@@ -92,7 +92,7 @@
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center py-2">
         <h6 class="mb-0 font-weight-bold">
-            <i class="fas fa-list mr-1"></i> Payment History Transactions
+            <i class="fas fa-list mr-1"></i> Daily Bill Transactions
             <span class="badge badge-info ml-1">{{ $payments->total() }}</span>
         </h6>
         <div class="d-flex align-items-center gap-2">
@@ -114,6 +114,9 @@
                    style="font-size:12px;">
                 <thead style="background:#2c3e50; color:#fff;">
                     <tr>
+                        <th style="width:30px;">
+                            <input type="checkbox" id="selectAll">
+                        </th>
                         <th>R.Date ↕</th>
                         <th>Company Name</th>
                         <th>Contact Person</th>
@@ -129,6 +132,7 @@
                         <th>Created On ↕</th>
                         <th>Note/Remarks</th>
                         <th style="width:80px;">Action</th>
+                        <th style="width:30px;"></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -140,6 +144,12 @@
                         $isVoid = $pay->isVoid();
                     @endphp
                     <tr class="{{ $isVoid ? 'text-muted' : '' }}" id="pay-row-{{ $pay->id }}">
+                        <td>
+                            @if(!$isVoid)
+                            <input type="checkbox" class="pay-check" value="{{ $pay->id }}"
+                                   data-status="{{ $pay->status }}">
+                            @endif
+                        </td>
                         <td style="white-space:nowrap;">
                             {{ optional($pay->received_date)->format('d-m-Y') }}
                         </td>
@@ -202,10 +212,15 @@
                                 <span class="badge badge-secondary">Void</span>
                             @endif
                         </td>
+                        <td>
+                            @if(!$isVoid)
+                            <input type="checkbox" class="pay-check-2" value="{{ $pay->id }}">
+                            @endif
+                        </td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="15" class="text-center py-5 text-muted">
+                        <td colspan="17" class="text-center py-5 text-muted">
                             <i class="fas fa-receipt fa-3x d-block mb-3 opacity-50"></i>
                             No data available in table
                         </td>
@@ -214,10 +229,10 @@
                 </tbody>
                 <tfoot style="background:#f8f9fa; font-weight:bold;">
                     <tr>
-                        <td colspan="6" class="text-right pr-3">Total</td>
+                        <td colspan="7" class="text-right pr-3">Total</td>
                         <td class="text-right">{{ number_format($totalBill, 2) }}</td>
                         <td class="text-right text-success">{{ number_format($totalReceived, 2) }}</td>
-                        <td colspan="7"></td>
+                        <td colspan="8"></td>
                     </tr>
                 </tfoot>
             </table>
@@ -257,7 +272,7 @@
                 <div class="row mb-3">
                     <div class="col-md-4">
                         <label class="font-weight-bold small">POP (Customer) <span class="text-danger">*</span></label>
-                        <select id="rc_customer" class="form-control">
+                        <select id="rc_customer" class="form-control select2">
                             <option value="">Select Customer</option>
                             @foreach($customers ?? [] as $c)
                                 <option value="{{ $c->id }}"
@@ -312,11 +327,8 @@
                         <label class="font-weight-bold small">Received By</label>
                         <select id="rc_received_by" class="form-control">
                             <option value="">Select</option>
-                            @foreach($employees ?? [] as $emp)
-                                <option value="{{ $emp->user_id }}"
-                                    {{ $emp->user_id == auth()->id() ? 'selected':'' }}>
-                                    {{ $emp->name }}
-                                </option>
+                            @foreach($users ?? [] as $u)
+                                <option value="{{ $u->id }}">{{ $u->name }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -433,9 +445,8 @@
 
 
 @section('js')
-@parent
 <script>
-var CSRF = '{{ csrf_token() }}';
+const CSRF = '{{ csrf_token() }}';
 
 // ── Per page ──────────────────────────────────────────────────
 $('#perPage').on('change', function () {
@@ -453,44 +464,30 @@ $('#tableSearch').on('keyup', function () {
 });
 
 // ── Select All ────────────────────────────────────────────────
+$('#selectAll').on('change', function () {
+    $('.pay-check').prop('checked', this.checked);
+    toggleBulkBtns();
+});
+$(document).on('change', '.pay-check', toggleBulkBtns);
 
-// ── select2 — শুধু select2 থাকলে init হবে ────────────────────
-if (typeof $.fn.select2 !== 'undefined') {
-    $('.select2-filter').select2({ width: '100%' });
-    $('#billReceiveModal').on('shown.bs.modal', function () {
-        if (!$('#rc_customer').hasClass('select2-hidden-accessible')) {
-            $('#rc_customer').select2({ dropdownParent: $('#billReceiveModal'), width: '100%' });
-            $('#rc_customer').on('select2:select select2:unselect', function () {
-                $(this).trigger('change.custom');
-            });
-        }
-    });
+function toggleBulkBtns() {
+    var n = $('.pay-check:checked').length;
+    $('#btnDeleteSelected, #btnApproveSelected').prop('disabled', n === 0);
 }
 
-// ── Export XLSX ───────────────────────────────────────────────
-$('#btnCSV').on('click', function () {
-    var params = $('#filterForm').serialize();
-    window.location.href = '{{ route("bandwidth-sale.daily-bill.xlsx") }}?' + params;
-});
-
-// ── Export PDF ────────────────────────────────────────────────
-$('#btnPDF').on('click', function () {
-    var params = $('#filterForm').serialize();
-    window.open('{{ route("bandwidth-sale.daily-bill.pdf") }}?' + params, '_blank');
-});
+// ── select2 ───────────────────────────────────────────────────
+$('.select2').select2({ width:'100%' });
+$('#rc_customer').select2({ dropdownParent: $('#billReceiveModal'), width:'100%' });
 
 // ── Customer select → load due invoices ───────────────────────
-$(document).on('change change.custom', '#rc_customer', function () {
+$('#rc_customer').on('change', function () {
+    var opt    = $(this).find(':selected');
     var custId = $(this).val();
-    var opt    = $('#rc_customer option[value="' + custId + '"]');
-    $('#rc_pop_name').val(opt.data('name') || opt.text() || '');
+    $('#rc_pop_name').val(opt.data('name') || '');
     $('#rc_mobile').val(opt.data('mobile') || '');
     $('#rc_invoice').html('<option value="">Loading...</option>');
 
-    if (!custId) {
-        $('#rc_invoice').html('<option value="">— Select Invoice —</option>');
-        return;
-    }
+    if (!custId) return;
 
     $.get('/bandwidth-sale/invoices/due-for-customer/' + custId, function (res) {
         var options = '<option value="">— Select Invoice —</option>';
@@ -501,12 +498,12 @@ $(document).on('change change.custom', '#rc_customer', function () {
                             data-payable="${inv.grand_total}"
                             data-previous="${inv.received_amount}"
                             data-due="${inv.due_amount}">
-                            ${inv.invoice_no} (${inv.billing_month}) — Due: ${inv.due_amount}
+                            Invoice#${inv.invoice_no} (${inv.billing_month}) — Due: ${inv.due_amount}
                         </option>`;
         });
         $('#rc_invoice').html(options);
     }).fail(function () {
-        $('#rc_invoice').html('<option value="">No invoices found</option>');
+        $('#rc_invoice').html('<option value="">No invoices</option>');
     });
 });
 
@@ -530,36 +527,11 @@ $('#rc_invoice').on('change', function () {
 });
 
 // ── Submit Bill Receive ───────────────────────────────────────
-$('#btnSubmitReceive').off('click').on('click', function () {
-    var invoiceId      = $('#rc_invoice').val();
-    var receivedAmount = parseFloat($('#rc_received_amount').val()) || 0;
-    var discount       = parseFloat($('#rc_discount').val())        || 0;
-    var balanceDue     = parseFloat($('#rc_balance_due').text())    || 0;
-    var payable        = parseFloat($('#rc_payable').text())        || 0;
-
+$('#btnSubmitReceive').on('click', function () {
+    var invoiceId = $('#rc_invoice').val();
     if (!invoiceId) {
         Swal.fire({ toast:true, position:'top-end', icon:'warning',
-            title: 'Please select an invoice.', showConfirmButton:false, timer:2000 });
-        return;
-    }
-    if (receivedAmount <= 0) {
-        Swal.fire({ toast:true, position:'top-end', icon:'warning',
-            title: 'Received amount must be greater than 0.', showConfirmButton:false, timer:2500 });
-        return;
-    }
-    if (receivedAmount > balanceDue) {
-        Swal.fire({ toast:true, position:'top-end', icon:'error',
-            title: 'Received amount (' + receivedAmount.toFixed(2) + ') cannot exceed Balance Due (' + balanceDue.toFixed(2) + ').', showConfirmButton:false, timer:3000 });
-        return;
-    }
-    if (discount > payable) {
-        Swal.fire({ toast:true, position:'top-end', icon:'error',
-            title: 'Discount (' + discount.toFixed(2) + ') cannot exceed Payable Amount (' + payable.toFixed(2) + ').', showConfirmButton:false, timer:3000 });
-        return;
-    }
-    if ((receivedAmount + discount) > balanceDue) {
-        Swal.fire({ toast:true, position:'top-end', icon:'error',
-            title: 'Received + Discount (' + (receivedAmount + discount).toFixed(2) + ') cannot exceed Balance Due (' + balanceDue.toFixed(2) + ').', showConfirmButton:false, timer:3000 });
+            title:'Please select an invoice.', showConfirmButton:false, timer:2000 });
         return;
     }
 
@@ -617,15 +589,12 @@ $(document).on('click', '.btn-void', function () {
         icon: 'warning',
         input: 'text',
         inputPlaceholder: 'Void reason (required)',
-        inputAttributes: { autocomplete: 'off' },
         showCancelButton: true,
         confirmButtonColor: '#dc3545',
         confirmButtonText: 'Void',
         cancelButtonText: 'Cancel',
-        reverseButtons: true,
         preConfirm: function (val) {
-            if (!val || !val.trim()) Swal.showValidationMessage('Reason is required.');
-            return val;
+            if (!val) Swal.showValidationMessage('Reason is required.');
         }
     }).then(function (r) {
         if (!r.isConfirmed) return;
@@ -637,10 +606,6 @@ $(document).on('click', '.btn-void', function () {
                 Swal.fire({ toast:true, position:'top-end', icon:'success',
                     title: res.message, showConfirmButton:false, timer:2500 });
                 setTimeout(function () { location.reload(); }, 1500);
-            },
-            error: function (xhr) {
-                Swal.fire({ toast:true, position:'top-end', icon:'error',
-                    title: xhr.responseJSON?.message || 'Error.', showConfirmButton:false, timer:3000 });
             }
         });
     });

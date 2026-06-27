@@ -14,12 +14,22 @@ class Income extends Model
         'income_no', 'category_id', 'amount', 'income_date',
         'payment_method', 'transaction_id', 'customer_id',
         'payer', 'reference_no', 'description', 'receipt_path',
-        'status', 'void_reason', 'created_by',
+        'status', 'void_reason', 'void_date', 'void_by',
+        'source_type', 'source_id', 'source_invoice_id', 'created_by',
     ];
+
+    // source_type constants
+    const SOURCE_DIRECT         = 'manual';
+    const SOURCE_MONTHLY_BILL   = 'monthly_bill';
+    const SOURCE_BANDWIDTH_SALE = 'bandwidth_sale';
+    const SOURCE_PRODUCT_SALE   = 'product_sale';
+    const SOURCE_PRODUCT_RETURN = 'product_return';
+    const SOURCE_CONNECTION_FEE = 'connection_fee';
 
     protected $casts = [
         'amount'      => 'decimal:2',
         'income_date' => 'date',
+        'void_date'   => 'datetime',
     ];
 
     // ── Boot ──────────────────────────────────────────────────────
@@ -115,6 +125,41 @@ class Income extends Model
     public function isActive(): bool
     {
         return $this->status === 'active';
+    }
+
+    public function isDirectSource(): bool
+    {
+        return in_array($this->source_type, [null, '', self::SOURCE_DIRECT]);
+    }
+
+    public function getSourceLabelAttribute(): string
+    {
+        return match ($this->source_type) {
+            self::SOURCE_MONTHLY_BILL   => 'Monthly Bill',
+            self::SOURCE_BANDWIDTH_SALE => 'Bandwidth Sale',
+            self::SOURCE_PRODUCT_SALE   => 'Product Sale',
+            self::SOURCE_PRODUCT_RETURN => 'Product Return',
+            self::SOURCE_CONNECTION_FEE => 'Connection Fee',
+            default                     => 'Manual',
+        };
+    }
+
+    public function getSourceUrlAttribute(): ?string
+    {
+        if ($this->isDirectSource() || ! $this->source_id) {
+            return null;
+        }
+
+        return match ($this->source_type) {
+            self::SOURCE_MONTHLY_BILL   => route('billing.show', $this->source_id),
+            self::SOURCE_BANDWIDTH_SALE => route('bandwidth-sale.invoices.show',
+                $this->source_invoice_id ?? $this->source_id
+            ),
+            self::SOURCE_PRODUCT_SALE   => route('inventory.sales.show', $this->source_id),
+            self::SOURCE_PRODUCT_RETURN => route('inventory.sale-returns.show', $this->source_id),
+            self::SOURCE_CONNECTION_FEE => route('connection-fee.show', $this->source_id),
+            default                     => null,
+        };
     }
 
     // ── Static Helpers ────────────────────────────────────────────

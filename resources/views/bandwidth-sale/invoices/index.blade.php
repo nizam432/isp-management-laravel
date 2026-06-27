@@ -1424,35 +1424,47 @@ $('#btnSubmitPay').on('click', function() {
 $(document).on('click', '.btn-void-pay-view', function() {
     var id = $(this).data('id');
     var no = $(this).data('no');
-    Swal.fire({
-        title: 'Void Payment?',
-        html: `<code>${no}</code> void হবে।<br>
-               <strong class="text-success">Income record ও void হবে।</strong>`,
-        icon: 'warning',
-        input: 'text',
-        inputPlaceholder: 'Void reason (required)',
-        showCancelButton: true,
-        confirmButtonColor: '#dc3545',
-        confirmButtonText: 'Void',
-        preConfirm: val => { if (!val) Swal.showValidationMessage('Reason required.'); }
-    }).then(r => {
-        if (!r.isConfirmed) return;
-        $.ajax({
-            url:    '/bandwidth-sale/payments/'+id+'/void',
-            method: 'POST',
-            data:   { _token: CSRF, reason: r.value },
-            headers: {'X-Requested-With':'XMLHttpRequest'},
-            success: function(res) {
-                toastOk(res.message);
-                // Reload view modal
-                setTimeout(() => {
-                    $('#viewModal').modal('hide');
-                    location.reload();
-                }, 1500);
-            },
-            error: xhr => toastErr(xhr.responseJSON?.message || 'Error.')
+
+    // viewModal hide করে তারপর SweetAlert দেখাব
+    // না হলে Bootstrap modal এর backdrop SweetAlert input block করে
+    $('#viewModal').modal('hide');
+
+    setTimeout(function() {
+        Swal.fire({
+            title: 'Void Payment?',
+            html: `<code>${no}</code> void হবে।<br>
+                   <strong class="text-success">Income record ও void হবে।</strong>`,
+            icon: 'warning',
+            input: 'text',
+            inputPlaceholder: 'Void reason (required)',
+            inputAttributes: { autocomplete: 'off' },
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Void',
+            cancelButtonText: 'Cancel',
+            reverseButtons: true,
+            preConfirm: val => {
+                if (!val || !val.trim()) {
+                    Swal.showValidationMessage('Reason required.');
+                }
+                return val;
+            }
+        }).then(r => {
+            if (!r.isConfirmed) return;
+            $.ajax({
+                url:    '/bandwidth-sale/payments/'+id+'/void',
+                method: 'POST',
+                data:   { _token: CSRF, reason: r.value },
+                headers: {'X-Requested-With':'XMLHttpRequest'},
+                success: function(res) {
+                    toastOk(res.message);
+                    setTimeout(() => location.reload(), 1500);
+                },
+                error: xhr => toastErr(xhr.responseJSON?.message || 'Error.')
+            });
         });
-    });
+    }, 400); // viewModal hide animation শেষ হওয়ার পর
 });
 
 // ── DELETE ────────────────────────────────────────────────────

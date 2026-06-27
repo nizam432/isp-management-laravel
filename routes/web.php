@@ -637,10 +637,14 @@ Route::middleware(['auth'])->group(function () {
         Route::post('invoices/{bwsInvoice}/receive', [BwsInvoiceController::class, 'receiveStore']) ->name('invoices.receive');
 
         // ── Payment Void ───────────────────────
-        Route::post('payments/{payment}/void', [BwsInvoiceController::class, 'voidPayment']) ->name('payments.void');
+        Route::post('payments/delete-selected',     [BwsInvoiceController::class, 'deleteSelected'])  ->name('payments.delete-selected');
+        Route::post('payments/approve-selected',    [BwsInvoiceController::class, 'approveSelected']) ->name('payments.approve-selected');
+        Route::post('payments/{payment}/void',      [BwsInvoiceController::class, 'voidPayment'])     ->name('payments.void');
 
         // ── Daily Bill ─────────────────────────
-        Route::get('daily-bill', [BwsInvoiceController::class, 'dailyBill']) ->name('daily-bill.index');
+        Route::get('daily-bill',          [BwsInvoiceController::class, 'dailyBill'])            ->name('daily-bill.index');
+        Route::get('daily-bill/xlsx',     [BwsInvoiceController::class, 'dailyBillExportXlsx'])  ->name('daily-bill.xlsx');
+        Route::get('daily-bill/pdf',      [BwsInvoiceController::class, 'dailyBillExportPdf'])   ->name('daily-bill.pdf');
 
         // ── Recurring Invoice ──────────────────
         Route::get   ('recurring',                   [BwsInvoiceController::class, 'recurringIndex'])  ->name('recurring.index');

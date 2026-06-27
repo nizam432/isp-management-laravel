@@ -34,7 +34,8 @@ class IncomeController extends Controller
                 $q->whereDate('income_date', '<=', $request->date_to))
             ->when($request->month, fn($q) =>
                 $q->byMonth($request->month))
-            ->latest('income_date')
+            ->orderByDesc('income_date')
+            ->orderByDesc('id')
             ->paginate($request->get('per_page', 20))
             ->withQueryString();
 
@@ -123,6 +124,13 @@ class IncomeController extends Controller
             return response()->json(['success' => false, 'message' => 'Void income cannot be edited.'], 422);
         }
 
+        if (! $income->isDirectSource()) {
+            return response()->json([
+                'success' => false,
+                'message' => "This income came from {$income->sourceLabel}. Please edit it from the source module.",
+            ], 422);
+        }
+
         return response()->json([
             'success' => true,
             'income'  => [
@@ -149,6 +157,13 @@ class IncomeController extends Controller
     {
         if ($income->isVoid()) {
             return response()->json(['success' => false, 'message' => 'Void income cannot be edited.'], 422);
+        }
+
+        if (! $income->isDirectSource()) {
+            return response()->json([
+                'success' => false,
+                'message' => "This income came from {$income->sourceLabel}. Please edit it from the source module.",
+            ], 422);
         }
 
         $validated = $request->validate([
@@ -213,9 +228,21 @@ class IncomeController extends Controller
             return response()->json(['success' => false, 'message' => 'Already voided.'], 422);
         }
 
+        if (! $income->isDirectSource()) {
+            return response()->json([
+                'success' => false,
+                'message' => "This income came from {$income->sourceLabel}. Please void it from the source module.",
+            ], 422);
+        }
+
         $request->validate(['reason' => 'required|string|max:255']);
 
-        $income->update(['status' => 'void', 'void_reason' => $request->reason]);
+        $income->update([
+            'status'      => 'void',
+            'void_reason' => $request->reason,
+            'void_date'   => now(),
+            'void_by'     => auth()->id(),
+        ]);
 
         ActivityLog::log('Income voided', 'Income', $income->id);
 
@@ -269,6 +296,9 @@ class IncomeController extends Controller
             'payment_method' => strtoupper($income->payment_method),
             'amount'         => number_format($income->amount, 2),
             'status_badge'   => $income->statusBadge,
+            'is_direct'      => $income->isDirectSource(),
+            'source_type'    => $income->source_type,
+            'source_label'   => $income->sourceLabel,
             'show_url'       => route('incomes.show', $income),
             'edit_data_url'  => route('incomes.edit-data', $income),
             'update_url'     => route('incomes.update', $income),
