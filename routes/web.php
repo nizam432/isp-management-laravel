@@ -59,6 +59,7 @@ use App\Http\Controllers\Client\OnlinePaymentController;
 // ─────────────────────────────────────────────
 // Public Routes
 // ─────────────────────────────────────────────
+
 Route::get('/', fn() => redirect()->route('login'));
 
 Route::get('language/{locale}', [LanguageController::class, 'switch'])->name('language.switch');
