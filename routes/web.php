@@ -589,12 +589,16 @@ Route::middleware(['auth'])->group(function () {
 
         // Purchase Bill
         Route::prefix('purchase')->name('purchase.')->group(function () {
-            Route::get('/',                    [BandwidthPurchaseController::class, 'index'])  ->name('index');
-            Route::get('/create',              [BandwidthPurchaseController::class, 'create']) ->name('create');
-            Route::post('/',                   [BandwidthPurchaseController::class, 'store'])  ->name('store');
-            Route::get('/{purchase}/edit',     [BandwidthPurchaseController::class, 'edit'])   ->name('edit');
-            Route::put('/{purchase}',          [BandwidthPurchaseController::class, 'update']) ->name('update');
-            Route::post('/{purchase}/void',    [BandwidthPurchaseController::class, 'void'])   ->name('void');
+            Route::get('/',                              [BandwidthPurchaseController::class, 'index'])          ->name('index');
+            Route::get('/create',                        [BandwidthPurchaseController::class, 'create'])         ->name('create');
+            Route::post('/',                             [BandwidthPurchaseController::class, 'store'])          ->name('store');
+            Route::get('/{purchase}/edit',               [BandwidthPurchaseController::class, 'edit'])           ->name('edit');
+            Route::put('/{purchase}',                    [BandwidthPurchaseController::class, 'update'])         ->name('update');
+            Route::post('/{purchase}/void',              [BandwidthPurchaseController::class, 'void'])           ->name('void');
+            Route::delete('/{purchase}',                 [BandwidthPurchaseController::class, 'destroy'])        ->name('destroy');
+            Route::post('/{purchase}/pay',               [BandwidthPurchaseController::class, 'pay'])            ->name('pay');
+            Route::get('/{purchase}/payment-history',    [BandwidthPurchaseController::class, 'paymentHistory']) ->name('payment-history');
+            Route::post('/payment/{payment}/void',       [BandwidthPurchaseController::class, 'voidPayment'])    ->name('payment.void');
         });
 
         // Purchase Report

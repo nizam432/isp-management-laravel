@@ -272,6 +272,25 @@
                     </div>
                 </div>
 
+                {{-- Payment Method — Paid > 0 হলে দেখাবে --}}
+                <div class="summary-row border-bottom flex-column align-items-start py-3 px-4"
+                     id="paymentMethodWrap" style="display:none!important;">
+                    <span class="summary-label mb-2">Payment Method <span class="text-danger">*</span></span>
+                    <select name="payment_method" id="paymentMethodSelect" class="form-control">
+                        <option value="bank">Bank</option>
+                        <option value="cash">Cash</option>
+                        <option value="bkash">bKash</option>
+                        <option value="nagad">Nagad</option>
+                        <option value="rocket">Rocket</option>
+                        <option value="cheque">Cheque</option>
+                        <option value="card">Card</option>
+                    </select>
+                    <input type="text" name="transaction_no" class="form-control mt-2"
+                           placeholder="Transaction No (optional)" style="font-size:13px;">
+                    <input type="date" name="payment_date" class="form-control mt-2"
+                           value="{{ date('Y-m-d') }}" style="font-size:13px;">
+                </div>
+
                 {{-- Due row --}}
                 <div class="summary-row border-bottom">
                     <span class="summary-label">Due</span>
@@ -657,6 +676,15 @@ $(function () {
         const fmt = v => '৳ ' + v.toLocaleString('en-US', {minimumFractionDigits:2});
         $('#dueDisplay').text(fmt(due))
                         .css('color', due > 0 ? '#c62828' : '#2e7d32');
+
+        // Payment method — paid > 0 হলে দেখাবে
+        if (paid > 0) {
+            $('#paymentMethodWrap').css('display', 'flex').show();
+            $('#paymentMethodSelect').attr('required', true);
+        } else {
+            $('#paymentMethodWrap').hide();
+            $('#paymentMethodSelect').removeAttr('required');
+        }
     }
 
     $(document).on('input', '.line-qty, .line-rate, .line-vat', function () { recalc(); });

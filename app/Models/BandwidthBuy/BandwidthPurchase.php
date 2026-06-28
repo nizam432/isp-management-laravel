@@ -27,6 +27,7 @@ class BandwidthPurchase extends Model
         'due'          => 'decimal:2',
     ];
 
+    // ── Relations ─────────────────────────────────────────────────
     public function provider()
     {
         return $this->belongsTo(BandwidthProvider::class, 'provider_id');
@@ -42,14 +43,59 @@ class BandwidthPurchase extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function payments()
+    {
+        return $this->hasMany(BandwidthPurchasePayment::class, 'purchase_id');
+    }
+
+    // ── Accessors ─────────────────────────────────────────────────
     public function getDocumentUrlAttribute(): ?string
     {
         return $this->document ? asset('storage/' . $this->document) : null;
     }
 
+    // ── Status Helpers ────────────────────────────────────────────
+    public function isPaid(): bool
+    {
+        return (float) $this->due <= 0 && (float) $this->paid > 0;
+    }
+
+    public function isPartial(): bool
+    {
+        return (float) $this->paid > 0 && (float) $this->due > 0;
+    }
+
+    public function isDue(): bool
+    {
+        return (float) $this->paid <= 0;
+    }
+
+    public function isEditable(): bool
+    {
+        return $this->isDue();
+    }
+
+    public function getStatusLabelAttribute(): string
+    {
+        if ($this->isPaid())    return 'Paid';
+        if ($this->isPartial()) return 'Partial';
+        return 'Due';
+    }
+
+    public function getStatusBadgeAttribute(): string
+    {
+        if ($this->isPaid())    return '<span class="badge badge-success">Paid</span>';
+        if ($this->isPartial()) return '<span class="badge badge-warning">Partial</span>';
+        return '<span class="badge badge-danger">Due</span>';
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────
     public function recalculateDue(): void
     {
-        $this->due = max(0, (float) $this->sub_total - (float) $this->paid);
+        $totalPaid = $this->payments()->sum('amount');
+        $this->paid = $totalPaid;
+        $this->due  = max(0, (float) $this->sub_total - $totalPaid);
         $this->save();
     }
 }
+
