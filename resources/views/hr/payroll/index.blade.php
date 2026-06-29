@@ -67,7 +67,7 @@
                 @forelse($payrolls as $i => $payroll)
                 <tr id="payroll-row-{{ $payroll->id }}" class="{{ $payroll->isVoid() ? 'text-muted' : '' }}">
                     <td>
-                        @if($payroll->isPending())
+                        @if($payroll->isPending() && $payroll->payments->count() === 0)
                         <input type="checkbox" class="pay-check" value="{{ $payroll->id }}">
                         @endif
                     </td>
@@ -111,7 +111,7 @@
                             <i class="fas fa-money-bill-wave"></i>
                         </button>
                         @endif
-                        @if($payroll->isPending())
+                        @if($payroll->isPending() && $payroll->payments->count() === 0)
                         <a href="{{ route('payroll.edit', $payroll) }}"
                            class="btn btn-xs btn-warning" title="Edit">
                             <i class="fas fa-edit"></i>

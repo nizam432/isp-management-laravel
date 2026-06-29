@@ -407,19 +407,23 @@ class PayrollController extends Controller
     // =========================================================================
     // VOID PAYMENT
     // =========================================================================
-    public function voidPayment(Request $request, PayrollPayment $payrollPayment)
+    public function voidPayment(Request $request, PayrollPayment $payment)
     {
-        if ($payrollPayment->isVoid()) {
+        if ($payment->isVoid()) {
             return response()->json(['success' => false, 'message' => 'Already voided.'], 422);
         }
 
         $request->validate(['reason' => 'required|string|max:255']);
 
+        $payroll = Payroll::find($payment->payroll_id);
+        if (! $payroll) {
+            return response()->json(['success' => false, 'message' => 'Payroll not found.'], 422);
+        }
+
         DB::beginTransaction();
         try {
-            // Void linked expense
-            if ($payrollPayment->expense_id) {
-                $expense = \App\Models\Expense::find($payrollPayment->expense_id);
+            if ($payment->expense_id) {
+                $expense = \App\Models\Expense::find($payment->expense_id);
                 if ($expense && ! $expense->isVoid()) {
                     $expense->update([
                         'status'        => 'void',
@@ -430,16 +434,14 @@ class PayrollController extends Controller
                 }
             }
 
-            // Void payment
-            $payrollPayment->update([
+            $payment->update([
                 'status'      => 'void',
                 'void_reason' => $request->reason,
                 'void_date'   => now(),
                 'void_by'     => auth()->id(),
             ]);
 
-            // Recalculate payroll paid/due/status
-            $payrollPayment->payroll->recalculate();
+            $payroll->recalculate();
 
             DB::commit();
 
@@ -460,7 +462,12 @@ class PayrollController extends Controller
     public function destroy(Payroll $payroll)
     {
         if (! $payroll->isPending()) {
-            return response()->json(['success' => false, 'message' => 'Only pending payroll can be deleted. Partial/Paid payroll cannot be deleted.'], 422);
+            return response()->json(['success' => false, 'message' => 'Only pending payroll can be deleted.'], 422);
+        }
+
+        // Payment history থাকলে delete করা যাবে না
+        if ($payroll->payments()->count() > 0) {
+            return response()->json(['success' => false, 'message' => 'This payroll has payment history. Cannot delete.'], 422);
         }
 
         DB::beginTransaction();
@@ -493,6 +500,7 @@ class PayrollController extends Controller
         try {
             $payrolls = Payroll::whereIn('id', $request->ids)
                 ->where('status', 'pending')
+                ->whereDoesntHave('payments')
                 ->get();
 
             foreach ($payrolls as $payroll) {
