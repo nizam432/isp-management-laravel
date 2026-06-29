@@ -63,15 +63,180 @@ class BandwidthPurchaseController extends Controller
     }
 
     // =========================================================================
+    // PAYMENT DETAIL — AJAX GET (for view modal)
+    // =========================================================================
+    public function paymentDetail(BandwidthPurchasePayment $payment)
+    {
+        $payment->load(['purchase.provider', 'createdBy']);
+
+        return response()->json([
+            'success' => true,
+            'payment' => [
+                'id'             => $payment->id,
+                'invoice_no'     => $payment->purchase->invoice_no ?? '—',
+                'provider'       => $payment->purchase->provider->company_name ?? '—',
+                'payment_date'   => optional($payment->payment_date)->format('d M Y'),
+                'amount'         => number_format($payment->amount, 2),
+                'method'         => strtoupper($payment->payment_method),
+                'transaction_no' => $payment->transaction_no ?? '—',
+                'remarks'        => $payment->remarks ?? '—',
+                'created_by'     => $payment->createdBy->name ?? '—',
+                'is_void'        => $payment->status === 'void',
+                'void_date'      => $payment->void_date ? $payment->void_date->format('d M Y h:i A') : '—',
+                'void_by'        => $payment->void_by
+                                    ? (\App\Models\User::find($payment->void_by)?->name ?? '—')
+                                    : '—',
+                'void_reason'    => $payment->void_reason ?? '—',
+            ],
+        ]);
+    }
+
+    // =========================================================================
+    // ALL PAYMENT HISTORY — Separate page
+    // =========================================================================
+    public function allPaymentHistory(Request $request)
+    {
+        $query = BandwidthPurchasePayment::with(['purchase.provider', 'createdBy'])
+            ->when($request->provider_id, fn($q) =>
+                $q->whereHas('purchase', fn($p) => $p->where('provider_id', $request->provider_id))
+            )
+            ->when($request->from_date, fn($q) =>
+                $q->whereDate('payment_date', '>=', $request->from_date)
+            )
+            ->when($request->to_date, fn($q) =>
+                $q->whereDate('payment_date', '<=', $request->to_date)
+            )
+            ->when($request->status, fn($q) =>
+                $q->where('status', $request->status)
+            )
+            ->orderByDesc('payment_date')
+            ->orderByDesc('id');
+
+        $payments    = $query->paginate($request->get('per_page', 20))->withQueryString();
+        $providers   = BandwidthProvider::active()->orderBy('company_name')->get();
+        $totalAmount = BandwidthPurchasePayment::where('status', 'active')
+            ->when($request->provider_id, fn($q) =>
+                $q->whereHas('purchase', fn($p) => $p->where('provider_id', $request->provider_id))
+            )
+            ->when($request->from_date, fn($q) => $q->whereDate('payment_date', '>=', $request->from_date))
+            ->when($request->to_date,   fn($q) => $q->whereDate('payment_date', '<=', $request->to_date))
+            ->sum('amount');
+
+        return view('bandwidth-buy.purchase.payment-history',
+            compact('payments', 'providers', 'totalAmount'));
+    }
+
+    // =========================================================================
+    // ALL PAYMENT HISTORY EXPORT XLSX
+    // =========================================================================
+    public function allPaymentHistoryXlsx(Request $request)
+    {
+        $payments = $this->getFilteredAllPayments($request);
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Payment History');
+
+        $headers = ['A'=>'#','B'=>'Payment Date','C'=>'Invoice No','D'=>'Provider',
+                    'E'=>'Amount (৳)','F'=>'Method','G'=>'Tx No','H'=>'Remarks',
+                    'I'=>'Created By'];
+
+        foreach ($headers as $col => $label) {
+            $sheet->setCellValue($col.'1', $label);
+            $sheet->getStyle($col.'1')->getFont()->setBold(true);
+            $sheet->getStyle($col.'1')->getFill()
+                ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+                ->getStartColor()->setRGB('1a237e');
+            $sheet->getStyle($col.'1')->getFont()->getColor()->setRGB('FFFFFF');
+        }
+
+        foreach ($payments as $i => $p) {
+            $row = $i + 2;
+            $sheet->setCellValue('A'.$row, $i + 1);
+            $sheet->setCellValue('B'.$row, optional($p->payment_date)->format('d-m-Y'));
+            $sheet->setCellValue('C'.$row, $p->purchase->invoice_no ?? '—');
+            $sheet->setCellValue('D'.$row, $p->purchase->provider->company_name ?? '—');
+            $sheet->setCellValue('E'.$row, (float) $p->amount);
+            $sheet->setCellValue('F'.$row, strtoupper($p->payment_method));
+            $sheet->setCellValue('G'.$row, $p->transaction_no ?? '—');
+            $sheet->setCellValue('H'.$row, $p->remarks ?? '—');
+            $sheet->setCellValue('I'.$row, $p->createdBy->name ?? '—');
+        }
+
+        foreach (range('A', 'I') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        $filename = 'payment-history-' . now()->format('Y-m-d') . '.xlsx';
+        $tmpPath  = storage_path('app/' . $filename);
+        (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet))->save($tmpPath);
+
+        return response()->download($tmpPath, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
+    }
+
+    // =========================================================================
+    // ALL PAYMENT HISTORY EXPORT PDF
+    // =========================================================================
+    public function allPaymentHistoryPdf(Request $request)
+    {
+        $payments = $this->getFilteredAllPayments($request);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView(
+            'bandwidth-buy.purchase.payment-history-pdf',
+            compact('payments')
+        )->setPaper('a4', 'landscape');
+
+        return $pdf->download('payment-history-' . now()->format('Y-m-d') . '.pdf');
+    }
+
+    private function getFilteredAllPayments(Request $request)
+    {
+        return BandwidthPurchasePayment::with(['purchase.provider', 'createdBy'])
+            ->when($request->provider_id, fn($q) =>
+                $q->whereHas('purchase', fn($p) => $p->where('provider_id', $request->provider_id))
+            )
+            ->when($request->from_date, fn($q) =>
+                $q->whereDate('payment_date', '>=', $request->from_date)
+            )
+            ->when($request->to_date, fn($q) =>
+                $q->whereDate('payment_date', '<=', $request->to_date)
+            )
+            ->orderByDesc('payment_date')
+            ->orderByDesc('id')
+            ->get();
+    }
+
+    // =========================================================================
+    // SHOW
+    // =========================================================================
+    public function show(BandwidthPurchase $purchase)
+    {
+        $purchase->load(['provider', 'lines.service', 'payments.createdBy', 'createdBy']);
+        return view('bandwidth-buy.purchase.show', compact('purchase'));
+    }
+
+    // =========================================================================
     // INDEX
     // =========================================================================
-    public function index()
+    public function index(Request $request)
     {
-        $purchases = BandwidthPurchase::with('provider', 'lines.service', 'payments')
-            ->latest('billing_date')
-            ->paginate(20);
+        $query = BandwidthPurchase::with('provider', 'lines.service', 'payments')
+            ->when($request->provider_id, fn($q) => $q->where('provider_id', $request->provider_id))
+            ->when($request->from_date,   fn($q) => $q->whereDate('billing_date', '>=', $request->from_date))
+            ->when($request->to_date,     fn($q) => $q->whereDate('billing_date', '<=', $request->to_date))
+            ->when($request->status, function ($q) use ($request) {
+                if ($request->status === 'paid')    return $q->where('due', '<=', 0)->where('paid', '>', 0);
+                if ($request->status === 'partial') return $q->where('paid', '>', 0)->where('due', '>', 0);
+                if ($request->status === 'due')     return $q->where('paid', '<=', 0);
+            })
+            ->latest('billing_date');
 
-        return view('bandwidth-buy.purchase.index', compact('purchases'));
+        $purchases = $query->paginate(20)->withQueryString();
+        $providers = BandwidthProvider::active()->orderBy('company_name')->get();
+
+        return view('bandwidth-buy.purchase.index', compact('purchases', 'providers'));
     }
 
     // =========================================================================
@@ -414,11 +579,80 @@ class BandwidthPurchaseController extends Controller
     }
 
     // =========================================================================
+    // EXPORT XLSX
+    // =========================================================================
+    public function exportXlsx()
+    {
+        $purchases = BandwidthPurchase::with('provider', 'lines.service', 'payments')
+            ->latest('billing_date')->get();
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Purchase Bills');
+
+        $headers = ['A'=>'#','B'=>'Invoice No','C'=>'Provider','D'=>'Billing Date',
+                    'E'=>'Sub Total','F'=>'Paid','G'=>'Due','H'=>'Status'];
+
+        foreach ($headers as $col => $label) {
+            $sheet->setCellValue($col.'1', $label);
+            $sheet->getStyle($col.'1')->getFont()->setBold(true);
+            $sheet->getStyle($col.'1')->getFill()
+                ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+                ->getStartColor()->setRGB('1a237e');
+            $sheet->getStyle($col.'1')->getFont()->getColor()->setRGB('FFFFFF');
+        }
+
+        foreach ($purchases as $i => $p) {
+            $row = $i + 2;
+            $sheet->setCellValue('A'.$row, $i + 1);
+            $sheet->setCellValue('B'.$row, $p->invoice_no);
+            $sheet->setCellValue('C'.$row, $p->provider->company_name ?? '—');
+            $sheet->setCellValue('D'.$row, optional($p->billing_date)->format('d-m-Y'));
+            $sheet->setCellValue('E'.$row, (float) $p->sub_total);
+            $sheet->setCellValue('F'.$row, (float) $p->paid);
+            $sheet->setCellValue('G'.$row, (float) $p->due);
+            $sheet->setCellValue('H'.$row, $p->statusLabel);
+        }
+
+        foreach (range('A', 'H') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        $filename = 'purchase-bills-' . now()->format('Y-m-d') . '.xlsx';
+        $tmpPath  = storage_path('app/' . $filename);
+        (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet))->save($tmpPath);
+
+        return response()->download($tmpPath, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
+    }
+
+    // =========================================================================
+    // EXPORT PDF
+    // =========================================================================
+    public function exportPdf()
+    {
+        $purchases = BandwidthPurchase::with('provider', 'lines.service', 'payments')
+            ->latest('billing_date')->get();
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView(
+            'bandwidth-buy.purchase.export-pdf',
+            compact('purchases')
+        )->setPaper('a4', 'landscape');
+
+        return $pdf->download('purchase-bills-' . now()->format('Y-m-d') . '.pdf');
+    }
+
+    // =========================================================================
     // VOID INDIVIDUAL PAYMENT
     // =========================================================================
     public function voidPayment(Request $request, BandwidthPurchasePayment $payment)
     {
         $request->validate(['reason' => 'required|string|max:255']);
+
+        if ($payment->status === 'void') {
+            return response()->json(['success' => false, 'message' => 'Already voided.'], 422);
+        }
 
         DB::beginTransaction();
         try {
@@ -435,7 +669,13 @@ class BandwidthPurchaseController extends Controller
                 }
             }
 
-            $payment->delete();
+            // Payment status void — delete না করে status update
+            $payment->update([
+                'status'      => 'void',
+                'void_reason' => $request->reason,
+                'void_date'   => now(),
+                'void_by'     => auth()->id(),
+            ]);
 
             // Recalc purchase paid/due
             $payment->purchase->recalculateDue();

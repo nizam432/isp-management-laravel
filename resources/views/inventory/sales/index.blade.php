@@ -1,58 +1,148 @@
-@extends('layouts.app')
+@extends('adminlte::page')
 @section('title', 'Sales')
-@section('content')
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h4 class="mb-0">Sales</h4>
-        <a href="{{ route('inventory.sales.create') }}" class="btn btn-primary btn-sm">+ New Sale</a>
-    </div>
-    @include('inventory._partials.alerts')
-    <div class="card border-0 shadow-sm mb-3">
-        <div class="card-body py-2">
-            <form method="GET" class="row g-2 align-items-end">
-                <div class="col-md-2"><input type="text" name="search" class="form-control form-control-sm" placeholder="Sale/Invoice No..." value="{{ request('search') }}"></div>
-                <div class="col-md-2">
-                    <select name="status" class="form-select form-select-sm">
-                        <option value="">All Status</option>
-                        <option value="draft" {{ request('status') == 'draft' ? 'selected' : '' }}>Draft</option>
-                        <option value="confirmed" {{ request('status') == 'confirmed' ? 'selected' : '' }}>Confirmed</option>
-                        <option value="cancelled" {{ request('status') == 'cancelled' ? 'selected' : '' }}>Cancelled</option>
-                    </select>
-                </div>
-                <div class="col-md-2"><input type="date" name="from" class="form-control form-control-sm" value="{{ request('from') }}"></div>
-                <div class="col-md-2"><input type="date" name="to" class="form-control form-control-sm" value="{{ request('to') }}"></div>
-                <div class="col-auto">
-                    <button class="btn btn-sm btn-secondary">Filter</button>
-                    <a href="{{ route('inventory.sales.index') }}" class="btn btn-sm btn-outline-secondary">Reset</a>
-                </div>
-            </form>
+
+@section('content_header')
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h4 class="mb-0 font-weight-bold text-dark">
+                <i class="fas fa-receipt mr-2 text-primary"></i>Sales
+            </h4>
+            <small class="text-muted">Manage all inventory sales</small>
         </div>
+        <a href="{{ route('inventory.sales.create') }}" class="btn btn-primary btn-sm px-3">
+            <i class="fas fa-plus mr-1"></i> New Sale
+        </a>
     </div>
-    <div class="card border-0 shadow-sm">
-        <div class="card-body p-0">
-            <table class="table table-hover mb-0">
-                <thead class="table-light">
-                    <tr><th>Invoice No</th><th>Date</th><th>Customer</th><th>Total</th><th>Paid</th><th>Due</th><th>Status</th><th></th></tr>
+@endsection
+
+@section('content')
+
+@include('inventory._partials.alerts')
+
+<div class="card mb-3 shadow-sm">
+    <div class="card-body py-3">
+        <form method="GET" class="row align-items-end">
+            <div class="col-md-3">
+                <label class="small font-weight-bold">Search</label>
+                <input type="text" name="search" class="form-control form-control-sm"
+                       placeholder="Sale / Invoice No..." value="{{ request('search') }}">
+            </div>
+            <div class="col-md-2">
+                <label class="small font-weight-bold">Status</label>
+                <select name="status" class="form-control form-control-sm">
+                    <option value="">All Status</option>
+                    <option value="draft"     {{ request('status') == 'draft'     ? 'selected' : '' }}>Draft</option>
+                    <option value="confirmed" {{ request('status') == 'confirmed' ? 'selected' : '' }}>Confirmed</option>
+                    <option value="cancelled" {{ request('status') == 'cancelled' ? 'selected' : '' }}>Cancelled</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="small font-weight-bold">From</label>
+                <input type="date" name="from" class="form-control form-control-sm" value="{{ request('from') }}">
+            </div>
+            <div class="col-md-2">
+                <label class="small font-weight-bold">To</label>
+                <input type="date" name="to" class="form-control form-control-sm" value="{{ request('to') }}">
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary btn-sm px-3 mr-2">
+                    <i class="fas fa-search mr-1"></i> Search
+                </button>
+                <a href="{{ route('inventory.sales.index') }}" class="btn btn-secondary btn-sm px-3">
+                    <i class="fas fa-redo mr-1"></i> Reset
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header py-2 d-flex justify-content-between align-items-center"
+         style="background:linear-gradient(135deg,#1a237e 0%,#283593 100%);">
+        <h6 class="m-0 text-white font-weight-bold">
+            <i class="fas fa-list mr-1"></i> Sale List
+        </h6>
+        <input type="text" id="searchInput" class="form-control form-control-sm"
+               placeholder="Quick search..." style="width:220px; border-radius:20px;">
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" id="saleTable">
+                <thead>
+                    <tr style="background:#f8f9fa; border-bottom:2px solid #dee2e6;">
+                        <th style="font-size:12px;font-weight:700;text-transform:uppercase;color:#555;padding:10px 12px;">Invoice No</th>
+                        <th style="font-size:12px;font-weight:700;text-transform:uppercase;color:#555;padding:10px 12px;">Date</th>
+                        <th style="font-size:12px;font-weight:700;text-transform:uppercase;color:#555;padding:10px 12px;">Customer</th>
+                        <th class="text-right" style="font-size:12px;font-weight:700;text-transform:uppercase;color:#555;padding:10px 12px;">Total</th>
+                        <th class="text-right" style="font-size:12px;font-weight:700;text-transform:uppercase;color:#555;padding:10px 12px;">Paid</th>
+                        <th class="text-right" style="font-size:12px;font-weight:700;text-transform:uppercase;color:#555;padding:10px 12px;">Due</th>
+                        <th class="text-center" style="font-size:12px;font-weight:700;text-transform:uppercase;color:#555;padding:10px 12px;">Status</th>
+                        <th class="text-center" style="width:70px;"></th>
+                    </tr>
                 </thead>
-                <tbody>
+                <tbody id="saleTableBody">
                     @forelse($sales as $sale)
                     <tr>
-                        <td>{{ $sale->invoice_no }}<br><small class="text-muted">{{ $sale->sale_no }}</small></td>
-                        <td>{{ $sale->sale_date->format('d M Y') }}</td>
-                        <td>{{ $sale->customer_name }}</td>
-                        <td>৳{{ number_format($sale->total_amount,2) }}</td>
-                        <td>৳{{ number_format($sale->paid_amount,2) }}</td>
-                        <td class="{{ $sale->due_amount > 0 ? 'text-danger fw-semibold' : '' }}">৳{{ number_format($sale->due_amount,2) }}</td>
-                        <td><span class="badge bg-{{ $sale->status == 'confirmed' ? 'success' : ($sale->status == 'draft' ? 'warning' : 'secondary') }}">{{ ucfirst($sale->status) }}</span></td>
-                        <td><a href="{{ route('inventory.sales.show', $sale) }}" class="btn btn-sm btn-outline-info">View</a></td>
+                        <td style="padding:10px 12px;">
+                            <span class="font-weight-bold">{{ $sale->invoice_no }}</span>
+                            <br><small class="text-muted">{{ $sale->sale_no }}</small>
+                        </td>
+                        <td style="padding:10px 12px;" class="text-muted small">{{ $sale->sale_date->format('d M Y') }}</td>
+                        <td style="padding:10px 12px;">{{ $sale->customer_name }}</td>
+                        <td style="padding:10px 12px;" class="text-right font-weight-bold">৳{{ number_format($sale->total_amount, 2) }}</td>
+                        <td style="padding:10px 12px;" class="text-right text-success">৳{{ number_format($sale->paid_amount, 2) }}</td>
+                        <td style="padding:10px 12px;" class="text-right {{ $sale->due_amount > 0 ? 'text-danger font-weight-bold' : 'text-muted' }}">
+                            ৳{{ number_format($sale->due_amount, 2) }}
+                        </td>
+                        <td style="padding:10px 12px;" class="text-center">
+                            <span class="badge badge-{{ $sale->status == 'confirmed' ? 'success' : ($sale->status == 'draft' ? 'warning' : 'secondary') }}">
+                                {{ ucfirst($sale->status) }}
+                            </span>
+                        </td>
+                        <td style="padding:10px 12px;" class="text-center">
+                            <a href="{{ route('inventory.sales.show', $sale) }}"
+                               class="btn btn-sm btn-info px-2" title="View">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                        </td>
                     </tr>
                     @empty
-                    <tr><td colspan="8" class="text-center text-muted py-4">No sales found</td></tr>
+                    <tr>
+                        <td colspan="8" class="text-center py-5 text-muted">
+                            <i class="fas fa-receipt fa-3x mb-3 d-block" style="opacity:.2;"></i>
+                            No sales found. Click <strong>+ New Sale</strong> to add one.
+                        </td>
+                    </tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
-        <div class="card-footer bg-white">{{ $sales->links() }}</div>
     </div>
+    @if($sales->hasPages())
+    <div class="card-footer bg-light py-2">{{ $sales->links() }}</div>
+    @endif
 </div>
+
 @endsection
+
+@section('css')
+<style>
+    #saleTable tbody td { vertical-align: middle; }
+    #saleTable tbody tr:hover { background:#f0f4ff !important; }
+    #searchInput:focus { box-shadow: 0 0 0 3px rgba(26,35,126,.15); border-color:#1a237e; }
+</style>
+@stop
+
+@section('js')
+@parent
+<script>
+$(function () {
+    $('#searchInput').on('input', function () {
+        const q = $(this).val().toLowerCase();
+        $('#saleTableBody tr').each(function () {
+            $(this).toggle($(this).text().toLowerCase().includes(q));
+        });
+    });
+});
+</script>
+@stop

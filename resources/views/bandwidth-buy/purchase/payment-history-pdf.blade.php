@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Payment History</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: DejaVu Sans, sans-serif; font-size: 10px; color: #333; }
+        .header { text-align: center; margin-bottom: 12px; }
+        .header h2 { font-size: 16px; color: #1a237e; }
+        .header p { font-size: 10px; color: #666; margin-top: 3px; }
+        .meta { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 9px; color: #666; }
+        table { width: 100%; border-collapse: collapse; font-size: 9px; }
+        thead tr { background: #1a237e; color: #fff; }
+        thead th { padding: 5px 4px; text-align: left; }
+        thead th.right { text-align: right; }
+        tbody tr:nth-child(even) { background: #f8f9fa; }
+        tbody td { padding: 4px; border-bottom: 1px solid #e9ecef; }
+        tbody td.right { text-align: right; }
+        tfoot tr { background: #1a237e; color: #fff; font-weight: bold; }
+        tfoot td { padding: 5px 4px; }
+        tfoot td.right { text-align: right; }
+    </style>
+</head>
+<body>
+<div class="header">
+    <h2>Bandwidth Purchase — Payment History</h2>
+    <p>Generated: {{ now()->format('d M Y, h:i A') }}</p>
+</div>
+<div class="meta">
+    <span>Total Records: {{ $payments->count() }}</span>
+    <span>Total Amount: ৳ {{ number_format($payments->sum('amount'), 2) }}</span>
+</div>
+<table>
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>Payment Date</th>
+            <th>Invoice No</th>
+            <th>Provider</th>
+            <th class="right">Amount (৳)</th>
+            <th>Method</th>
+            <th>Tx No</th>
+            <th>Remarks</th>
+            <th>Created By</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach($payments as $i => $p)
+        <tr>
+            <td>{{ $i + 1 }}</td>
+            <td>{{ optional($p->payment_date)->format('d M Y') }}</td>
+            <td>{{ $p->purchase->invoice_no ?? '—' }}</td>
+            <td>{{ $p->purchase->provider->company_name ?? '—' }}</td>
+            <td class="right" style="color:#28a745; font-weight:bold;">{{ number_format($p->amount, 2) }}</td>
+            <td>{{ strtoupper($p->payment_method) }}</td>
+            <td>{{ $p->transaction_no ?? '—' }}</td>
+            <td>{{ Str::limit($p->remarks, 25) ?? '—' }}</td>
+            <td>{{ $p->createdBy->name ?? '—' }}</td>
+        </tr>
+        @endforeach
+    </tbody>
+    <tfoot>
+        <tr>
+            <td colspan="4" style="text-align:right; padding-right:6px;">Total</td>
+            <td class="right">{{ number_format($payments->sum('amount'), 2) }}</td>
+            <td colspan="4"></td>
+        </tr>
+    </tfoot>
+</table>
+</body>
+</html>

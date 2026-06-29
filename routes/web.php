@@ -479,12 +479,21 @@ Route::middleware(['auth'])->group(function () {
     Route::post('employees/{employee}/resign-terminate', [EmployeeController::class, 'resignTerminate'])->name('employees.resign-terminate')->middleware('can:hr.employee.edit');
 
     Route::prefix('payroll')->name('payroll.')->group(function () {
-        Route::get('/',                  [PayrollController::class, 'index'])->name('index')->middleware('can:hr.payroll.view');
-        Route::get('/generate',          [PayrollController::class, 'generate'])->name('generate')->middleware('can:hr.payroll.manage');
-        Route::post('/',                 [PayrollController::class, 'store'])->name('store')->middleware('can:hr.payroll.manage');
-        Route::get('/{payroll}',         [PayrollController::class, 'show'])->name('show');
-        Route::post('/{payroll}/pay',    [PayrollController::class, 'pay'])->name('pay');
-        Route::get('/{payroll}/payslip', [PayrollController::class, 'payslip'])->name('payslip');
+        Route::get('/',                          [PayrollController::class, 'index'])          ->name('index')->middleware('can:hr.payroll.view');
+        Route::get('/generate',                  [PayrollController::class, 'generate'])       ->name('generate')->middleware('can:hr.payroll.manage');
+        Route::post('/',                         [PayrollController::class, 'store'])          ->name('store')->middleware('can:hr.payroll.manage');
+        Route::post('/bulk-delete',              [PayrollController::class, 'bulkDelete'])     ->name('bulk-delete');
+        Route::get('/export-xlsx',               [PayrollController::class, 'exportXlsx'])    ->name('export-xlsx');
+        Route::get('/export-pdf',                [PayrollController::class, 'exportPdf'])     ->name('export-pdf');
+        Route::post('/payment/{payment}/void',   [PayrollController::class, 'voidPayment'])   ->name('payment.void');
+        Route::get('/{payroll}',                 [PayrollController::class, 'show'])          ->name('show');
+        Route::get('/{payroll}/edit',            [PayrollController::class, 'edit'])          ->name('edit');
+        Route::put('/{payroll}',                 [PayrollController::class, 'update'])        ->name('update');
+        Route::post('/{payroll}/pay',            [PayrollController::class, 'pay'])           ->name('pay');
+        Route::delete('/{payroll}',              [PayrollController::class, 'destroy'])       ->name('destroy');
+        Route::get('/{payroll}/payslip',         [PayrollController::class, 'payslip'])       ->name('payslip');
+        Route::get('/{payroll}/payslip-pdf',     [PayrollController::class, 'payslipPdf'])    ->name('payslip-pdf');
+        Route::get('/{payroll}/payment-history', [PayrollController::class, 'paymentHistory'])->name('payment-history');
     });
 
     Route::prefix('leave')->name('leave.')->group(function () {
@@ -512,6 +521,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('reports/profit-loss',     [ExpenseController::class, 'profitLoss'])    ->name('profit-loss')->middleware('can:accounting.report.view');
         Route::get('reports/profit-loss/pdf', [ExpenseController::class, 'profitLossPdf']) ->name('profit-loss.pdf');
         Route::get('api/chart-data',          [ExpenseController::class, 'chartData'])     ->name('chart-data');
+        Route::get('export/xlsx',             [ExpenseController::class, 'exportXlsx'])    ->name('export-xlsx');
+        Route::get('export/pdf',              [ExpenseController::class, 'exportPdf'])     ->name('export-pdf');
 
         // CRUD
         Route::get('/',               [ExpenseController::class, 'index'])  ->name('index')->middleware('can:accounting.expense.view');
@@ -592,13 +603,20 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/',                              [BandwidthPurchaseController::class, 'index'])          ->name('index');
             Route::get('/create',                        [BandwidthPurchaseController::class, 'create'])         ->name('create');
             Route::post('/',                             [BandwidthPurchaseController::class, 'store'])          ->name('store');
+            Route::get('/{purchase}',                    [BandwidthPurchaseController::class, 'show'])           ->name('show');
             Route::get('/{purchase}/edit',               [BandwidthPurchaseController::class, 'edit'])           ->name('edit');
             Route::put('/{purchase}',                    [BandwidthPurchaseController::class, 'update'])         ->name('update');
             Route::post('/{purchase}/void',              [BandwidthPurchaseController::class, 'void'])           ->name('void');
             Route::delete('/{purchase}',                 [BandwidthPurchaseController::class, 'destroy'])        ->name('destroy');
-            Route::post('/{purchase}/pay',               [BandwidthPurchaseController::class, 'pay'])            ->name('pay');
+            Route::get('/export-xlsx',                   [BandwidthPurchaseController::class, 'exportXlsx'])           ->name('export-xlsx');
+            Route::get('/export-pdf',                    [BandwidthPurchaseController::class, 'exportPdf'])            ->name('export-pdf');
+            Route::get('/payment-history',               [BandwidthPurchaseController::class, 'allPaymentHistory'])    ->name('all-payment-history');
+            Route::get('/payment-history/xlsx',          [BandwidthPurchaseController::class, 'allPaymentHistoryXlsx'])->name('all-payment-history.xlsx');
+            Route::get('/payment-history/pdf',           [BandwidthPurchaseController::class, 'allPaymentHistoryPdf']) ->name('all-payment-history.pdf');
+            Route::post('/{purchase}/pay',               [BandwidthPurchaseController::class, 'pay'])                  ->name('pay');
             Route::get('/{purchase}/payment-history',    [BandwidthPurchaseController::class, 'paymentHistory']) ->name('payment-history');
             Route::post('/payment/{payment}/void',       [BandwidthPurchaseController::class, 'voidPayment'])    ->name('payment.void');
+            Route::get('/payment/{payment}/detail',      [BandwidthPurchaseController::class, 'paymentDetail'])  ->name('payment.detail');
         });
 
         // Purchase Report

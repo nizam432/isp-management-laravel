@@ -441,6 +441,88 @@ class ExpenseController extends Controller
     // =========================================================================
     // QUICK ADD EXPENSE CATEGORY — AJAX
     // =========================================================================
+    // =========================================================================
+    // EXPORT XLSX
+    // =========================================================================
+    public function exportXlsx(Request $request)
+    {
+        $expenses = $this->getFilteredExpenses($request);
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Expenses');
+
+        $headers = ['A'=>'#','B'=>'Expense No','C'=>'Date','D'=>'Category',
+                    'E'=>'Description','F'=>'Payee','G'=>'Method',
+                    'H'=>'Amount','I'=>'Status'];
+
+        foreach ($headers as $col => $label) {
+            $sheet->setCellValue($col.'1', $label);
+            $sheet->getStyle($col.'1')->getFont()->setBold(true);
+            $sheet->getStyle($col.'1')->getFill()
+                ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+                ->getStartColor()->setRGB('c0392b');
+            $sheet->getStyle($col.'1')->getFont()->getColor()->setRGB('FFFFFF');
+        }
+
+        foreach ($expenses as $i => $exp) {
+            $row = $i + 2;
+            $sheet->setCellValue('A'.$row, $i + 1);
+            $sheet->setCellValue('B'.$row, $exp->expense_no);
+            $sheet->setCellValue('C'.$row, optional($exp->expense_date)->format('d-m-Y'));
+            $sheet->setCellValue('D'.$row, $exp->category->name ?? '—');
+            $sheet->setCellValue('E'.$row, $exp->description ?? '—');
+            $sheet->setCellValue('F'.$row, $exp->payee ?? '—');
+            $sheet->setCellValue('G'.$row, strtoupper($exp->payment_method));
+            $sheet->setCellValue('H'.$row, (float) $exp->amount);
+            $sheet->setCellValue('I'.$row, ucfirst($exp->status));
+        }
+
+        foreach (range('A', 'I') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        $filename = 'expenses-' . now()->format('Y-m-d') . '.xlsx';
+        $tmpPath  = storage_path('app/' . $filename);
+        (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet))->save($tmpPath);
+
+        return response()->download($tmpPath, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
+    }
+
+    // =========================================================================
+    // EXPORT PDF
+    // =========================================================================
+    public function exportPdf(Request $request)
+    {
+        $expenses = $this->getFilteredExpenses($request);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView(
+            'expenses.export-pdf',
+            compact('expenses')
+        )->setPaper('a4', 'landscape');
+
+        return $pdf->download('expenses-' . now()->format('Y-m-d') . '.pdf');
+    }
+
+    private function getFilteredExpenses(Request $request)
+    {
+        return Expense::with(['category', 'createdBy'])
+            ->when($request->search, fn($q) =>
+                $q->where('description', 'like', "%{$request->search}%")
+                  ->orWhere('payee', 'like', "%{$request->search}%")
+                  ->orWhere('expense_no', 'like', "%{$request->search}%"))
+            ->when($request->category_id, fn($q) => $q->where('category_id', $request->category_id))
+            ->when($request->status, fn($q) => $q->where('status', $request->status))
+            ->when($request->payment_method, fn($q) => $q->where('payment_method', $request->payment_method))
+            ->when($request->date_from, fn($q) => $q->whereDate('expense_date', '>=', $request->date_from))
+            ->when($request->date_to, fn($q) => $q->whereDate('expense_date', '<=', $request->date_to))
+            ->orderByDesc('expense_date')
+            ->orderByDesc('id')
+            ->get();
+    }
+
     public function quickAddCategory(Request $request)
     {
         $request->validate([

@@ -1,91 +1,141 @@
-@extends('layouts.app')
+@extends('adminlte::page')
 @section('title', 'Stock Adjustment')
-@section('content')
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h4 class="mb-0">Stock Adjustment</h4>
+
+@section('content_header')
+    <div>
+        <h4 class="mb-0 font-weight-bold text-dark">
+            <i class="fas fa-sliders-h mr-2 text-primary"></i>Stock Adjustment
+        </h4>
+        <small class="text-muted">Manually adjust stock quantities</small>
     </div>
-    @include('inventory._partials.alerts')
-    <div class="row g-3">
-        <div class="col-md-5">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white fw-semibold">New Adjustment</div>
-                <div class="card-body">
-                    <form action="{{ route('inventory.stock.adjustment') }}" method="POST">
-                        @csrf
-                        <div class="mb-3">
-                            <label class="form-label">Product *</label>
-                            <select name="product_id" class="form-select" required>
-                                <option value="">Select Product</option>
-                                @foreach($products as $p)
-                                <option value="{{ $p->id }}">{{ $p->name }} (Stock: {{ $p->stock_quantity }} {{ $p->unit }})</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Location *</label>
-                            <select name="location_id" class="form-select" required>
-                                <option value="">Select Location</option>
-                                @foreach($locations as $loc)
-                                <option value="{{ $loc->id }}">{{ $loc->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Date *</label>
-                            <input type="date" name="adjustment_date" class="form-control" value="{{ date('Y-m-d') }}" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Type *</label>
-                            <select name="type" class="form-select" required>
-                                <option value="add">Add (Stock বাড়াও)</option>
-                                <option value="subtract">Subtract (Stock কমাও)</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Quantity *</label>
-                            <input type="number" name="quantity" class="form-control" min="0.01" step="0.01" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Reason *</label>
-                            <input type="text" name="reason" class="form-control" placeholder="Physical count correction..." required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Note</label>
-                            <textarea name="note" class="form-control" rows="2"></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100">Save Adjustment</button>
-                    </form>
-                </div>
+@endsection
+
+@section('content')
+
+@include('inventory._partials.alerts')
+
+<div class="row">
+    <div class="col-md-5">
+        <div class="card shadow-sm">
+            <div class="card-header py-2" style="background:linear-gradient(135deg,#1a237e 0%,#283593 100%);">
+                <h6 class="m-0 text-white font-weight-bold">
+                    <i class="fas fa-plus-minus mr-1"></i> New Adjustment
+                </h6>
+            </div>
+            <div class="card-body">
+                <form action="{{ route('inventory.stock.adjustment') }}" method="POST">
+                    @csrf
+                    <div class="form-group">
+                        <label class="font-weight-bold small">Product <span class="text-danger">*</span></label>
+                        <select name="product_id" class="form-control @error('product_id') is-invalid @enderror" required>
+                            <option value="">-- Select Product --</option>
+                            @foreach($products as $p)
+                            <option value="{{ $p->id }}">{{ $p->name }} (Stock: {{ $p->stock_quantity }} {{ $p->unit }})</option>
+                            @endforeach
+                        </select>
+                        @error('product_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+                    <div class="form-group">
+                        <label class="font-weight-bold small">Location <span class="text-danger">*</span></label>
+                        <select name="location_id" class="form-control @error('location_id') is-invalid @enderror" required>
+                            <option value="">-- Select Location --</option>
+                            @foreach($locations as $loc)
+                            <option value="{{ $loc->id }}">{{ $loc->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('location_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+                    <div class="form-group">
+                        <label class="font-weight-bold small">Date <span class="text-danger">*</span></label>
+                        <input type="date" name="adjustment_date" class="form-control" value="{{ date('Y-m-d') }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="font-weight-bold small">Type <span class="text-danger">*</span></label>
+                        <select name="type" class="form-control" required>
+                            <option value="add">Add — Stock বাড়াও</option>
+                            <option value="subtract">Subtract — Stock কমাও</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="font-weight-bold small">Quantity <span class="text-danger">*</span></label>
+                        <input type="number" name="quantity" class="form-control @error('quantity') is-invalid @enderror"
+                               min="0.01" step="0.01" placeholder="0" required>
+                        @error('quantity')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+                    <div class="form-group">
+                        <label class="font-weight-bold small">Reason <span class="text-danger">*</span></label>
+                        <input type="text" name="reason" class="form-control @error('reason') is-invalid @enderror"
+                               placeholder="e.g. Physical count correction, Damage" required>
+                        @error('reason')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+                    <div class="form-group">
+                        <label class="font-weight-bold small">Note</label>
+                        <textarea name="note" class="form-control" rows="2" placeholder="Optional note"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">
+                        <i class="fas fa-save mr-1"></i> Save Adjustment
+                    </button>
+                </form>
             </div>
         </div>
-        <div class="col-md-7">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white fw-semibold">Adjustment History</div>
-                <div class="card-body p-0">
-                    <table class="table table-sm mb-0">
-                        <thead class="table-light">
-                            <tr><th>Date</th><th>Product</th><th>Type</th><th>Qty</th><th>Reason</th><th>By</th></tr>
+    </div>
+
+    <div class="col-md-7">
+        <div class="card shadow-sm">
+            <div class="card-header py-2" style="background:linear-gradient(135deg,#1a237e 0%,#283593 100%);">
+                <h6 class="m-0 text-white font-weight-bold">
+                    <i class="fas fa-history mr-1"></i> Adjustment History
+                </h6>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr style="background:#f8f9fa; border-bottom:2px solid #dee2e6;">
+                                <th style="font-size:12px;color:#555;padding:10px 12px;">Date</th>
+                                <th style="font-size:12px;color:#555;padding:10px 12px;">Product</th>
+                                <th class="text-center" style="font-size:12px;color:#555;padding:10px 12px;">Type</th>
+                                <th class="text-center" style="font-size:12px;color:#555;padding:10px 12px;">Qty</th>
+                                <th style="font-size:12px;color:#555;padding:10px 12px;">Reason</th>
+                                <th style="font-size:12px;color:#555;padding:10px 12px;">By</th>
+                            </tr>
                         </thead>
                         <tbody>
                             @forelse($adjustments as $adj)
                             <tr>
-                                <td>{{ $adj->adjustment_date->format('d M Y') }}</td>
-                                <td>{{ $adj->product->name }}</td>
-                                <td><span class="badge bg-{{ $adj->type == 'add' ? 'success' : 'danger' }}">{{ ucfirst($adj->type) }}</span></td>
-                                <td>{{ $adj->quantity }}</td>
-                                <td>{{ $adj->reason }}</td>
-                                <td>{{ $adj->createdBy->name ?? '—' }}</td>
+                                <td style="padding:10px 12px;" class="small text-muted">{{ $adj->adjustment_date->format('d M Y') }}</td>
+                                <td style="padding:10px 12px;" class="font-weight-bold">{{ $adj->product->name }}</td>
+                                <td style="padding:10px 12px;" class="text-center">
+                                    <span class="badge badge-{{ $adj->type == 'add' ? 'success' : 'danger' }}">
+                                        {{ ucfirst($adj->type) }}
+                                    </span>
+                                </td>
+                                <td style="padding:10px 12px;" class="text-center font-weight-bold">{{ $adj->quantity }}</td>
+                                <td style="padding:10px 12px;" class="text-muted small">{{ $adj->reason }}</td>
+                                <td style="padding:10px 12px;" class="text-muted small">{{ $adj->createdBy->name ?? '—' }}</td>
                             </tr>
                             @empty
-                            <tr><td colspan="6" class="text-center text-muted py-3">No adjustments</td></tr>
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted">No adjustments found.</td>
+                            </tr>
                             @endforelse
                         </tbody>
                     </table>
                 </div>
-                <div class="card-footer bg-white">{{ $adjustments->links() }}</div>
             </div>
+            @if($adjustments->hasPages())
+            <div class="card-footer bg-light py-2">{{ $adjustments->links() }}</div>
+            @endif
         </div>
     </div>
 </div>
+
 @endsection
+
+@section('css')
+<style>
+    .card-header h6 { font-size:13px; letter-spacing:.3px; }
+    .form-group label { color:#555; }
+    .table tbody td { vertical-align: middle; }
+</style>
+@stop

@@ -17,12 +17,17 @@ class BandwidthPurchasePayment extends Model
         'transaction_no',
         'remarks',
         'expense_id',
+        'status',
+        'void_reason',
+        'void_date',
+        'void_by',
         'created_by',
     ];
 
     protected $casts = [
         'payment_date' => 'date',
         'amount'       => 'decimal:2',
+        'void_date'    => 'datetime',
     ];
 
     // ── Relations ─────────────────────────────────────────────────

@@ -1,155 +1,278 @@
-@extends('layouts.app')
-@section('title', 'New Purchase')
-@section('content')
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h4 class="mb-0">New Purchase</h4>
-        <a href="{{ route('inventory.purchases.index') }}" class="btn btn-outline-secondary btn-sm">← Back</a>
+@extends('adminlte::page')
+@section('title', 'New Sale')
+
+@section('content_header')
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h4 class="mb-0 font-weight-bold text-dark">
+                <i class="fas fa-plus-circle mr-2 text-primary"></i>New Sale
+            </h4>
+            <small class="text-muted">Create a new inventory sale</small>
+        </div>
+        <a href="{{ route('inventory.sales.index') }}" class="btn btn-secondary btn-sm px-3">
+            <i class="fas fa-arrow-left mr-1"></i> Back to Sales
+        </a>
     </div>
-    <form action="{{ route('inventory.purchases.store') }}" method="POST" id="purchaseForm">
-        @csrf
-        <div class="row g-3">
-            <div class="col-md-8">
-                <div class="card border-0 shadow-sm mb-3">
-                    <div class="card-header bg-white fw-semibold">Purchase Info</div>
-                    <div class="card-body">
-                        <div class="row g-3">
-                            <div class="col-md-4">
-                                <label class="form-label">Vendor *</label>
-                                <select name="vendor_id" class="form-select" required>
-                                    <option value="">Select Vendor</option>
-                                    @foreach($vendors as $v)
-                                    <option value="{{ $v->id }}" {{ old('vendor_id') == $v->id ? 'selected' : '' }}>{{ $v->name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Store Location *</label>
-                                <select name="location_id" class="form-select" required>
-                                    <option value="">Select Location</option>
-                                    @foreach($locations as $loc)
-                                    <option value="{{ $loc->id }}" {{ old('location_id') == $loc->id ? 'selected' : '' }}>{{ $loc->name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Purchase Date *</label>
-                                <input type="date" name="purchase_date" class="form-control" value="{{ old('purchase_date', date('Y-m-d')) }}" required>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Invoice No</label>
-                                <input type="text" name="invoice_no" class="form-control" value="{{ old('invoice_no') }}">
-                            </div>
-                        </div>
-                    </div>
-                </div>
+@endsection
 
-                {{-- Items --}}
-                <div class="card border-0 shadow-sm">
-                    <div class="card-header bg-white fw-semibold d-flex justify-content-between">
-                        Purchase Items
-                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="addRow()">+ Add Item</button>
-                    </div>
-                    <div class="card-body p-0">
-                        <table class="table table-sm mb-0" id="itemsTable">
-                            <thead class="table-light">
-                                <tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Total</th><th></th></tr>
-                            </thead>
-                            <tbody id="itemsBody">
-                                <tr>
-                                    <td>
-                                        <select name="items[0][product_id]" class="form-select form-select-sm" required>
-                                            <option value="">Select Product</option>
-                                            @foreach($products as $p)
-                                            <option value="{{ $p->id }}" data-price="{{ $p->purchase_price }}">{{ $p->name }} ({{ $p->unit }})</option>
-                                            @endforeach
-                                        </select>
-                                    </td>
-                                    <td><input type="number" name="items[0][quantity]" class="form-control form-control-sm qty" min="0.01" step="0.01" required onchange="calcRow(this)"></td>
-                                    <td><input type="number" name="items[0][unit_price]" class="form-control form-control-sm price" min="0" step="0.01" required onchange="calcRow(this)"></td>
-                                    <td><input type="number" name="items[0][total]" class="form-control form-control-sm total-field" readonly></td>
-                                    <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">✕</button></td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+@section('content')
+
+@include('inventory._partials.alerts')
+
+<form action="{{ route('inventory.sales.store') }}" method="POST" id="saleForm">
+@csrf
+
+<div class="row">
+    <div class="col-md-8">
+
+        {{-- Sale Info --}}
+        <div class="card shadow-sm mb-3">
+            <div class="card-header py-2" style="background:linear-gradient(135deg,#1a237e 0%,#283593 100%);">
+                <h6 class="m-0 text-white font-weight-bold">
+                    <i class="fas fa-info-circle mr-1"></i> Sale Information
+                </h6>
             </div>
-
-            {{-- Summary --}}
-            <div class="col-md-4">
-                <div class="card border-0 shadow-sm">
-                    <div class="card-header bg-white fw-semibold">Summary</div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label class="form-label">Subtotal</label>
-                            <input type="number" id="subtotalDisplay" class="form-control" readonly value="0">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Discount</label>
-                            <input type="number" name="discount" class="form-control" value="0" min="0" step="0.01" onchange="calcTotal()">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Tax</label>
-                            <input type="number" name="tax" class="form-control" value="0" min="0" step="0.01" onchange="calcTotal()">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Total</label>
-                            <input type="number" id="totalDisplay" class="form-control fw-bold" readonly value="0">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Note</label>
-                            <textarea name="note" class="form-control" rows="2">{{ old('note') }}</textarea>
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100">Save Purchase</button>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 form-group">
+                        <label class="font-weight-bold small">Customer Name <span class="text-danger">*</span></label>
+                        <input type="text" name="customer_name"
+                               class="form-control @error('customer_name') is-invalid @enderror"
+                               value="{{ old('customer_name') }}" placeholder="Customer name" required>
+                        @error('customer_name')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+                    <div class="col-md-4 form-group">
+                        <label class="font-weight-bold small">Customer Phone</label>
+                        <input type="text" name="customer_phone" class="form-control"
+                               value="{{ old('customer_phone') }}" placeholder="01XXXXXXXXX">
+                    </div>
+                    <div class="col-md-4 form-group">
+                        <label class="font-weight-bold small">Store Location <span class="text-danger">*</span></label>
+                        <select name="location_id" class="form-control @error('location_id') is-invalid @enderror" required>
+                            <option value="">-- Select Location --</option>
+                            @foreach($locations as $loc)
+                            <option value="{{ $loc->id }}" {{ old('location_id') == $loc->id ? 'selected' : '' }}>{{ $loc->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('location_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+                    <div class="col-md-4 form-group">
+                        <label class="font-weight-bold small">Sale Date <span class="text-danger">*</span></label>
+                        <input type="date" name="sale_date" class="form-control"
+                               value="{{ old('sale_date', date('Y-m-d')) }}" required>
+                    </div>
+                    <div class="col-md-4 form-group">
+                        <label class="font-weight-bold small">Sale Type</label>
+                        <select name="sale_type" class="form-control">
+                            <option value="cash"   {{ old('sale_type') == 'cash'   ? 'selected' : '' }}>Cash</option>
+                            <option value="credit" {{ old('sale_type') == 'credit' ? 'selected' : '' }}>Credit</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 form-group mb-0">
+                        <label class="font-weight-bold small">Invoice No</label>
+                        <input type="text" name="invoice_no" class="form-control"
+                               value="{{ old('invoice_no') }}" placeholder="Optional">
                     </div>
                 </div>
             </div>
         </div>
-    </form>
+
+        {{-- Items --}}
+        <div class="card shadow-sm">
+            <div class="card-header py-2 d-flex justify-content-between align-items-center"
+                 style="background:linear-gradient(135deg,#1a237e 0%,#283593 100%);">
+                <h6 class="m-0 text-white font-weight-bold">
+                    <i class="fas fa-boxes mr-1"></i> Sale Items
+                </h6>
+                <button type="button" class="btn btn-light btn-sm px-3" onclick="addRow()">
+                    <i class="fas fa-plus mr-1"></i> Add Item
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0" id="itemsTable">
+                        <thead>
+                            <tr style="background:#f8f9fa; border-bottom:2px solid #dee2e6;">
+                                <th style="padding:10px 12px;font-size:12px;color:#555;">Product</th>
+                                <th style="padding:10px 12px;font-size:12px;color:#555;width:100px;">Qty</th>
+                                <th style="padding:10px 12px;font-size:12px;color:#555;width:120px;">Unit Price (৳)</th>
+                                <th style="padding:10px 12px;font-size:12px;color:#555;width:110px;">Discount (৳)</th>
+                                <th style="padding:10px 12px;font-size:12px;color:#555;width:120px;">Total (৳)</th>
+                                <th style="width:46px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="itemsBody">
+                            <tr>
+                                <td style="padding:6px 10px;">
+                                    <select name="items[0][product_id]" class="form-control form-control-sm" required onchange="fillPrice(this)">
+                                        <option value="">-- Select Product --</option>
+                                        @foreach($products as $p)
+                                        <option value="{{ $p->id }}" data-price="{{ $p->sell_price }}">
+                                            {{ $p->name }} (Stock: {{ $p->stock_quantity }} {{ $p->unit }})
+                                        </option>
+                                        @endforeach
+                                    </select>
+                                </td>
+                                <td style="padding:6px 10px;">
+                                    <input type="number" name="items[0][quantity]" class="form-control form-control-sm qty"
+                                           min="0.01" step="0.01" required onchange="calcRow(this)" placeholder="0">
+                                </td>
+                                <td style="padding:6px 10px;">
+                                    <input type="number" name="items[0][unit_price]" class="form-control form-control-sm price"
+                                           min="0" step="0.01" required onchange="calcRow(this)" placeholder="0.00">
+                                </td>
+                                <td style="padding:6px 10px;">
+                                    <input type="number" name="items[0][discount]" class="form-control form-control-sm item-discount"
+                                           min="0" step="0.01" value="0" onchange="calcRow(this)" placeholder="0.00">
+                                </td>
+                                <td style="padding:6px 10px;">
+                                    <input type="number" name="items[0][total]" class="form-control form-control-sm total-field"
+                                           readonly placeholder="0.00">
+                                </td>
+                                <td style="padding:6px 10px;">
+                                    <button type="button" class="btn btn-sm btn-danger px-2" onclick="removeRow(this)">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    {{-- Summary --}}
+    <div class="col-md-4">
+        <div class="card shadow-sm">
+            <div class="card-header py-2" style="background:linear-gradient(135deg,#1a237e 0%,#283593 100%);">
+                <h6 class="m-0 text-white font-weight-bold">
+                    <i class="fas fa-calculator mr-1"></i> Summary
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label class="font-weight-bold small">Subtotal</label>
+                    <div class="input-group">
+                        <div class="input-group-prepend"><span class="input-group-text">৳</span></div>
+                        <input type="number" id="subtotalDisplay" class="form-control" readonly value="0.00">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="font-weight-bold small">Extra Discount</label>
+                    <div class="input-group">
+                        <div class="input-group-prepend"><span class="input-group-text">৳</span></div>
+                        <input type="number" name="discount" class="form-control" value="0" min="0" step="0.01" onchange="calcTotal()">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="font-weight-bold small">Grand Total</label>
+                    <div class="input-group">
+                        <div class="input-group-prepend"><span class="input-group-text">৳</span></div>
+                        <input type="number" id="totalDisplay" class="form-control font-weight-bold" readonly value="0.00"
+                               style="background:#e8f4fd; color:#1a237e;">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="font-weight-bold small">Paid Amount</label>
+                    <div class="input-group">
+                        <div class="input-group-prepend"><span class="input-group-text">৳</span></div>
+                        <input type="number" name="paid_amount" class="form-control" value="0" min="0" step="0.01">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="font-weight-bold small">Note</label>
+                    <textarea name="note" class="form-control" rows="3"
+                              placeholder="Optional note for this sale">{{ old('note') }}</textarea>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">
+                    <i class="fas fa-save mr-1"></i> Save Sale
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
-@push('scripts')
+
+</form>
+
+@endsection
+
+@section('css')
+<style>
+    .card-header h6 { font-size: 13px; letter-spacing: .3px; }
+    .form-group label { color: #555; }
+    .input-group-text { background:#f4f6f9; border-color:#ced4da; }
+    #itemsTable tbody tr:hover { background:#f0f4ff; }
+</style>
+@stop
+
+@section('js')
+@parent
 <script>
 let rowIndex = 1;
+const products = @json($products->map(fn($p) => ['id' => $p->id, 'name' => $p->name . ' (Stock: ' . $p->stock_quantity . ' ' . $p->unit . ')', 'price' => $p->sell_price]));
+
 function addRow() {
-    const products = @json($products->map(fn($p) => ['id' => $p->id, 'name' => $p->name . ' (' . $p->unit . ')', 'price' => $p->purchase_price]));
-    let opts = '<option value="">Select Product</option>' + products.map(p => `<option value="${p.id}" data-price="${p.price}">${p.name}</option>`).join('');
+    let opts = '<option value="">-- Select Product --</option>' +
+        products.map(p => `<option value="${p.id}" data-price="${p.price}">${p.name}</option>`).join('');
     const row = `<tr>
-        <td><select name="items[${rowIndex}][product_id]" class="form-select form-select-sm" required onchange="fillPrice(this)">${opts}</select></td>
-        <td><input type="number" name="items[${rowIndex}][quantity]" class="form-control form-control-sm qty" min="0.01" step="0.01" required onchange="calcRow(this)"></td>
-        <td><input type="number" name="items[${rowIndex}][unit_price]" class="form-control form-control-sm price" min="0" step="0.01" required onchange="calcRow(this)"></td>
-        <td><input type="number" name="items[${rowIndex}][total]" class="form-control form-control-sm total-field" readonly></td>
-        <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)">✕</button></td>
+        <td style="padding:6px 10px;">
+            <select name="items[${rowIndex}][product_id]" class="form-control form-control-sm" required onchange="fillPrice(this)">${opts}</select>
+        </td>
+        <td style="padding:6px 10px;">
+            <input type="number" name="items[${rowIndex}][quantity]" class="form-control form-control-sm qty" min="0.01" step="0.01" required onchange="calcRow(this)" placeholder="0">
+        </td>
+        <td style="padding:6px 10px;">
+            <input type="number" name="items[${rowIndex}][unit_price]" class="form-control form-control-sm price" min="0" step="0.01" required onchange="calcRow(this)" placeholder="0.00">
+        </td>
+        <td style="padding:6px 10px;">
+            <input type="number" name="items[${rowIndex}][discount]" class="form-control form-control-sm item-discount" min="0" step="0.01" value="0" onchange="calcRow(this)" placeholder="0.00">
+        </td>
+        <td style="padding:6px 10px;">
+            <input type="number" name="items[${rowIndex}][total]" class="form-control form-control-sm total-field" readonly placeholder="0.00">
+        </td>
+        <td style="padding:6px 10px;">
+            <button type="button" class="btn btn-sm btn-danger px-2" onclick="removeRow(this)">
+                <i class="fas fa-times"></i>
+            </button>
+        </td>
     </tr>`;
     document.getElementById('itemsBody').insertAdjacentHTML('beforeend', row);
     rowIndex++;
 }
+
 function fillPrice(sel) {
-    const price = sel.options[sel.selectedIndex].dataset.price;
+    const price = sel.options[sel.selectedIndex].dataset.price || 0;
     const row = sel.closest('tr');
     row.querySelector('.price').value = price;
     calcRow(row.querySelector('.qty'));
 }
+
 function calcRow(input) {
     const row = input.closest('tr');
-    const qty = parseFloat(row.querySelector('.qty').value) || 0;
-    const price = parseFloat(row.querySelector('.price').value) || 0;
-    row.querySelector('.total-field').value = (qty * price).toFixed(2);
+    const qty      = parseFloat(row.querySelector('.qty').value)           || 0;
+    const price    = parseFloat(row.querySelector('.price').value)         || 0;
+    const discount = parseFloat(row.querySelector('.item-discount').value) || 0;
+    row.querySelector('.total-field').value = Math.max(0, (qty * price) - discount).toFixed(2);
     calcTotal();
 }
+
 function removeRow(btn) {
     btn.closest('tr').remove();
     calcTotal();
 }
+
 function calcTotal() {
     let subtotal = 0;
     document.querySelectorAll('.total-field').forEach(f => subtotal += parseFloat(f.value) || 0);
     document.getElementById('subtotalDisplay').value = subtotal.toFixed(2);
     const discount = parseFloat(document.querySelector('[name=discount]').value) || 0;
-    const tax = parseFloat(document.querySelector('[name=tax]').value) || 0;
-    document.getElementById('totalDisplay').value = (subtotal - discount + tax).toFixed(2);
+    document.getElementById('totalDisplay').value = Math.max(0, subtotal - discount).toFixed(2);
 }
-document.querySelector('[name="items[0][product_id]"]').addEventListener('change', function() { fillPrice(this); });
+
+document.querySelector('[name="items[0][product_id]"]').addEventListener('change', function () {
+    fillPrice(this);
+});
 </script>
-@endpush
-@endsection
+@stop

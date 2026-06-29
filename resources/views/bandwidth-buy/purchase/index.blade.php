@@ -9,9 +9,17 @@
             </h4>
             <small class="text-muted">Upstream bandwidth purchase invoices</small>
         </div>
-        <a href="{{ route('bandwidth-buy.purchase.create') }}" class="btn btn-primary btn-sm px-3">
-            <i class="fas fa-plus mr-1"></i> New Purchase
-        </a>
+        <div class="d-flex gap-2">
+            <button class="btn btn-success btn-sm px-3" id="btnXlsx">
+                <i class="fas fa-file-excel mr-1"></i> XLSX
+            </button>
+            <button class="btn btn-danger btn-sm px-3 ml-1" id="btnPdf">
+                <i class="fas fa-file-pdf mr-1"></i> PDF
+            </button>
+            <a href="{{ route('bandwidth-buy.purchase.create') }}" class="btn btn-primary btn-sm px-3 ml-1">
+                <i class="fas fa-plus mr-1"></i> New Purchase
+            </a>
+        </div>
     </div>
 @endsection
 
@@ -92,6 +100,52 @@
             </div>
             <div class="sc-icon"><i class="fas fa-money-bill-wave"></i></div>
         </div>
+    </div>
+</div>
+
+{{-- ── Filter ──────────────────────────────────────────────────────── --}}
+<div class="card mb-3 shadow-sm">
+    <div class="card-body py-3">
+        <form method="GET" id="filterForm" class="row align-items-end">
+            <div class="col-md-3">
+                <label class="small font-weight-bold">Provider</label>
+                <select name="provider_id" class="form-control form-control-sm">
+                    <option value="">All Providers</option>
+                    @foreach($providers as $prov)
+                        <option value="{{ $prov->id }}" {{ request('provider_id') == $prov->id ? 'selected' : '' }}>
+                            {{ $prov->company_name }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="small font-weight-bold">Status</label>
+                <select name="status" class="form-control form-control-sm">
+                    <option value="">All Status</option>
+                    <option value="due"     {{ request('status') == 'due'     ? 'selected' : '' }}>Due</option>
+                    <option value="partial" {{ request('status') == 'partial' ? 'selected' : '' }}>Partial</option>
+                    <option value="paid"    {{ request('status') == 'paid'    ? 'selected' : '' }}>Paid</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="small font-weight-bold">From Date</label>
+                <input type="date" name="from_date" class="form-control form-control-sm"
+                       value="{{ request('from_date') }}">
+            </div>
+            <div class="col-md-2">
+                <label class="small font-weight-bold">To Date</label>
+                <input type="date" name="to_date" class="form-control form-control-sm"
+                       value="{{ request('to_date') }}">
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary btn-sm px-3 mr-2">
+                    <i class="fas fa-search mr-1"></i>Search
+                </button>
+                <a href="{{ route('bandwidth-buy.purchase.index') }}" class="btn btn-secondary btn-sm px-3">
+                    <i class="fas fa-redo mr-1"></i>Reset
+                </a>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -363,11 +417,40 @@
                 </div>
             </div>
 
+            {{-- Payment History Section --}}
+            <div class="px-4 py-3" style="background:#f8f9fa; border-top:1px solid #dee2e6;">
+                <h6 class="font-weight-bold mb-2">
+                    <i class="fas fa-history mr-1 text-primary"></i> Payment History
+                </h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0" style="font-size:13px;">
+                        <thead style="background:#e9ecef;">
+                            <tr>
+                                <th>#</th>
+                                <th>Date</th>
+                                <th>Amount (৳)</th>
+                                <th>Method</th>
+                                <th>Tx No</th>
+                                <th>Remarks</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="viewHistTableBody">
+                            <tr><td colspan="7" class="text-center py-2 text-muted">Loading...</td></tr>
+                        </tbody>
+                        <tfoot id="viewHistFoot" style="display:none; background:#e3f2fd;">
+                            <tr>
+                                <td colspan="2" class="text-right font-weight-bold">Total Paid</td>
+                                <td class="font-weight-bold text-success" id="viewHistTotal"></td>
+                                <td colspan="4"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
             {{-- Footer --}}
             <div class="modal-footer border-0 bg-light px-4" style="border-radius:0 0 8px 8px;">
-                <a href="#" id="mEditBtn" class="btn btn-warning px-4">
-                    <i class="fas fa-edit mr-1"></i> Edit Purchase
-                </a>
                 <button type="button" class="btn btn-light border px-4" data-dismiss="modal">
                     <i class="fas fa-times mr-1"></i> Close
                 </button>
@@ -436,9 +519,6 @@
                 </button>
                 <button type="button" class="btn btn-success px-4" id="btnConfirmPay">
                     <i class="fas fa-check mr-1"></i>Confirm Payment
-                </button>
-                <button type="button" class="btn btn-outline-info px-3" id="btnViewHistory">
-                    <i class="fas fa-history mr-1"></i>History
                 </button>
             </div>
         </div>
@@ -711,44 +791,60 @@ $(function () {
         });
     });
 
+    // ── Export XLSX ───────────────────────────────────────────────
+    $('#btnXlsx').on('click', function () {
+        window.location.href = '{{ route("bandwidth-buy.purchase.export-xlsx") }}';
+    });
+
+    // ── Export PDF ────────────────────────────────────────────────
+    $('#btnPdf').on('click', function () {
+        window.open('{{ route("bandwidth-buy.purchase.export-pdf") }}', '_blank');
+    });
+
     // ── Void individual payment ───────────────────────────────────
     $(document).on('click', '.btn-void-payment', function () {
         const payId = $(this).data('id');
         const payNo = $(this).data('no');
 
-        Swal.fire({
-            title: 'Void Payment?',
-            html: `Payment <code>${payNo}</code> void হবে।<br>
-                   <strong class="text-success">Accounting Expense ও void হবে।</strong>`,
-            icon: 'warning',
-            input: 'text',
-            inputPlaceholder: 'Void reason (required)',
-            inputAttributes: { autocomplete: 'off' },
-            showCancelButton: true,
-            confirmButtonColor: '#dc3545',
-            confirmButtonText: 'Void',
-            cancelButtonText: 'Cancel',
-            reverseButtons: true,
-            preConfirm: function (val) {
-                if (!val || !val.trim()) Swal.showValidationMessage('Reason required.');
-                return val;
-            }
-        }).then(function (r) {
-            if (!r.isConfirmed) return;
-            $.ajax({
-                url:    `/bandwidth-buy/purchase/payment/${payId}/void`,
-                method: 'POST',
-                data:   { _token: CSRF, reason: r.value },
-                success: function (res) {
-                    toastr.success(res.message);
-                    $(`#hist-pay-row-${payId}`).fadeOut();
-                    setTimeout(() => location.reload(), 1500);
-                },
-                error: function (xhr) {
-                    toastr.error(xhr.responseJSON?.message || 'Void failed.');
+        // linesModal hide করে তারপর SweetAlert দেখাব
+        $('#linesModal').modal('hide');
+
+        setTimeout(function () {
+            Swal.fire({
+                title: 'Void Payment?',
+                html: `Payment <code>${payNo}</code> void হবে।<br>
+                       <strong class="text-success">Accounting Expense ও void হবে।</strong>`,
+                icon: 'warning',
+                input: 'text',
+                inputPlaceholder: 'Void reason (required)',
+                inputAttributes: { autocomplete: 'off' },
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                confirmButtonText: 'Void',
+                cancelButtonText: 'Cancel',
+                reverseButtons: true,
+                preConfirm: function (val) {
+                    if (!val || !val.trim()) Swal.showValidationMessage('Reason required.');
+                    return val;
                 }
+            }).then(function (r) {
+                if (!r.isConfirmed) return;
+                $.ajax({
+                    url:    `/bandwidth-buy/purchase/payment/${payId}/void`,
+                    method: 'POST',
+                    data:   { _token: CSRF, reason: r.value },
+                    success: function (res) {
+                        toastr.success(res.message);
+                        $(`#hist-pay-row-${payId}`).fadeOut();
+                        $(`#view-hist-pay-row-${payId}`).fadeOut();
+                        setTimeout(() => location.reload(), 1500);
+                    },
+                    error: function (xhr) {
+                        toastr.error(xhr.responseJSON?.message || 'Void failed.');
+                    }
+                });
             });
-        });
+        }, 400);
     });
     $(document).on('click', '.btn-view-lines', function () {
         const $btn    = $(this);
@@ -776,8 +872,41 @@ $(function () {
             $('#mBankWrap').hide();
         }
 
-        // Edit link
-        $('#mEditBtn').attr('href', `/bandwidth-buy/purchase/${id}/edit`);
+        // Edit link remove — no longer needed
+        // $('#mEditBtn').attr('href', `/bandwidth-buy/purchase/${id}/edit`);
+
+        // ── Load payment history ───────────────────────────────────
+        $('#viewHistTableBody').html('<tr><td colspan="7" class="text-center py-2 text-muted"><i class="fas fa-spinner fa-spin mr-1"></i> Loading...</td></tr>');
+        $('#viewHistFoot').hide();
+
+        $.get(`/bandwidth-buy/purchase/${id}/payment-history`, function (res) {
+            if (!res.payments || !res.payments.length) {
+                $('#viewHistTableBody').html('<tr><td colspan="7" class="text-center py-2 text-muted">No payments yet.</td></tr>');
+                return;
+            }
+            let histHtml = '';
+            res.payments.forEach(function (p, i) {
+                histHtml += `<tr id="view-hist-pay-row-${p.id}">
+                    <td>${i+1}</td>
+                    <td>${p.payment_date}</td>
+                    <td class="font-weight-bold text-success">৳ ${p.amount}</td>
+                    <td><span class="badge badge-light border">${p.payment_method}</span></td>
+                    <td>${p.transaction_no}</td>
+                    <td>${p.remarks}</td>
+                    <td>
+                        <button class="btn btn-xs btn-danger btn-void-payment"
+                                data-id="${p.id}"
+                                data-no="${p.payment_no}"
+                                style="font-size:11px; padding:2px 8px;">
+                            <i class="fas fa-ban mr-1"></i>Void
+                        </button>
+                    </td>
+                </tr>`;
+            });
+            $('#viewHistTableBody').html(histHtml);
+            $('#viewHistTotal').text('৳ ' + res.total);
+            $('#viewHistFoot').show();
+        });
 
         // Populate lines from pre-rendered JS data
         const lines = PURCHASE_LINES[id] || [];

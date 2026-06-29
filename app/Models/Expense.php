@@ -24,15 +24,27 @@ class Expense extends Model
         'receipt_path',
         'status',
         'reject_reason',
+        'void_date',
+        'void_by',
+        'source_type',
+        'source_id',
+        'source_invoice_id',
         'created_by',
         'approved_by',
         'approved_at',
     ];
 
+    // source_type constants
+    const SOURCE_MANUAL             = 'manual';
+    const SOURCE_BANDWIDTH_PURCHASE = 'bandwidth_purchase';
+    const SOURCE_HR_PAYROLL         = 'hr_payroll';
+    const SOURCE_INVENTORY_PURCHASE = 'inventory_purchase';
+
     protected $casts = [
         'amount'       => 'decimal:2',
         'expense_date' => 'date',
         'approved_at'  => 'datetime',
+        'void_date'    => 'datetime',
     ];
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -175,6 +187,33 @@ class Expense extends Model
     public function isPending(): bool
     {
         return $this->status === 'pending';
+    }
+
+    public function isDirectSource(): bool
+    {
+        return in_array($this->source_type, [null, '', self::SOURCE_MANUAL]);
+    }
+
+    public function getSourceLabelAttribute(): string
+    {
+        return match ($this->source_type) {
+            self::SOURCE_BANDWIDTH_PURCHASE => 'Bandwidth Purchase',
+            self::SOURCE_HR_PAYROLL         => 'HR Payroll',
+            self::SOURCE_INVENTORY_PURCHASE => 'Inventory Purchase',
+            default                         => 'Manual',
+        };
+    }
+
+    public function getSourceUrlAttribute(): ?string
+    {
+        if ($this->isDirectSource() || ! $this->source_id) return null;
+
+        return match ($this->source_type) {
+            self::SOURCE_BANDWIDTH_PURCHASE => route('bandwidth-buy.purchase.show', $this->source_invoice_id ?? $this->source_id),
+            self::SOURCE_HR_PAYROLL         => route('payroll.show', $this->source_id),
+            self::SOURCE_INVENTORY_PURCHASE => route('inventory.purchases.index'),
+            default                         => null,
+        };
     }
 
     // ──────────────────────────────────────────────────────────────────────────

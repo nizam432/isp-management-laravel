@@ -1,14 +1,27 @@
-@extends('layouts.app')
+@extends('adminlte::page')
 @section('title', 'Low Stock Report')
-@section('content')
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h4 class="mb-0">Low Stock Report</h4>
-        <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">🖨 Print</button>
+
+@section('content_header')
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h4 class="mb-0 font-weight-bold text-dark">
+                <i class="fas fa-exclamation-triangle mr-2 text-warning"></i>Low Stock Report
+            </h4>
+        </div>
+        <button onclick="window.print()" class="btn btn-secondary btn-sm px-3">
+            <i class="fas fa-print mr-1"></i> Print
+        </button>
     </div>
-    @include('inventory._partials.alerts')
-    <div class="card border-0 shadow-sm">
-        <div class="card-body"><p class="text-muted">Report content here.</p></div>
+@endsection
+
+@section('content')
+@include('inventory._partials.alerts')
+<div class="card shadow-sm">
+    <div class="card-header py-2" style="background:linear-gradient(135deg,#1a237e 0%,#283593 100%);">
+        <h6 class="m-0 text-white font-weight-bold"><i class="fas fa-exclamation-triangle mr-1"></i> Low Stock Report</h6>
+    </div>
+    <div class="card-body">
+        <p class="text-muted mb-0">Report content here.</p>
     </div>
 </div>
 @endsection

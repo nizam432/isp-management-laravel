@@ -2,7 +2,13 @@
 @extends('layouts.app')
 @section('page_title', 'Expenses')
 @section('page_actions')
-    <button type="button" class="btn btn-primary btn-sm" id="btnAddExpense">
+    <button class="btn btn-success btn-sm" id="btnXlsx">
+        <i class="fas fa-file-excel mr-1"></i> XLSX
+    </button>
+    <button class="btn btn-danger btn-sm ml-1" id="btnPdf">
+        <i class="fas fa-file-pdf mr-1"></i> PDF
+    </button>
+    <button type="button" class="btn btn-primary btn-sm ml-1" id="btnAddExpense">
         <i class="fas fa-plus mr-1"></i> Add Expense
     </button>
     <a href="{{ route('expenses.profit-loss') }}" class="btn btn-info btn-sm ml-1">
@@ -12,41 +18,73 @@
 @section('page_content')
 
 {{-- Summary Cards --}}
+<style>
+.exp-stat-card {
+    border-radius: 8px;
+    color: #fff;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+.exp-stat-card .sc-left .sc-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: rgba(255,255,255,.85);
+    margin-bottom: 4px;
+}
+.exp-stat-card .sc-left .sc-value {
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+}
+.exp-stat-card .sc-icon {
+    font-size: 48px;
+    color: rgba(255,255,255,.18);
+}
+</style>
 <div class="row mb-3">
-    <div class="col-md-3">
-        <div class="info-box bg-danger">
-            <span class="info-box-icon"><i class="fas fa-wallet"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">This Month Expense</span>
-                <span class="info-box-number">৳{{ number_format($totalThis) }}</span>
+    <div class="col-md-3 col-6">
+        <div class="exp-stat-card" style="background:linear-gradient(135deg,#c0392b,#e74c3c);">
+            <div class="sc-left">
+                <div class="sc-label"><i class="fas fa-wallet mr-1"></i> This Month</div>
+                <div class="sc-value">৳{{ number_format($totalThis) }}</div>
             </div>
+            <div class="sc-icon"><i class="fas fa-wallet"></i></div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="info-box bg-warning">
-            <span class="info-box-icon"><i class="fas fa-calendar-minus"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">Last Month Expense</span>
-                <span class="info-box-number">৳{{ number_format($totalLast) }}</span>
+    <div class="col-md-3 col-6">
+        <div class="exp-stat-card" style="background:linear-gradient(135deg,#d35400,#f39c12);">
+            <div class="sc-left">
+                <div class="sc-label"><i class="fas fa-calendar-minus mr-1"></i> Last Month</div>
+                <div class="sc-value">৳{{ number_format($totalLast) }}</div>
             </div>
+            <div class="sc-icon"><i class="fas fa-calendar-minus"></i></div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="info-box bg-info">
-            <span class="info-box-icon"><i class="fas fa-calendar-day"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">Today's Expense</span>
-                <span class="info-box-number">৳{{ number_format($todayTotal) }}</span>
+    <div class="col-md-3 col-6">
+        <div class="exp-stat-card" style="background:linear-gradient(135deg,#117a8b,#17a2b8);">
+            <div class="sc-left">
+                <div class="sc-label"><i class="fas fa-calendar-day mr-1"></i> Today</div>
+                <div class="sc-value">৳{{ number_format($todayTotal) }}</div>
             </div>
+            <div class="sc-icon"><i class="fas fa-calendar-day"></i></div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="info-box {{ $pendingCount > 0 ? 'bg-orange' : 'bg-secondary' }}">
-            <span class="info-box-icon"><i class="fas fa-clock"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">Pending Approval</span>
-                <span class="info-box-number">{{ $pendingCount }}</span>
+    <div class="col-md-3 col-6">
+        <div class="exp-stat-card" style="background:linear-gradient(135deg,#5a6268,#6c757d);">
+            <div class="sc-left">
+                <div class="sc-label"><i class="fas fa-clock mr-1"></i> Pending Approval</div>
+                <div class="sc-value">{{ $pendingCount }}</div>
             </div>
+            <div class="sc-icon"><i class="fas fa-clock"></i></div>
         </div>
     </div>
 </div>
@@ -185,20 +223,28 @@
                             <i class="fas fa-eye"></i>
                         </a>
                         @if(!$exp->isVoid())
-                        <button class="btn btn-xs btn-warning btn-edit-expense"
-                                data-id="{{ $exp->id }}"
-                                data-url="{{ route('expenses.edit-data', $exp) }}"
-                                data-update-url="{{ route('expenses.update', $exp) }}"
-                                title="Edit">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="btn btn-xs btn-danger btn-void-expense"
-                                data-id="{{ $exp->id }}"
-                                data-no="{{ $exp->expense_no }}"
-                                data-url="{{ route('expenses.void', $exp) }}"
-                                title="Void">
-                            <i class="fas fa-ban"></i>
-                        </button>
+                            @if($exp->isDirectSource())
+                                <button class="btn btn-xs btn-warning btn-edit-expense"
+                                        data-id="{{ $exp->id }}"
+                                        data-url="{{ route('expenses.edit-data', $exp) }}"
+                                        data-update-url="{{ route('expenses.update', $exp) }}"
+                                        title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-xs btn-danger btn-void-expense"
+                                        data-id="{{ $exp->id }}"
+                                        data-no="{{ $exp->expense_no }}"
+                                        data-url="{{ route('expenses.void', $exp) }}"
+                                        title="Void">
+                                    <i class="fas fa-ban"></i>
+                                </button>
+                            @else
+                                <a href="{{ $exp->sourceUrl }}"
+                                   class="btn btn-xs btn-secondary"
+                                   title="Open {{ $exp->sourceLabel }}">
+                                    <i class="fas fa-external-link-alt mr-1"></i>{{ $exp->sourceLabel }}
+                                </a>
+                            @endif
                         @endif
                     </td>
                 </tr>
@@ -310,6 +356,18 @@
 @push('js')
 <script>
 const CSRF = '{{ csrf_token() }}';
+
+// ── Export XLSX ───────────────────────────────────────────────
+$('#btnXlsx').on('click', function () {
+    var params = $('form[method="GET"]').first().serialize();
+    window.location.href = '{{ route("expenses.export-xlsx") }}?' + params;
+});
+
+// ── Export PDF ────────────────────────────────────────────────
+$('#btnPdf').on('click', function () {
+    var params = $('form[method="GET"]').first().serialize();
+    window.open('{{ route("expenses.export-pdf") }}?' + params, '_blank');
+});
 
 // ── helpers ───────────────────────────────────────────────────
 function clearErrors(formId) {

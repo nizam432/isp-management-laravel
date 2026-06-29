@@ -92,7 +92,7 @@ class BandwidthPurchase extends Model
     // ── Helpers ───────────────────────────────────────────────────
     public function recalculateDue(): void
     {
-        $totalPaid = $this->payments()->sum('amount');
+        $totalPaid = $this->payments()->where('status', 'active')->sum('amount');
         $this->paid = $totalPaid;
         $this->due  = max(0, (float) $this->sub_total - $totalPaid);
         $this->save();

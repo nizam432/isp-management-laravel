@@ -1,14 +1,28 @@
-@extends('layouts.app')
-@section('title', 'Stock Transfer List')
-@section('content')
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h4 class="mb-0">Stock Transfer</h4>
-        <a href="{{ route('inventory.transfers.create') }}" class="btn btn-primary btn-sm">+ New Stock Transfer</a>
+@extends('adminlte::page')
+@section('title', 'Stock Transfers')
+
+@section('content_header')
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h4 class="mb-0 font-weight-bold text-dark">
+                <i class="fas fa-exchange-alt mr-2 text-primary"></i>Stock Transfers
+            </h4>
+            <small class="text-muted">Transfer stock between locations</small>
+        </div>
+        <a href="{{ route('inventory.transfers.create') }}" class="btn btn-primary btn-sm px-3">
+            <i class="fas fa-plus mr-1"></i> New Transfer
+        </a>
     </div>
-    @include('inventory._partials.alerts')
-    <div class="card border-0 shadow-sm">
-        <div class="card-body"><p class="text-muted">List view content here.</p></div>
+@endsection
+
+@section('content')
+@include('inventory._partials.alerts')
+<div class="card shadow-sm">
+    <div class="card-header py-2" style="background:linear-gradient(135deg,#1a237e 0%,#283593 100%);">
+        <h6 class="m-0 text-white font-weight-bold"><i class="fas fa-list mr-1"></i> Transfer List</h6>
+    </div>
+    <div class="card-body">
+        <p class="text-muted mb-0">List view content here.</p>
     </div>
 </div>
 @endsection

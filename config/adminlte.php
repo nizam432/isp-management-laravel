@@ -652,6 +652,11 @@ return [
                     'icon' => 'fas fa-fw fa-file-invoice-dollar',
                 ],
                 [
+                    'text' => 'Payment History',
+                    'url'  => 'bandwidth-buy/purchase/payment-history',
+                    'icon' => 'fas fa-fw fa-history',
+                ],
+                [
                     'text' => 'Purchase Report',
                     'url'  => 'bandwidth-buy/report',
                     'icon' => 'fas fa-fw fa-chart-bar',
