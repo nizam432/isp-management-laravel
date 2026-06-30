@@ -108,6 +108,7 @@ Route::middleware(['auth'])->group(function () {
     // ── Packages ───────────────────────────────
     Route::get ('packages/sync',  [PackageController::class, 'syncPreview'])->name('packages.sync.preview')->middleware('can:package.mikrotik.sync');
     Route::post('packages/sync', [PackageController::class, 'syncStore'])  ->name('packages.sync.store')  ->middleware('can:package.mikrotik.sync');
+    Route::get('packages/mikrotik-profiles', [PackageController::class, 'mikrotikProfilesByProtocol'])->name('packages.mikrotik-profiles')->middleware('can:package.view');
     Route::resource('packages', PackageController::class)->middleware([
         'index'   => 'can:package.view',
         'show'    => 'can:package.view',

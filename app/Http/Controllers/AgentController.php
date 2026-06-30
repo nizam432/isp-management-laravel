@@ -6,6 +6,8 @@ use App\Models\Agent;
 use App\Models\User;
 use App\Models\ActivityLog;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 
 class AgentController extends Controller
 {
@@ -13,52 +15,90 @@ class AgentController extends Controller
      * Display a paginated list of agents.
      * Includes customer count and total commission per agent.
      */
-    public function index()
+    public function index(Request $request)
     {
         $agents = Agent::with('user')
             ->withCount('customers')             // number of customers under this agent
             ->withSum('commissions', 'amount')   // total commission earned
+            ->when($request->search, fn($q) =>
+                $q->where('name', 'like', "%{$request->search}%")
+                  ->orWhere('phone', 'like', "%{$request->search}%")
+                  ->orWhereHas('user', fn($u) => $u->where('email', 'like', "%{$request->search}%")))
+            ->when($request->area, fn($q) => $q->where('area', $request->area))
+            ->when($request->status === 'active', fn($q) => $q->where('is_active', true))
+            ->when($request->status === 'inactive', fn($q) => $q->where('is_active', false))
             ->latest()
-            ->paginate(15);
+            ->paginate(15)
+            ->withQueryString();
 
-        return view('agents.index', compact('agents'));
+        $totalAgents    = Agent::count();
+        $activeAgents   = Agent::where('is_active', true)->count();
+        $inactiveAgents = Agent::where('is_active', false)->count();
+        $pendingCommissionTotal = \App\Models\AgentCommission::pending()->sum('amount');
+
+        return view('agents.index', compact(
+            'agents', 'totalAgents', 'activeAgents', 'inactiveAgents', 'pendingCommissionTotal'
+        ));
     }
 
     /**
      * Show the form for creating a new agent.
-     * Only shows users who are not already assigned as an agent.
+     * Now creates a fresh User account (email/password) instead of linking existing.
      */
     public function create()
     {
-        // Active users who do not yet have an agent record
-        $users = User::active()->doesntHave('agent')->get();
-
-        return view('agents.create', compact('users'));
+        return view('agents.create');
     }
 
     /**
-     * Store a newly created agent in the database.
-     * Assigns the 'agent' role to the linked user.
+     * Store a newly created agent — creates a new User account (login)
+     * and links it to the agent record.
      */
     public function store(Request $request)
     {
         $request->validate([
-            'user_id'         => 'required|exists:users,id|unique:agents', // one user = one agent
+            'email'           => 'required|email|max:150|unique:users,email',
+            'password'        => 'required|string|min:6|confirmed',
             'name'            => 'required|string|max:100',
             'phone'           => 'nullable|string|max:20',
             'area'            => 'nullable|string|max:100',
             'commission_rate' => 'required|numeric|min:0|max:100', // max 100%
+            'is_active'       => 'nullable|boolean',
         ]);
 
-        $agent = Agent::create($request->all());
+        DB::beginTransaction();
+        try {
+            // ── নতুন User account তৈরি — Agent login করতে পারবে ──
+            $user = User::create([
+                'name'              => $request->name,
+                'email'             => $request->email,
+                'password'          => Hash::make($request->password),
+                'email_verified_at' => now(),
+            ]);
 
-        // Assign Spatie 'agent' role to the linked user
-        $agent->user->assignRole('agent');
+            // Spatie 'agent' role দাও
+            $user->assignRole('agent');
 
-        ActivityLog::log('Agent created', 'Agent', $agent->id, null, $agent->toArray());
+            $agent = Agent::create([
+                'user_id'         => $user->id,
+                'name'            => $request->name,
+                'phone'           => $request->phone,
+                'area'            => $request->area,
+                'commission_rate' => $request->commission_rate,
+                'is_active'       => $request->boolean('is_active', true),
+            ]);
 
-        return redirect()->route('agents.index')
-                         ->with('success', 'Agent created successfully.');
+            ActivityLog::log('Agent created', 'Agent', $agent->id, null, $agent->toArray());
+
+            DB::commit();
+
+            return redirect()->route('agents.index')
+                             ->with('success', "Agent '{$agent->name}' created. Login: {$user->email}");
+
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return back()->withInput()->with('error', 'Failed to create agent: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -75,7 +115,17 @@ class AgentController extends Controller
     }
 
     /**
+     * Show edit form.
+     */
+    public function edit(Agent $agent)
+    {
+        $agent->load('user');
+        return view('agents.edit', compact('agent'));
+    }
+
+    /**
      * Update the specified agent's information.
+     * Optionally updates linked User's email/password too.
      */
     public function update(Request $request, Agent $agent)
     {
@@ -85,11 +135,39 @@ class AgentController extends Controller
             'area'            => 'nullable|string|max:100',
             'commission_rate' => 'required|numeric|min:0|max:100',
             'is_active'       => 'nullable|boolean',
+            'email'           => 'nullable|email|max:150|unique:users,email,' . $agent->user_id,
+            'password'        => 'nullable|string|min:6|confirmed',
         ]);
 
-        $agent->update($request->all());
+        DB::beginTransaction();
+        try {
+            $agent->update([
+                'name'            => $request->name,
+                'phone'           => $request->phone,
+                'area'            => $request->area,
+                'commission_rate' => $request->commission_rate,
+                'is_active'       => $request->boolean('is_active'),
+            ]);
 
-        return back()->with('success', 'Agent updated successfully.');
+            // Linked User account update (optional email/password change)
+            if ($agent->user) {
+                $userData = ['name' => $request->name];
+                if ($request->filled('email')) {
+                    $userData['email'] = $request->email;
+                }
+                if ($request->filled('password')) {
+                    $userData['password'] = Hash::make($request->password);
+                }
+                $agent->user->update($userData);
+            }
+
+            DB::commit();
+            return back()->with('success', 'Agent updated successfully.');
+
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return back()->withInput()->with('error', 'Update failed: ' . $e->getMessage());
+        }
     }
 
     /**
