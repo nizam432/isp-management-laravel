@@ -81,6 +81,16 @@
                                 ৳{{ number_format($sale->due_amount, 2) }}
                             </td>
                         </tr>
+                        @if($sale->refund_due > 0)
+                        <tr style="background:#fff3e0;">
+                            <td class="small font-weight-bold pl-3" style="color:#e65100;">
+                                <i class="fas fa-exclamation-circle mr-1"></i>Refund Due
+                            </td>
+                            <td class="pr-3 font-weight-bold" style="color:#e65100; font-size:14px;">
+                                ৳{{ number_format($sale->refund_due, 2) }}
+                            </td>
+                        </tr>
+                        @endif
                     </tbody>
                 </table>
             </div>

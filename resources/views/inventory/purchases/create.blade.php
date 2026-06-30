@@ -7,7 +7,7 @@
             <h4 class="mb-0 font-weight-bold text-dark">
                 <i class="fas fa-plus-circle mr-2 text-primary"></i>New Purchase
             </h4>
-            <small class="text-muted">Create a new inventory purchase order</small>
+            <small class="text-muted">Create a new inventory purchase</small>
         </div>
         <a href="{{ route('inventory.purchases.index') }}" class="btn btn-secondary btn-sm px-3">
             <i class="fas fa-arrow-left mr-1"></i> Back to Purchases
@@ -167,6 +167,28 @@
                                style="background:#e8f4fd; color:#1a237e;">
                     </div>
                 </div>
+
+                {{-- Paid input row --}}
+                <div class="form-group">
+                    <label class="font-weight-bold small">Paid Amount</label>
+                    <div class="input-group">
+                        <div class="input-group-prepend"><span class="input-group-text">৳</span></div>
+                        <input type="number" name="paid_amount" id="paidInput" class="form-control" value="0" min="0" step="0.01" onchange="updatePaymentVisibility()">
+                    </div>
+                </div>
+
+                {{-- Payment method — paid > 0 হলে দেখাবে --}}
+                <div class="form-group" id="paymentMethodWrap" style="display:none;">
+                    <label class="font-weight-bold small">Payment Method</label>
+                    <select name="payment_method" id="paymentMethodSelect" class="form-control">
+                        <option value="cash">Cash</option>
+                        <option value="bank">Bank Transfer</option>
+                        <option value="mobile_banking">Mobile Banking</option>
+                    </select>
+                    <input type="text" name="payment_reference" class="form-control mt-2"
+                           placeholder="Reference No (optional)">
+                </div>
+
                 <div class="form-group">
                     <label class="font-weight-bold small">Note</label>
                     <textarea name="note" class="form-control" rows="3"
@@ -251,7 +273,26 @@ function calcTotal() {
     document.getElementById('subtotalDisplay').value = subtotal.toFixed(2);
     const discount = parseFloat(document.querySelector('[name=discount]').value) || 0;
     const tax      = parseFloat(document.querySelector('[name=tax]').value)      || 0;
-    document.getElementById('totalDisplay').value = (subtotal - discount + tax).toFixed(2);
+    const total    = Math.max(0, subtotal - discount + tax);
+    document.getElementById('totalDisplay').value = total.toFixed(2);
+
+    var paidInput = document.getElementById('paidInput');
+    if (parseFloat(paidInput.value) > total) {
+        paidInput.value = total.toFixed(2);
+    }
+    paidInput.max = total;
+}
+
+function updatePaymentVisibility() {
+    var paid = parseFloat(document.getElementById('paidInput').value) || 0;
+    var wrap = document.getElementById('paymentMethodWrap');
+    if (paid > 0) {
+        wrap.style.display = 'block';
+        document.getElementById('paymentMethodSelect').setAttribute('required', true);
+    } else {
+        wrap.style.display = 'none';
+        document.getElementById('paymentMethodSelect').removeAttribute('required');
+    }
 }
 
 document.querySelector('[name="items[0][product_id]"]').addEventListener('change', function () {

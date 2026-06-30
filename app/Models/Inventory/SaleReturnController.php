@@ -65,8 +65,6 @@ class SaleReturnController extends Controller
                 'customer_name' => $sale->customer_name,
                 'location_id'   => $sale->location_id,
                 'client_id'     => $sale->client_id,
-                'paid_amount'   => (float) $sale->paid_amount,
-                'total_amount'  => (float) $sale->total_amount,
             ],
             'items' => $sale->items->map(function ($item) {
                 $alreadyReturned = SaleReturnItem::where('sale_item_id', $item->id)
@@ -145,7 +143,7 @@ class SaleReturnController extends Controller
                 'location_id'  => $sale->location_id,
                 'return_date'  => $request->return_date,
                 'total_amount' => $totalAmount,
-                'reason'       => $request->reason ?: 'Not specified',
+                'reason'       => $request->reason,
                 'refund_type'  => $request->refund_type,
                 'status'       => 'approved', // সরাসরি approved — draft নেই
                 'note'         => $request->note,
@@ -177,23 +175,10 @@ class SaleReturnController extends Controller
                 ]);
             }
 
-            // ── Sale total কমাও, due/refund সঠিকভাবে recalculate ──
-            $newTotal = max(0, $sale->total_amount - $totalAmount);
-            $paid     = (float) $sale->paid_amount;
-
-            if ($paid > $newTotal) {
-                // Customer বেশি দিয়ে ফেলেছে — refund due হবে
-                $newDue    = 0;
-                $refundDue = $paid - $newTotal;
-            } else {
-                $newDue    = $newTotal - $paid;
-                $refundDue = 0;
-            }
-
+            // ── Sale total কমাও ───────────────────────────────────
             $sale->update([
-                'total_amount' => $newTotal,
-                'due_amount'   => $newDue,
-                'refund_due'   => $refundDue,
+                'total_amount' => max(0, $sale->total_amount - $totalAmount),
+                'due_amount'   => max(0, $sale->due_amount - $totalAmount),
             ]);
 
             // ── Client Ledger reverse ─────────────────────────────

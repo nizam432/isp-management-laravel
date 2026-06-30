@@ -12,6 +12,47 @@ use Illuminate\Support\Facades\DB;
 
 class PurchasePaymentController extends Controller
 {
+    // ── Initial payment — Purchase create এর সময় call হয় ──────────
+    public function createInitialPayment(Purchase $purchase, float $amount, Request $request): PurchasePayment
+    {
+        $payment = PurchasePayment::create([
+            'purchase_id'    => $purchase->id,
+            'amount'         => $amount,
+            'payment_date'   => $request->purchase_date ?? now()->toDateString(),
+            'payment_method' => $request->payment_method ?? 'cash',
+            'reference_no'   => $request->payment_reference ?? null,
+            'note'           => 'Initial payment on purchase creation',
+            'created_by'     => auth()->id(),
+        ]);
+
+        $newPaid = $purchase->paid_amount + $amount;
+        $newDue  = $purchase->total_amount - $newPaid;
+
+        $purchase->update([
+            'paid_amount'    => $newPaid,
+            'due_amount'     => $newDue,
+            'payment_status' => $newDue <= 0 ? 'paid' : ($newPaid > 0 ? 'partial' : 'unpaid'),
+        ]);
+
+        $lastBalance = $purchase->vendor->ledger()->latest('id')->value('balance') ?? 0;
+        VendorLedger::create([
+            'vendor_id'    => $purchase->vendor_id,
+            'date'         => $payment->payment_date,
+            'type'         => 'payment',
+            'reference_id' => $payment->id,
+            'debit'        => $amount,
+            'credit'       => 0,
+            'balance'      => $lastBalance - $amount,
+            'note'         => 'Payment for: ' . $purchase->purchase_no,
+            'created_by'   => auth()->id(),
+        ]);
+
+        app(AccountingService::class)->createPurchaseExpense($payment);
+
+        return $payment;
+    }
+
+    // ── Pay — AJAX from Purchase List Pay Modal ───────────────────
     public function store(Request $request, Purchase $purchase)
     {
         $request->validate([
@@ -22,8 +63,12 @@ class PurchasePaymentController extends Controller
             'note'           => 'nullable|string',
         ]);
 
-        if (!$purchase->isReceived()) {
-            return back()->with('error', 'Payment can only be added to received purchases.');
+        if ($purchase->isCancelled()) {
+            return response()->json(['success' => false, 'message' => 'Cannot pay a cancelled purchase.'], 422);
+        }
+
+        if ($purchase->due_amount <= 0) {
+            return response()->json(['success' => false, 'message' => 'This purchase is already fully paid.'], 422);
         }
 
         DB::transaction(function () use ($request, $purchase) {
@@ -37,7 +82,6 @@ class PurchasePaymentController extends Controller
                 'created_by'     => auth()->id(),
             ]);
 
-            // Purchase paid/due update
             $newPaid = $purchase->paid_amount + $request->amount;
             $newDue  = $purchase->total_amount - $newPaid;
 
@@ -47,7 +91,6 @@ class PurchasePaymentController extends Controller
                 'payment_status' => $newDue <= 0 ? 'paid' : ($newPaid > 0 ? 'partial' : 'unpaid'),
             ]);
 
-            // Vendor Ledger এ debit করো
             $lastBalance = $purchase->vendor->ledger()->latest('id')->value('balance') ?? 0;
             VendorLedger::create([
                 'vendor_id'    => $purchase->vendor_id,
@@ -61,11 +104,16 @@ class PurchasePaymentController extends Controller
                 'created_by'   => auth()->id(),
             ]);
 
-            // Accounting → Expense এ auto entry
             app(AccountingService::class)->createPurchaseExpense($payment);
         });
 
-        return back()->with('success', 'Payment added successfully.');
+        return response()->json([
+            'success' => true,
+            'message' => "Payment of ৳" . number_format($request->amount, 2) . " recorded.",
+            'paid'    => number_format($purchase->fresh()->paid_amount, 2),
+            'due'     => number_format($purchase->fresh()->due_amount, 2),
+            'status'  => $purchase->fresh()->payment_status,
+        ]);
     }
 
     public function void(Request $request, Purchase $purchase, PurchasePayment $payment)
@@ -75,11 +123,10 @@ class PurchasePaymentController extends Controller
         ]);
 
         if ($payment->isVoid()) {
-            return back()->with('error', 'This payment is already void.');
+            return response()->json(['success' => false, 'message' => 'This payment is already void.'], 422);
         }
 
         DB::transaction(function () use ($request, $purchase, $payment) {
-            // Payment void করো
             $payment->update([
                 'is_void'     => true,
                 'void_reason' => $request->void_reason,
@@ -87,17 +134,15 @@ class PurchasePaymentController extends Controller
                 'void_at'     => now(),
             ]);
 
-            // Purchase paid/due reverse করো
             $newPaid = $purchase->paid_amount - $payment->amount;
             $newDue  = $purchase->total_amount - $newPaid;
 
             $purchase->update([
                 'paid_amount'    => $newPaid,
                 'due_amount'     => $newDue,
-                'payment_status' => $newDue >= $purchase->total_amount ? 'unpaid' : ($newPaid > 0 ? 'partial' : 'unpaid'),
+                'payment_status' => $newPaid <= 0 ? 'unpaid' : ($newDue > 0 ? 'partial' : 'paid'),
             ]);
 
-            // Vendor Ledger reverse
             $lastBalance = $purchase->vendor->ledger()->latest('id')->value('balance') ?? 0;
             VendorLedger::create([
                 'vendor_id'    => $purchase->vendor_id,
@@ -111,9 +156,12 @@ class PurchasePaymentController extends Controller
                 'created_by'   => auth()->id(),
             ]);
 
-            // Accounting → Expense void
             app(AccountingService::class)->voidPurchaseExpense($payment);
         });
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json(['success' => true, 'message' => 'Payment voided successfully.']);
+        }
 
         return back()->with('success', 'Payment voided successfully.');
     }

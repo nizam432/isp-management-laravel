@@ -12,6 +12,49 @@ use Illuminate\Support\Facades\DB;
 
 class SalePaymentController extends Controller
 {
+    // ── Initial payment — Sale create এর সময় call হয় ──────────────
+    public function createInitialPayment(Sale $sale, float $amount, Request $request): SalePayment
+    {
+        $payment = SalePayment::create([
+            'sale_id'        => $sale->id,
+            'amount'         => $amount,
+            'payment_date'   => $request->sale_date ?? now()->toDateString(),
+            'payment_method' => $request->payment_method ?? 'cash',
+            'reference_no'   => $request->payment_reference ?? null,
+            'note'           => 'Initial payment on sale creation',
+            'created_by'     => auth()->id(),
+        ]);
+
+        $newPaid = $sale->paid_amount + $amount;
+        $newDue  = $sale->total_amount - $newPaid;
+
+        $sale->update([
+            'paid_amount'    => $newPaid,
+            'due_amount'     => $newDue,
+            'payment_status' => $newDue <= 0 ? 'paid' : ($newPaid > 0 ? 'partial' : 'unpaid'),
+        ]);
+
+        if ($sale->client_id) {
+            $lastBalance = ClientLedger::lastBalance($sale->client_id);
+            ClientLedger::create([
+                'client_id'    => $sale->client_id,
+                'date'         => $payment->payment_date,
+                'type'         => 'payment',
+                'reference_id' => $payment->id,
+                'debit'        => $amount,
+                'credit'       => 0,
+                'balance'      => $lastBalance - $amount,
+                'note'         => 'Payment for: ' . $sale->sale_no,
+                'created_by'   => auth()->id(),
+            ]);
+        }
+
+        app(AccountingService::class)->createSaleIncome($payment);
+
+        return $payment;
+    }
+
+    // ── Pay — AJAX from Sale List Pay Modal ──────────────────────
     public function store(Request $request, Sale $sale)
     {
         $request->validate([
@@ -22,8 +65,12 @@ class SalePaymentController extends Controller
             'note'           => 'nullable|string',
         ]);
 
-        if (!$sale->isConfirmed()) {
-            return back()->with('error', 'Payment can only be added to confirmed sales.');
+        if ($sale->isCancelled()) {
+            return response()->json(['success' => false, 'message' => 'Cannot pay a cancelled sale.'], 422);
+        }
+
+        if ($sale->due_amount <= 0) {
+            return response()->json(['success' => false, 'message' => 'This sale is already fully paid.'], 422);
         }
 
         DB::transaction(function () use ($request, $sale) {
@@ -37,7 +84,6 @@ class SalePaymentController extends Controller
                 'created_by'     => auth()->id(),
             ]);
 
-            // Sale paid/due update
             $newPaid = $sale->paid_amount + $request->amount;
             $newDue  = $sale->total_amount - $newPaid;
 
@@ -47,7 +93,6 @@ class SalePaymentController extends Controller
                 'payment_status' => $newDue <= 0 ? 'paid' : ($newPaid > 0 ? 'partial' : 'unpaid'),
             ]);
 
-            // Client Ledger এ debit করো (payment পেলাম)
             if ($sale->client_id) {
                 $lastBalance = ClientLedger::lastBalance($sale->client_id);
                 ClientLedger::create([
@@ -63,11 +108,16 @@ class SalePaymentController extends Controller
                 ]);
             }
 
-            // Accounting → Income এ auto entry
             app(AccountingService::class)->createSaleIncome($payment);
         });
 
-        return back()->with('success', 'Payment added successfully.');
+        return response()->json([
+            'success' => true,
+            'message' => "Payment of ৳" . number_format($request->amount, 2) . " recorded.",
+            'paid'    => number_format($sale->fresh()->paid_amount, 2),
+            'due'     => number_format($sale->fresh()->due_amount, 2),
+            'status'  => $sale->fresh()->payment_status,
+        ]);
     }
 
     public function void(Request $request, Sale $sale, SalePayment $payment)
@@ -77,7 +127,7 @@ class SalePaymentController extends Controller
         ]);
 
         if ($payment->isVoid()) {
-            return back()->with('error', 'This payment is already void.');
+            return response()->json(['success' => false, 'message' => 'This payment is already void.'], 422);
         }
 
         DB::transaction(function () use ($request, $sale, $payment) {
@@ -88,17 +138,15 @@ class SalePaymentController extends Controller
                 'void_at'     => now(),
             ]);
 
-            // Sale paid/due reverse
             $newPaid = $sale->paid_amount - $payment->amount;
             $newDue  = $sale->total_amount - $newPaid;
 
             $sale->update([
                 'paid_amount'    => $newPaid,
                 'due_amount'     => $newDue,
-                'payment_status' => $newDue >= $sale->total_amount ? 'unpaid' : ($newPaid > 0 ? 'partial' : 'unpaid'),
+                'payment_status' => $newPaid <= 0 ? 'unpaid' : ($newDue > 0 ? 'partial' : 'paid'),
             ]);
 
-            // Client Ledger reverse
             if ($sale->client_id) {
                 $lastBalance = ClientLedger::lastBalance($sale->client_id);
                 ClientLedger::create([
@@ -114,9 +162,12 @@ class SalePaymentController extends Controller
                 ]);
             }
 
-            // Accounting → Income void
             app(AccountingService::class)->voidSaleIncome($payment);
         });
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json(['success' => true, 'message' => 'Payment voided successfully.']);
+        }
 
         return back()->with('success', 'Payment voided successfully.');
     }

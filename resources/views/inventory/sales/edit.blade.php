@@ -1,16 +1,16 @@
 @extends('adminlte::page')
-@section('title', 'New Sale')
+@section('title', 'Edit Sale')
 
 @section('content_header')
     <div class="d-flex justify-content-between align-items-center">
         <div>
             <h4 class="mb-0 font-weight-bold text-dark">
-                <i class="fas fa-plus-circle mr-2 text-primary"></i>New Sale
+                <i class="fas fa-edit mr-2 text-warning"></i>Edit Sale — {{ $sale->invoice_no }}
             </h4>
-            <small class="text-muted">Create a new inventory sale</small>
+            <small class="text-muted">No payments yet — safe to edit</small>
         </div>
-        <a href="{{ route('inventory.sales.index') }}" class="btn btn-secondary btn-sm px-3">
-            <i class="fas fa-arrow-left mr-1"></i> Back to Sales
+        <a href="{{ route('inventory.sales.show', $sale) }}" class="btn btn-secondary btn-sm px-3">
+            <i class="fas fa-arrow-left mr-1"></i> Back
         </a>
     </div>
 @endsection
@@ -19,8 +19,9 @@
 
 @include('inventory._partials.alerts')
 
-<form action="{{ route('inventory.sales.store') }}" method="POST" id="saleForm">
+<form action="{{ route('inventory.sales.update', $sale) }}" method="POST" id="saleForm">
 @csrf
+@method('PUT')
 
 <div class="row">
     <div class="col-md-8">
@@ -42,27 +43,23 @@
                             <option value="{{ $c->id }}"
                                     data-name="{{ $c->name }}"
                                     data-phone="{{ $c->phone }}"
-                                    {{ old('client_id') == $c->id ? 'selected' : '' }}>
+                                    {{ old('client_id', $sale->client_id) == $c->id ? 'selected' : '' }}>
                                 {{ $c->name }} @if($c->phone)({{ $c->phone }})@endif
                             </option>
                             @endforeach
                         </select>
                         <input type="text" name="walk_in_name" id="walkInName"
                                class="form-control mt-2"
-                               value="{{ old('walk_in_name', 'Walk-in Customer') }}"
-                               placeholder="Walk-in customer name">
-                    </div>
-                    <div class="col-md-4 form-group">
-                        <label class="font-weight-bold small">Customer Phone</label>
-                        <input type="text" name="customer_phone" id="customerPhone" class="form-control"
-                               value="{{ old('customer_phone') }}" placeholder="01XXXXXXXXX">
+                               value="{{ old('walk_in_name', $sale->walk_in_name ?? 'Walk-in Customer') }}"
+                               placeholder="Walk-in customer name"
+                               {{ $sale->client_id ? 'readonly' : '' }}>
                     </div>
                     <div class="col-md-4 form-group">
                         <label class="font-weight-bold small">Store Location <span class="text-danger">*</span></label>
                         <select name="location_id" class="form-control @error('location_id') is-invalid @enderror" required>
                             <option value="">-- Select Location --</option>
                             @foreach($locations as $loc)
-                            <option value="{{ $loc->id }}" {{ old('location_id') == $loc->id ? 'selected' : '' }}>{{ $loc->name }}</option>
+                            <option value="{{ $loc->id }}" {{ old('location_id', $sale->location_id) == $loc->id ? 'selected' : '' }}>{{ $loc->name }}</option>
                             @endforeach
                         </select>
                         @error('location_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
@@ -70,19 +67,14 @@
                     <div class="col-md-4 form-group">
                         <label class="font-weight-bold small">Sale Date <span class="text-danger">*</span></label>
                         <input type="date" name="sale_date" class="form-control"
-                               value="{{ old('sale_date', date('Y-m-d')) }}" required>
-                    </div>
-                    <div class="col-md-4 form-group">
-                        <label class="font-weight-bold small">Sale Type</label>
-                        <select name="sale_type" class="form-control">
-                            <option value="cash"   {{ old('sale_type') == 'cash'   ? 'selected' : '' }}>Cash</option>
-                            <option value="credit" {{ old('sale_type') == 'credit' ? 'selected' : '' }}>Credit</option>
-                        </select>
+                               value="{{ old('sale_date', $sale->sale_date->format('Y-m-d')) }}" required>
                     </div>
                     <div class="col-md-4 form-group mb-0">
-                        <label class="font-weight-bold small">Invoice No</label>
-                        <input type="text" name="invoice_no" class="form-control"
-                               value="{{ old('invoice_no') }}" placeholder="Optional">
+                        <label class="font-weight-bold small">Sale Type</label>
+                        <select name="sale_type" class="form-control">
+                            <option value="cash"   {{ old('sale_type', $sale->sale_type) == 'cash'   ? 'selected' : '' }}>Cash</option>
+                            <option value="credit" {{ old('sale_type', $sale->sale_type) == 'credit' ? 'selected' : '' }}>Credit</option>
+                        </select>
                     </div>
                 </div>
             </div>
@@ -113,32 +105,34 @@
                             </tr>
                         </thead>
                         <tbody id="itemsBody">
+                            @foreach($sale->items as $i => $item)
                             <tr>
                                 <td style="padding:6px 10px;">
-                                    <select name="items[0][product_id]" class="form-control form-control-sm" required onchange="fillPrice(this)">
+                                    <select name="items[{{ $i }}][product_id]" class="form-control form-control-sm" required onchange="fillPrice(this)">
                                         <option value="">-- Select Product --</option>
                                         @foreach($products as $p)
-                                        <option value="{{ $p->id }}" data-price="{{ $p->sell_price }}">
+                                        <option value="{{ $p->id }}" data-price="{{ $p->sell_price }}"
+                                            {{ $item->product_id == $p->id ? 'selected' : '' }}>
                                             {{ $p->name }} (Stock: {{ $p->stock_quantity }} {{ $p->unit }})
                                         </option>
                                         @endforeach
                                     </select>
                                 </td>
                                 <td style="padding:6px 10px;">
-                                    <input type="number" name="items[0][quantity]" class="form-control form-control-sm qty"
-                                           min="0.01" step="0.01" required onchange="calcRow(this)" placeholder="0">
+                                    <input type="number" name="items[{{ $i }}][quantity]" class="form-control form-control-sm qty"
+                                           min="0.01" step="0.01" required onchange="calcRow(this)" value="{{ $item->quantity }}">
                                 </td>
                                 <td style="padding:6px 10px;">
-                                    <input type="number" name="items[0][unit_price]" class="form-control form-control-sm price"
-                                           min="0" step="0.01" required onchange="calcRow(this)" placeholder="0.00">
+                                    <input type="number" name="items[{{ $i }}][unit_price]" class="form-control form-control-sm price"
+                                           min="0" step="0.01" required onchange="calcRow(this)" value="{{ $item->unit_price }}">
                                 </td>
                                 <td style="padding:6px 10px;">
-                                    <input type="number" name="items[0][discount]" class="form-control form-control-sm item-discount"
-                                           min="0" step="0.01" value="0" onchange="calcRow(this)" placeholder="0.00">
+                                    <input type="number" name="items[{{ $i }}][discount]" class="form-control form-control-sm item-discount"
+                                           min="0" step="0.01" value="{{ $item->discount }}" onchange="calcRow(this)">
                                 </td>
                                 <td style="padding:6px 10px;">
-                                    <input type="number" name="items[0][total]" class="form-control form-control-sm total-field"
-                                           readonly placeholder="0.00">
+                                    <input type="number" name="items[{{ $i }}][total]" class="form-control form-control-sm total-field"
+                                           readonly value="{{ $item->total_price }}">
                                 </td>
                                 <td style="padding:6px 10px;">
                                     <button type="button" class="btn btn-sm btn-danger px-2" onclick="removeRow(this)">
@@ -146,6 +140,7 @@
                                     </button>
                                 </td>
                             </tr>
+                            @endforeach
                         </tbody>
                     </table>
                 </div>
@@ -167,38 +162,34 @@
                     <label class="font-weight-bold small">Subtotal</label>
                     <div class="input-group">
                         <div class="input-group-prepend"><span class="input-group-text">৳</span></div>
-                        <input type="number" id="subtotalDisplay" class="form-control" readonly value="0.00">
+                        <input type="number" id="subtotalDisplay" class="form-control" readonly value="{{ $sale->subtotal }}">
                     </div>
                 </div>
                 <div class="form-group">
                     <label class="font-weight-bold small">Extra Discount</label>
                     <div class="input-group">
                         <div class="input-group-prepend"><span class="input-group-text">৳</span></div>
-                        <input type="number" name="discount" class="form-control" value="0" min="0" step="0.01" onchange="calcTotal()">
+                        <input type="number" name="discount" class="form-control" value="{{ old('discount', $sale->discount) }}" min="0" step="0.01" onchange="calcTotal()">
                     </div>
                 </div>
                 <div class="form-group">
                     <label class="font-weight-bold small">Grand Total</label>
                     <div class="input-group">
                         <div class="input-group-prepend"><span class="input-group-text">৳</span></div>
-                        <input type="number" id="totalDisplay" class="form-control font-weight-bold" readonly value="0.00"
+                        <input type="number" id="totalDisplay" class="form-control font-weight-bold" readonly value="{{ $sale->total_amount }}"
                                style="background:#e8f4fd; color:#1a237e;">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label class="font-weight-bold small">Paid Amount</label>
-                    <div class="input-group">
-                        <div class="input-group-prepend"><span class="input-group-text">৳</span></div>
-                        <input type="number" name="paid_amount" class="form-control" value="0" min="0" step="0.01">
-                    </div>
+                <div class="alert py-2" style="background:#fff3e0; border-left:4px solid #f57c00;">
+                    <small><i class="fas fa-info-circle mr-1"></i>
+                    Payment add করা যাবে Sale view page থেকে, এখান থেকে নয়।</small>
                 </div>
                 <div class="form-group">
                     <label class="font-weight-bold small">Note</label>
-                    <textarea name="note" class="form-control" rows="3"
-                              placeholder="Optional note for this sale">{{ old('note') }}</textarea>
+                    <textarea name="note" class="form-control" rows="3">{{ old('note', $sale->note) }}</textarea>
                 </div>
-                <button type="submit" class="btn btn-primary btn-block">
-                    <i class="fas fa-save mr-1"></i> Save Sale
+                <button type="submit" class="btn btn-warning btn-block">
+                    <i class="fas fa-save mr-1"></i> Update Sale
                 </button>
             </div>
         </div>
@@ -221,7 +212,7 @@
 @section('js')
 @parent
 <script>
-let rowIndex = 1;
+let rowIndex = {{ $sale->items->count() }};
 const products = @json($products->map(fn($p) => ['id' => $p->id, 'name' => $p->name . ' (Stock: ' . $p->stock_quantity . ' ' . $p->unit . ')', 'price' => $p->sell_price]));
 
 // ── Customer select handler ─────────────────────────────────────
@@ -229,10 +220,8 @@ $('#customerSelect').on('change', function () {
     var opt = $(this).find(':selected');
     if ($(this).val()) {
         $('#walkInName').val('').prop('readonly', true).attr('placeholder', opt.data('name'));
-        $('#customerPhone').val(opt.data('phone') || '');
     } else {
         $('#walkInName').val('Walk-in Customer').prop('readonly', false);
-        $('#customerPhone').val('').prop('readonly', false);
     }
 });
 
@@ -293,9 +282,5 @@ function calcTotal() {
     const discount = parseFloat(document.querySelector('[name=discount]').value) || 0;
     document.getElementById('totalDisplay').value = Math.max(0, subtotal - discount).toFixed(2);
 }
-
-document.querySelector('[name="items[0][product_id]"]').addEventListener('change', function () {
-    fillPrice(this);
-});
 </script>
 @stop

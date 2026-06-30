@@ -208,20 +208,39 @@ class AccountingService
             ->first();
         if (! $category) return null;
 
+        $purchase = $return->purchase;
+
+        // ── Expense এ শুধু ততটুকুই বিয়োগ হবে যতটুকু আসলে Paid হয়েছিল ──
+        $alreadyDeducted = Expense::where('source_type', 'purchase_return')
+            ->where('source_invoice_id', $purchase->id)
+            ->where('status', '!=', 'void')
+            ->sum('amount'); // negative sum
+
+        $alreadyDeducted = abs($alreadyDeducted);
+        $totalPaid       = (float) $purchase->paid_amount;
+
+        $availableToDeduct = max(0, $totalPaid - $alreadyDeducted);
+        $expenseImpact      = min($return->total_amount, $availableToDeduct);
+
+        if ($expenseImpact <= 0) {
+            return null; // কোনো টাকা Expense এ আসেইনি — কিছু বিয়োগ করার নেই
+        }
+
         return Expense::create([
             'expense_no'        => Expense::generateNumber(),
             'category_id'       => $category->id,
-            'amount'            => -abs($return->total_amount), // negative entry
+            'amount'            => -abs($expenseImpact), // শুধু paid অংশ negative
             'expense_date'      => $return->return_date,
             'payment_method'    => 'cash',
-            'payee'             => $return->vendor->name,
+            'payee'             => $return->vendor->name ?? '—',
             'reference_no'      => $return->return_no,
-            'description'       => "Purchase Return — {$return->purchase->purchase_no}"
-                                   . " [Return: ৳" . number_format($return->total_amount, 2) . "]",
+            'description'       => "Purchase Return — {$purchase->purchase_no}"
+                                   . " [Return Item Value: ৳" . number_format($return->total_amount, 2)
+                                   . " | Expense Adjusted: ৳" . number_format($expenseImpact, 2) . "]",
             'source_type'       => 'purchase_return',
             'source_id'         => $return->id,
-            'source_invoice_id' => $return->purchase_id,
-            'status'            => 'approved', // negative entry but active — not void
+            'source_invoice_id' => $purchase->id,
+            'status'            => 'approved',
             'created_by'        => auth()->id(),
             'approved_by'       => auth()->id(),
             'approved_at'       => now(),

@@ -133,10 +133,48 @@ class Sale extends Model
         return $this->status === 'cancelled';
     }
 
+    /**
+     * Payment হয়ে গেলে অথবা কোনো Return হলে sale lock হয়ে যাবে।
+     */
+    public function isLocked(): bool
+    {
+        return (float) $this->paid_amount > 0 || $this->returns()->where('status', '!=', 'cancelled')->exists();
+    }
+
+    public function isEditable(): bool
+    {
+        return ! $this->isLocked() && ! $this->isCancelled();
+    }
+
+    public function canDelete(): bool
+    {
+        return ! $this->isLocked() && ! $this->isCancelled();
+    }
+
     // Confirmed sale cancel করা যাবে না — return করতে হবে
     public function canCancel(): bool
     {
-        return $this->isDraft();
+        return ! $this->isLocked();
+    }
+
+    public function getStatusBadgeAttribute(): string
+    {
+        return match ($this->status) {
+            'confirmed' => '<span class="badge badge-success">Confirmed</span>',
+            'cancelled' => '<span class="badge badge-secondary">Cancelled</span>',
+            'draft'     => '<span class="badge badge-warning">Draft</span>',
+            default     => '<span class="badge badge-light">' . $this->status . '</span>',
+        };
+    }
+
+    public function getPaymentStatusBadgeAttribute(): string
+    {
+        return match ($this->payment_status) {
+            'paid'    => '<span class="badge badge-success">Paid</span>',
+            'partial' => '<span class="badge badge-warning">Partial</span>',
+            'unpaid'  => '<span class="badge badge-danger">Unpaid</span>',
+            default   => '<span class="badge badge-light">' . $this->payment_status . '</span>',
+        };
     }
 
     public function getCustomerNameAttribute(): string

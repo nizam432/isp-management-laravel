@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Inventory;
 
 use App\Http\Controllers\Controller;
 use App\Models\Inventory\Product;
+use App\Models\Inventory\ProductCategory;
 use App\Models\Inventory\Purchase;
 use App\Models\Inventory\Sale;
 use App\Models\Inventory\SaleItem;
@@ -11,6 +12,7 @@ use App\Models\Inventory\InternalConsumption;
 use App\Models\Inventory\StockTransaction;
 use App\Models\Inventory\Vendor;
 use App\Models\Inventory\ClientLedger;
+use App\Models\Customer;
 use Illuminate\Http\Request;
 
 class ReportController extends Controller
@@ -23,7 +25,9 @@ class ReportController extends Controller
                         ->when($request->low_stock, fn($q) => $q->lowStock())
                         ->get();
 
-        return view('inventory.reports.stock', compact('products'));
+        $categories = ProductCategory::orderBy('name')->get();
+
+        return view('inventory.reports.stock', compact('products', 'categories'));
     }
 
     // Purchase Report
@@ -161,7 +165,13 @@ class ReportController extends Controller
     // Client Ledger Report
     public function clientLedger(Request $request)
     {
-        $client = \App\Models\Customer::findOrFail($request->client_id);
+        $clients = Customer::orderBy('name')->get();
+
+        if (!$request->client_id) {
+            return view('inventory.reports.client-ledger', compact('clients'));
+        }
+
+        $client = Customer::findOrFail($request->client_id);
 
         $ledger = ClientLedger::where('client_id', $client->id)
                     ->when($request->from, fn($q) => $q->whereDate('date', '>=', $request->from))
@@ -169,6 +179,6 @@ class ReportController extends Controller
                     ->orderBy('date')
                     ->get();
 
-        return view('inventory.reports.client-ledger', compact('client', 'ledger'));
+        return view('inventory.reports.client-ledger', compact('client', 'ledger', 'clients'));
     }
 }

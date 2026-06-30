@@ -59,6 +59,7 @@ use App\Http\Controllers\Client\OnlinePaymentController;
 // ─────────────────────────────────────────────
 // Public Routes
 // ─────────────────────────────────────────────
+
 Route::get('/', fn() => redirect()->route('login'));
 
 Route::get('language/{locale}', [LanguageController::class, 'switch'])->name('language.switch');
@@ -255,6 +256,33 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('{inventoryItem}',         [InventoryController::class, 'destroy'])->name('destroy');
         Route::post('{inventoryItem}/stock-in',  [InventoryController::class, 'stockIn'])->name('stock-in');
         Route::post('{inventoryItem}/stock-out', [InventoryController::class, 'stockOut'])->name('stock-out');
+
+        // ── Sales ──────────────────────────────
+        Route::prefix('sales')->name('sales.')->group(function () {
+            Route::get('/',                    [\App\Http\Controllers\Inventory\SaleController::class, 'index'])      ->name('index');
+            Route::get('/create',              [\App\Http\Controllers\Inventory\SaleController::class, 'create'])     ->name('create');
+            Route::post('/',                   [\App\Http\Controllers\Inventory\SaleController::class, 'store'])      ->name('store');
+            Route::get('/export-xlsx',         [\App\Http\Controllers\Inventory\SaleController::class, 'exportXlsx']) ->name('export-xlsx');
+            Route::get('/export-pdf',          [\App\Http\Controllers\Inventory\SaleController::class, 'exportPdf'])  ->name('export-pdf');
+            Route::get('/{sale}/detail',       [\App\Http\Controllers\Inventory\SaleController::class, 'detail'])     ->name('detail');
+            Route::get('/{sale}/invoice-pdf',  [\App\Http\Controllers\Inventory\SaleController::class, 'invoicePdf']) ->name('invoice-pdf');
+            Route::post('/{sale}/payment',     [\App\Http\Controllers\Inventory\SalePaymentController::class, 'store'])->name('payment.store');
+            Route::post('/{sale}/payment/{payment}/void', [\App\Http\Controllers\Inventory\SalePaymentController::class, 'void'])->name('payment.void');
+            Route::get('/{sale}',              [\App\Http\Controllers\Inventory\SaleController::class, 'show'])       ->name('show');
+            Route::get('/{sale}/edit',         [\App\Http\Controllers\Inventory\SaleController::class, 'edit'])       ->name('edit');
+            Route::put('/{sale}',              [\App\Http\Controllers\Inventory\SaleController::class, 'update'])     ->name('update');
+            Route::post('/{sale}/void',        [\App\Http\Controllers\Inventory\SaleController::class, 'void'])       ->name('void');
+            Route::delete('/{sale}',           [\App\Http\Controllers\Inventory\SaleController::class, 'destroy'])    ->name('destroy');
+        });
+
+        // ── Sale Returns ───────────────────────
+        Route::prefix('sale-returns')->name('sale-returns.')->group(function () {
+            Route::get('/',                       [\App\Http\Controllers\Inventory\SaleReturnController::class, 'index'])     ->name('index');
+            Route::get('/create',                 [\App\Http\Controllers\Inventory\SaleReturnController::class, 'create'])    ->name('create');
+            Route::post('/',                      [\App\Http\Controllers\Inventory\SaleReturnController::class, 'store'])     ->name('store');
+            Route::get('/sale/{sale}/items',      [\App\Http\Controllers\Inventory\SaleReturnController::class, 'saleItems']) ->name('sale-items');
+            Route::get('/{saleReturn}',           [\App\Http\Controllers\Inventory\SaleReturnController::class, 'show'])      ->name('show');
+        });
     });
 
     // ── Reports ────────────────────────────────
@@ -478,12 +506,21 @@ Route::middleware(['auth'])->group(function () {
     Route::post('employees/{employee}/resign-terminate', [EmployeeController::class, 'resignTerminate'])->name('employees.resign-terminate')->middleware('can:hr.employee.edit');
 
     Route::prefix('payroll')->name('payroll.')->group(function () {
-        Route::get('/',                  [PayrollController::class, 'index'])->name('index')->middleware('can:hr.payroll.view');
-        Route::get('/generate',          [PayrollController::class, 'generate'])->name('generate')->middleware('can:hr.payroll.manage');
-        Route::post('/',                 [PayrollController::class, 'store'])->name('store')->middleware('can:hr.payroll.manage');
-        Route::get('/{payroll}',         [PayrollController::class, 'show'])->name('show');
-        Route::post('/{payroll}/pay',    [PayrollController::class, 'pay'])->name('pay');
-        Route::get('/{payroll}/payslip', [PayrollController::class, 'payslip'])->name('payslip');
+        Route::get('/',                          [PayrollController::class, 'index'])          ->name('index')->middleware('can:hr.payroll.view');
+        Route::get('/generate',                  [PayrollController::class, 'generate'])       ->name('generate')->middleware('can:hr.payroll.manage');
+        Route::post('/',                         [PayrollController::class, 'store'])          ->name('store')->middleware('can:hr.payroll.manage');
+        Route::post('/bulk-delete',              [PayrollController::class, 'bulkDelete'])     ->name('bulk-delete');
+        Route::get('/export-xlsx',               [PayrollController::class, 'exportXlsx'])    ->name('export-xlsx');
+        Route::get('/export-pdf',                [PayrollController::class, 'exportPdf'])     ->name('export-pdf');
+        Route::post('/payment/{payment}/void',   [PayrollController::class, 'voidPayment'])   ->name('payment.void');
+        Route::get('/{payroll}',                 [PayrollController::class, 'show'])          ->name('show');
+        Route::get('/{payroll}/edit',            [PayrollController::class, 'edit'])          ->name('edit');
+        Route::put('/{payroll}',                 [PayrollController::class, 'update'])        ->name('update');
+        Route::post('/{payroll}/pay',            [PayrollController::class, 'pay'])           ->name('pay');
+        Route::delete('/{payroll}',              [PayrollController::class, 'destroy'])       ->name('destroy');
+        Route::get('/{payroll}/payslip',         [PayrollController::class, 'payslip'])       ->name('payslip');
+        Route::get('/{payroll}/payslip-pdf',     [PayrollController::class, 'payslipPdf'])    ->name('payslip-pdf');
+        Route::get('/{payroll}/payment-history', [PayrollController::class, 'paymentHistory'])->name('payment-history');
     });
 
     Route::prefix('leave')->name('leave.')->group(function () {
@@ -511,6 +548,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('reports/profit-loss',     [ExpenseController::class, 'profitLoss'])    ->name('profit-loss')->middleware('can:accounting.report.view');
         Route::get('reports/profit-loss/pdf', [ExpenseController::class, 'profitLossPdf']) ->name('profit-loss.pdf');
         Route::get('api/chart-data',          [ExpenseController::class, 'chartData'])     ->name('chart-data');
+        Route::get('export/xlsx',             [ExpenseController::class, 'exportXlsx'])    ->name('export-xlsx');
+        Route::get('export/pdf',              [ExpenseController::class, 'exportPdf'])     ->name('export-pdf');
 
         // CRUD
         Route::get('/',               [ExpenseController::class, 'index'])  ->name('index')->middleware('can:accounting.expense.view');
@@ -588,12 +627,23 @@ Route::middleware(['auth'])->group(function () {
 
         // Purchase Bill
         Route::prefix('purchase')->name('purchase.')->group(function () {
-            Route::get('/',                    [BandwidthPurchaseController::class, 'index'])  ->name('index');
-            Route::get('/create',              [BandwidthPurchaseController::class, 'create']) ->name('create');
-            Route::post('/',                   [BandwidthPurchaseController::class, 'store'])  ->name('store');
-            Route::get('/{purchase}/edit',     [BandwidthPurchaseController::class, 'edit'])   ->name('edit');
-            Route::put('/{purchase}',          [BandwidthPurchaseController::class, 'update']) ->name('update');
-            Route::post('/{purchase}/void',    [BandwidthPurchaseController::class, 'void'])   ->name('void');
+            Route::get('/',                              [BandwidthPurchaseController::class, 'index'])                ->name('index');
+            Route::get('/create',                        [BandwidthPurchaseController::class, 'create'])               ->name('create');
+            Route::post('/',                             [BandwidthPurchaseController::class, 'store'])                ->name('store');
+            Route::get('/export-xlsx',                   [BandwidthPurchaseController::class, 'exportXlsx'])           ->name('export-xlsx');
+            Route::get('/export-pdf',                    [BandwidthPurchaseController::class, 'exportPdf'])            ->name('export-pdf');
+            Route::get('/payment-history',               [BandwidthPurchaseController::class, 'allPaymentHistory'])    ->name('all-payment-history');
+            Route::get('/payment-history/xlsx',          [BandwidthPurchaseController::class, 'allPaymentHistoryXlsx'])->name('all-payment-history.xlsx');
+            Route::get('/payment-history/pdf',           [BandwidthPurchaseController::class, 'allPaymentHistoryPdf']) ->name('all-payment-history.pdf');
+            Route::post('/payment/{payment}/void',       [BandwidthPurchaseController::class, 'voidPayment'])          ->name('payment.void');
+            Route::get('/payment/{payment}/detail',      [BandwidthPurchaseController::class, 'paymentDetail'])        ->name('payment.detail');
+            Route::get('/{purchase}',                    [BandwidthPurchaseController::class, 'show'])                 ->name('show');
+            Route::get('/{purchase}/edit',               [BandwidthPurchaseController::class, 'edit'])                 ->name('edit');
+            Route::put('/{purchase}',                    [BandwidthPurchaseController::class, 'update'])               ->name('update');
+            Route::post('/{purchase}/void',              [BandwidthPurchaseController::class, 'void'])                 ->name('void');
+            Route::delete('/{purchase}',                 [BandwidthPurchaseController::class, 'destroy'])              ->name('destroy');
+            Route::post('/{purchase}/pay',               [BandwidthPurchaseController::class, 'pay'])                  ->name('pay');
+            Route::get('/{purchase}/payment-history',    [BandwidthPurchaseController::class, 'paymentHistory'])       ->name('payment-history');
         });
 
         // Purchase Report
@@ -636,10 +686,14 @@ Route::middleware(['auth'])->group(function () {
         Route::post('invoices/{bwsInvoice}/receive', [BwsInvoiceController::class, 'receiveStore']) ->name('invoices.receive');
 
         // ── Payment Void ───────────────────────
-        Route::post('payments/{payment}/void', [BwsInvoiceController::class, 'voidPayment']) ->name('payments.void');
+        Route::post('payments/delete-selected',     [BwsInvoiceController::class, 'deleteSelected'])  ->name('payments.delete-selected');
+        Route::post('payments/approve-selected',    [BwsInvoiceController::class, 'approveSelected']) ->name('payments.approve-selected');
+        Route::post('payments/{payment}/void',      [BwsInvoiceController::class, 'voidPayment'])     ->name('payments.void');
 
         // ── Daily Bill ─────────────────────────
-        Route::get('daily-bill', [BwsInvoiceController::class, 'dailyBill']) ->name('daily-bill.index');
+        Route::get('daily-bill',          [BwsInvoiceController::class, 'dailyBill'])            ->name('daily-bill.index');
+        Route::get('daily-bill/xlsx',     [BwsInvoiceController::class, 'dailyBillExportXlsx'])  ->name('daily-bill.xlsx');
+        Route::get('daily-bill/pdf',      [BwsInvoiceController::class, 'dailyBillExportPdf'])   ->name('daily-bill.pdf');
 
         // ── Recurring Invoice ──────────────────
         Route::get   ('recurring',                   [BwsInvoiceController::class, 'recurringIndex'])  ->name('recurring.index');

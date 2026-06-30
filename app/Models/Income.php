@@ -155,7 +155,7 @@ class Income extends Model
             self::SOURCE_BANDWIDTH_SALE => route('bandwidth-sale.invoices.show',
                 $this->source_invoice_id ?? $this->source_id
             ),
-            self::SOURCE_PRODUCT_SALE   => route('inventory.sales.show', $this->source_id),
+            self::SOURCE_PRODUCT_SALE   => route('inventory.sales.show', $this->source_invoice_id ?? $this->source_id),
             self::SOURCE_PRODUCT_RETURN => route('inventory.sale-returns.show', $this->source_id),
             self::SOURCE_CONNECTION_FEE => route('connection-fee.show', $this->source_id),
             default                     => null,
