@@ -156,7 +156,6 @@ class SaleReturnController extends Controller
             foreach ($itemsData as $item) {
                 $return->items()->create($item);
 
-                // ── Stock ফেরত আসবে ───────────────────────────────
                 $product = Product::find($item['product_id']);
                 $product->increment('stock_quantity', $item['quantity']);
 
@@ -177,12 +176,11 @@ class SaleReturnController extends Controller
                 ]);
             }
 
-            // ── Sale total কমাও, due/refund সঠিকভাবে recalculate ──
             $newTotal = max(0, $sale->total_amount - $totalAmount);
             $paid     = (float) $sale->paid_amount;
 
             if ($paid > $newTotal) {
-                // Customer বেশি দিয়ে ফেলেছে — refund due হবে
+                // Customer overpaid; excess becomes a refund due.
                 $newDue    = 0;
                 $refundDue = $paid - $newTotal;
             } else {

@@ -58,7 +58,6 @@ class ClientDeviceAssignmentController extends Controller
                 'assigned_by' => auth()->id(),
             ]);
 
-            // Stock কমাও
             $product->decrement('stock_quantity', 1);
 
             LocationStock::where('product_id', $request->product_id)
@@ -89,7 +88,6 @@ class ClientDeviceAssignmentController extends Controller
         return view('inventory.assignments.show', compact('assignment'));
     }
 
-    // Device Return (Stock বাড়বে)
     public function return(Request $request, ClientDeviceAssignment $assignment)
     {
         $request->validate([
@@ -108,7 +106,6 @@ class ClientDeviceAssignmentController extends Controller
                 'note'        => $request->note ?? $assignment->note,
             ]);
 
-            // Stock বাড়াও
             $assignment->product->increment('stock_quantity', 1);
 
             LocationStock::updateOrCreate(

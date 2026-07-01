@@ -15,10 +15,6 @@ use Illuminate\Support\Facades\Log;
 
 class MikrotikController extends Controller
 {
-    // ══════════════════════════════════════════════
-    // পুরনো CRUD — Router & IP Pool Management
-    // ══════════════════════════════════════════════
-
     /**
      * Display a list of all MikroTik routers.
      */
@@ -109,7 +105,6 @@ class MikrotikController extends Controller
 
         $data = $request->except('password');
 
-        // Password দিলেই শুধু update হবে
         if ($request->filled('password')) {
             $data['password'] = $request->password;
         }
@@ -201,10 +196,6 @@ class MikrotikController extends Controller
         return back()->with('success', 'IP Pool added successfully.');
     }
 
-    // ══════════════════════════════════════════════
-    // নতুন — Live API Methods (AJAX)
-    // ══════════════════════════════════════════════
-
     /**
      * GET /mikrotik/{router}/status
      * Router live status — CPU, uptime, online count
@@ -227,10 +218,7 @@ class MikrotikController extends Controller
         }
     }
 
-    /**
-     * GET /mikrotik/{router}/pppoe-users
-     * সব PPPoE user লিস্ট
-     */
+    /** GET /mikrotik/{router}/pppoe-users — list all PPPoE users. */
     public function pppoeUsers(MikrotikRouter $router): JsonResponse
     {
         try {
@@ -243,10 +231,7 @@ class MikrotikController extends Controller
         }
     }
 
-    /**
-     * GET /mikrotik/{router}/active-sessions
-     * সব active PPPoE session
-     */
+    /** GET /mikrotik/{router}/active-sessions — list all active PPPoE sessions. */
     public function activeSessions(MikrotikRouter $router): JsonResponse
     {
         try {
@@ -265,10 +250,7 @@ class MikrotikController extends Controller
         $customers = Customer::pluck('name', 'pppoe_username'); // username → name map
         return view('mikrotik.active-sessions', compact('routers', 'customers'));
     }
-    /**
-     * GET /mikrotik/{router}/queues
-     * Simple Queue লিস্ট
-     */
+    /** GET /mikrotik/{router}/queues — list all Simple Queues. */
     public function queues(MikrotikRouter $router): JsonResponse
     {
         try {
@@ -281,10 +263,7 @@ class MikrotikController extends Controller
         }
     }
 
-    /**
-     * GET /mikrotik/{router}/profiles
-     * PPPoE Profile লিস্ট
-     */
+    /** GET /mikrotik/{router}/profiles — list all PPPoE profiles. */
     public function profiles(MikrotikRouter $router): JsonResponse
     {
         try {
@@ -297,10 +276,7 @@ class MikrotikController extends Controller
         }
     }
 
-    /**
-     * GET /mikrotik/{router}/hotspot-profiles
-     * Hotspot User Profile লিস্ট
-     */
+    /** GET /mikrotik/{router}/hotspot-profiles — list all Hotspot user profiles. */
     public function hotspotProfiles(MikrotikRouter $router): JsonResponse
     {
         try {
@@ -313,14 +289,7 @@ class MikrotikController extends Controller
     }
 
 
-    // ══════════════════════════════════════════════
-    // Customer-level Operations
-    // ══════════════════════════════════════════════
-
-    /**
-     * POST /customers/{customer}/mikrotik/provision
-     * Customer কে MikroTik এ add করো
-     */
+    /** POST /customers/{customer}/mikrotik/provision — create the PPPoE account on the router. */
     public function provisionCustomer(Customer $customer): JsonResponse
     {
         if (!$customer->pppoe_username || !$customer->pppoe_password) {
@@ -343,10 +312,7 @@ class MikrotikController extends Controller
         }
     }
 
-    /**
-     * POST /customers/{customer}/mikrotik/suspend
-     * Customer suspend করো
-     */
+    /** POST /customers/{customer}/mikrotik/suspend — disable the PPPoE account on the router. */
     public function suspendCustomer(Customer $customer): JsonResponse
     {
         try {
@@ -361,10 +327,7 @@ class MikrotikController extends Controller
         }
     }
 
-    /**
-     * POST /customers/{customer}/mikrotik/restore
-     * Customer restore করো
-     */
+    /** POST /customers/{customer}/mikrotik/restore — re-enable the PPPoE account on the router. */
     public function restoreCustomer(Customer $customer): JsonResponse
     {
         try {
@@ -396,10 +359,7 @@ class MikrotikController extends Controller
         }
     }
 
-    /**
-     * POST /customers/{customer}/mikrotik/change-package
-     * Package পরিবর্তন
-     */
+    /** POST /customers/{customer}/mikrotik/change-package — update the PPPoE profile to match the new package. */
     public function changePackage(Customer $customer): JsonResponse
     {
         try {
@@ -413,10 +373,7 @@ class MikrotikController extends Controller
         }
     }
 
-    /**
-     * DELETE /customers/{customer}/mikrotik
-     * MikroTik থেকে সম্পূর্ণ remove করো
-     */
+    /** DELETE /customers/{customer}/mikrotik — remove the PPPoE account from the router entirely. */
     public function removeCustomer(Customer $customer): JsonResponse
     {
         try {
@@ -431,10 +388,7 @@ class MikrotikController extends Controller
         }
     }
 
-    /**
-     * GET /customers/{customer}/mikrotik/session
-     * Customer এর live session info
-     */
+    /** GET /customers/{customer}/mikrotik/session — return the customer's live PPPoE session data. */
     public function customerSession(Customer $customer): JsonResponse
     {
         try {
@@ -454,10 +408,6 @@ class MikrotikController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
-
-    // ══════════════════════════════════════════════
-    // Bulk Operations
-    // ══════════════════════════════════════════════
 
     /**
      * POST /mikrotik/bulk-suspend

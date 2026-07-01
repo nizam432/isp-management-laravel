@@ -39,7 +39,6 @@ class SaleController extends Controller
         return view('inventory.sales.create', compact('locations', 'products', 'clients'));
     }
 
-    // ── STORE — সরাসরি Confirmed, stock তখনই কমবে ──────────────────
     public function store(Request $request)
     {
         $request->validate([
@@ -59,7 +58,6 @@ class SaleController extends Controller
             'items.*.discount'   => 'nullable|numeric|min:0',
         ]);
 
-        // ── Stock check আগে ──────────────────────────────────────
         foreach ($request->items as $item) {
             $product = Product::find($item['product_id']);
             if ($product->stock_quantity < $item['quantity']) {
@@ -90,11 +88,11 @@ class SaleController extends Controller
                 'discount'       => $discount,
                 'tax'            => $tax,
                 'total_amount'   => $totalAmount,
-                'paid_amount'    => 0, // payment আলাদাভাবে SalePayment দিয়ে হবে
+                'paid_amount'    => 0, // initial payment handled separately via SalePaymentController
                 'due_amount'     => $totalAmount,
                 'payment_status' => 'unpaid',
                 'sale_type'      => $request->sale_type,
-                'status'         => 'confirmed', // সরাসরি confirmed — draft নেই
+                'status'         => 'confirmed', // always confirmed on creation; no draft stage
                 'note'           => $request->note,
                 'created_by'     => auth()->id(),
             ]);
@@ -115,7 +113,6 @@ class SaleController extends Controller
                     'profit'         => $profit,
                 ]);
 
-                // ── Stock কমাও তখনই ──────────────────────────────
                 $product->decrement('stock_quantity', $item['quantity']);
 
                 LocationStock::where('product_id', $item['product_id'])
@@ -135,7 +132,6 @@ class SaleController extends Controller
                 ]);
             }
 
-            // ── Client Ledger ──────────────────────────────────────
             if ($sale->client_id) {
                 $lastBalance = ClientLedger::lastBalance($sale->client_id);
                 ClientLedger::create([
@@ -151,7 +147,6 @@ class SaleController extends Controller
                 ]);
             }
 
-            // ── Initial Payment (যদি দেওয়া থাকে) ──────────────────
             if ($paidAmount > 0) {
                 app(\App\Http\Controllers\Inventory\SalePaymentController::class)
                     ->createInitialPayment($sale, $paidAmount, $request);
@@ -168,7 +163,6 @@ class SaleController extends Controller
         return view('inventory.sales.show', compact('sale'));
     }
 
-    // ── EDIT — শুধু payment না থাকলে ─────────────────────────────
     public function edit(Sale $sale)
     {
         if (! $sale->isEditable()) {
@@ -184,7 +178,6 @@ class SaleController extends Controller
         return view('inventory.sales.edit', compact('sale', 'locations', 'products', 'clients'));
     }
 
-    // ── UPDATE — stock recalculate (return old, deduct new) ──────
     public function update(Request $request, Sale $sale)
     {
         if (! $sale->isEditable()) {
@@ -208,7 +201,7 @@ class SaleController extends Controller
         ]);
 
         DB::transaction(function () use ($request, $sale) {
-            // ── পুরনো stock return করো ──────────────────────────
+            // Revert stock for old items before applying new quantities.
             foreach ($sale->items as $oldItem) {
                 $oldItem->product->increment('stock_quantity', $oldItem->quantity);
                 LocationStock::where('product_id', $oldItem->product_id)
@@ -229,7 +222,6 @@ class SaleController extends Controller
             }
             $sale->items()->delete();
 
-            // ── নতুন items হিসাব করো ────────────────────────────
             $subtotal = 0;
             foreach ($request->items as $item) {
                 $itemDiscount = $item['discount'] ?? 0;
@@ -249,7 +241,7 @@ class SaleController extends Controller
                 'discount'     => $discount,
                 'tax'          => $tax,
                 'total_amount' => $totalAmount,
-                'due_amount'   => $totalAmount, // paid 0 ছিল
+                'due_amount'   => $totalAmount,
                 'sale_type'    => $request->sale_type,
                 'note'         => $request->note,
             ]);
@@ -298,7 +290,6 @@ class SaleController extends Controller
                          ->with('success', 'Sale updated successfully.');
     }
 
-    // ── VOID — শুধু payment না থাকলে, stock return ───────────────
     public function void(Request $request, Sale $sale)
     {
         if (! $sale->canCancel()) {
@@ -337,7 +328,6 @@ class SaleController extends Controller
                          ->with('success', 'Sale voided. Stock returned.');
     }
 
-    // ── DESTROY — শুধু payment না থাকলে ───────────────────────────
     public function destroy(Sale $sale)
     {
         if (! $sale->canDelete()) {
@@ -345,7 +335,6 @@ class SaleController extends Controller
         }
 
         DB::transaction(function () use ($sale) {
-            // Stock return
             foreach ($sale->items as $item) {
                 $item->product->increment('stock_quantity', $item->quantity);
                 LocationStock::where('product_id', $item->product_id)
@@ -373,7 +362,6 @@ class SaleController extends Controller
                          ->with('success', 'Sale deleted successfully.');
     }
 
-    // ── EXPORT XLSX ────────────────────────────────────────────────
     public function exportXlsx(Request $request)
     {
         $sales = $this->getFilteredSales($request);
@@ -421,7 +409,6 @@ class SaleController extends Controller
         ])->deleteFileAfterSend(true);
     }
 
-    // ── EXPORT PDF ─────────────────────────────────────────────────
     public function exportPdf(Request $request)
     {
         $sales = $this->getFilteredSales($request);
@@ -447,7 +434,6 @@ class SaleController extends Controller
             ->get();
     }
 
-    // ── DETAIL — AJAX for view modal ──────────────────────────────
     public function detail(Sale $sale)
     {
         $sale->load('client', 'location', 'items.product', 'payments.createdBy');
@@ -483,7 +469,6 @@ class SaleController extends Controller
         ]);
     }
 
-    // ── INVOICE PDF ────────────────────────────────────────────────
     public function invoicePdf(Sale $sale)
     {
         $sale->load('client', 'location', 'items.product', 'payments');

@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 namespace App\Http\Controllers\BandwidthBuy;
 
@@ -62,9 +62,6 @@ class BandwidthPurchaseController extends Controller
         return $expense;
     }
 
-    // =========================================================================
-    // PAYMENT DETAIL — AJAX GET (for view modal)
-    // =========================================================================
     public function paymentDetail(BandwidthPurchasePayment $payment)
     {
         $payment->load(['purchase.provider', 'createdBy']);
@@ -91,9 +88,6 @@ class BandwidthPurchaseController extends Controller
         ]);
     }
 
-    // =========================================================================
-    // ALL PAYMENT HISTORY — Separate page
-    // =========================================================================
     public function allPaymentHistory(Request $request)
     {
         $query = BandwidthPurchasePayment::with(['purchase.provider', 'createdBy'])
@@ -126,9 +120,6 @@ class BandwidthPurchaseController extends Controller
             compact('payments', 'providers', 'totalAmount'));
     }
 
-    // =========================================================================
-    // ALL PAYMENT HISTORY EXPORT XLSX
-    // =========================================================================
     public function allPaymentHistoryXlsx(Request $request)
     {
         $payments = $this->getFilteredAllPayments($request);
@@ -176,9 +167,6 @@ class BandwidthPurchaseController extends Controller
         ])->deleteFileAfterSend(true);
     }
 
-    // =========================================================================
-    // ALL PAYMENT HISTORY EXPORT PDF
-    // =========================================================================
     public function allPaymentHistoryPdf(Request $request)
     {
         $payments = $this->getFilteredAllPayments($request);
@@ -208,18 +196,12 @@ class BandwidthPurchaseController extends Controller
             ->get();
     }
 
-    // =========================================================================
-    // SHOW
-    // =========================================================================
     public function show(BandwidthPurchase $purchase)
     {
         $purchase->load(['provider', 'lines.service', 'payments.createdBy', 'createdBy']);
         return view('bandwidth-buy.purchase.show', compact('purchase'));
     }
 
-    // =========================================================================
-    // INDEX
-    // =========================================================================
     public function index(Request $request)
     {
         $query = BandwidthPurchase::with('provider', 'lines.service', 'payments')
@@ -239,9 +221,6 @@ class BandwidthPurchaseController extends Controller
         return view('bandwidth-buy.purchase.index', compact('purchases', 'providers'));
     }
 
-    // =========================================================================
-    // CREATE
-    // =========================================================================
     public function create()
     {
         $providers = BandwidthProvider::active()->orderBy('company_name')->get();
@@ -249,9 +228,6 @@ class BandwidthPurchaseController extends Controller
         return view('bandwidth-buy.purchase.create', compact('providers', 'services'));
     }
 
-    // =========================================================================
-    // STORE
-    // =========================================================================
     public function store(Request $request)
     {
         $request->validate([
@@ -350,12 +326,8 @@ class BandwidthPurchaseController extends Controller
         }
     }
 
-    // =========================================================================
-    // EDIT
-    // =========================================================================
     public function edit(BandwidthPurchase $purchase)
     {
-        // Partial/Paid হলে edit করা যাবে না
         if (! $purchase->isEditable()) {
             return redirect()->route('bandwidth-buy.purchase.index')
                 ->with('error', 'This purchase has payments and cannot be edited.');
@@ -369,9 +341,6 @@ class BandwidthPurchaseController extends Controller
             compact('purchase', 'providers', 'services'));
     }
 
-    // =========================================================================
-    // UPDATE
-    // =========================================================================
     public function update(Request $request, BandwidthPurchase $purchase)
     {
         if (! $purchase->isEditable()) {
@@ -451,9 +420,6 @@ class BandwidthPurchaseController extends Controller
         }
     }
 
-    // =========================================================================
-    // PAY — AJAX POST
-    // =========================================================================
     public function pay(Request $request, BandwidthPurchase $purchase)
     {
         $request->validate([
@@ -512,9 +478,6 @@ class BandwidthPurchaseController extends Controller
         }
     }
 
-    // =========================================================================
-    // PAYMENT HISTORY — AJAX GET
-    // =========================================================================
     public function paymentHistory(BandwidthPurchase $purchase)
     {
         $payments = $purchase->payments()
@@ -539,9 +502,6 @@ class BandwidthPurchaseController extends Controller
         ]);
     }
 
-    // =========================================================================
-    // VOID
-    // =========================================================================
     public function void(Request $request, BandwidthPurchase $purchase)
     {
         $request->validate(['reason' => 'required|string|max:255']);
@@ -578,9 +538,6 @@ class BandwidthPurchaseController extends Controller
         }
     }
 
-    // =========================================================================
-    // EXPORT XLSX
-    // =========================================================================
     public function exportXlsx()
     {
         $purchases = BandwidthPurchase::with('provider', 'lines.service', 'payments')
@@ -627,9 +584,6 @@ class BandwidthPurchaseController extends Controller
         ])->deleteFileAfterSend(true);
     }
 
-    // =========================================================================
-    // EXPORT PDF
-    // =========================================================================
     public function exportPdf()
     {
         $purchases = BandwidthPurchase::with('provider', 'lines.service', 'payments')
@@ -643,9 +597,6 @@ class BandwidthPurchaseController extends Controller
         return $pdf->download('purchase-bills-' . now()->format('Y-m-d') . '.pdf');
     }
 
-    // =========================================================================
-    // VOID INDIVIDUAL PAYMENT
-    // =========================================================================
     public function voidPayment(Request $request, BandwidthPurchasePayment $payment)
     {
         $request->validate(['reason' => 'required|string|max:255']);
@@ -669,7 +620,7 @@ class BandwidthPurchaseController extends Controller
                 }
             }
 
-            // Payment status void — delete না করে status update
+            // Void the payment record rather than deleting it, to preserve audit history.
             $payment->update([
                 'status'      => 'void',
                 'void_reason' => $request->reason,
@@ -693,9 +644,6 @@ class BandwidthPurchaseController extends Controller
         }
     }
 
-    // =========================================================================
-    // DESTROY
-    // =========================================================================
     public function destroy(BandwidthPurchase $purchase)
     {
         if (! $purchase->isEditable()) {

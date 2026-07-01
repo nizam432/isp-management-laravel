@@ -8,32 +8,30 @@ use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Spatie\Permission\Models\Role;
 
 class AgentController extends Controller
 {
-    /**
-     * Display a paginated list of agents.
-     * Includes customer count and total commission per agent.
-     */
     public function index(Request $request)
     {
         $agents = Agent::with('user')
-            ->withCount('customers')             // number of customers under this agent
-            ->withSum('commissions', 'amount')   // total commission earned
+            ->withCount('customers')
+            ->withSum('commissions', 'amount')
+            ->withSum(['commissions as pending_commission_sum' => fn($q) => $q->pending()], 'amount')
             ->when($request->search, fn($q) =>
                 $q->where('name', 'like', "%{$request->search}%")
                   ->orWhere('phone', 'like', "%{$request->search}%")
                   ->orWhereHas('user', fn($u) => $u->where('email', 'like', "%{$request->search}%")))
             ->when($request->area, fn($q) => $q->where('area', $request->area))
-            ->when($request->status === 'active', fn($q) => $q->where('is_active', true))
+            ->when($request->status === 'active',   fn($q) => $q->where('is_active', true))
             ->when($request->status === 'inactive', fn($q) => $q->where('is_active', false))
             ->latest()
             ->paginate(15)
             ->withQueryString();
 
-        $totalAgents    = Agent::count();
-        $activeAgents   = Agent::where('is_active', true)->count();
-        $inactiveAgents = Agent::where('is_active', false)->count();
+        $totalAgents            = Agent::count();
+        $activeAgents           = Agent::where('is_active', true)->count();
+        $inactiveAgents         = Agent::where('is_active', false)->count();
         $pendingCommissionTotal = \App\Models\AgentCommission::pending()->sum('amount');
 
         return view('agents.index', compact(
@@ -41,19 +39,11 @@ class AgentController extends Controller
         ));
     }
 
-    /**
-     * Show the form for creating a new agent.
-     * Now creates a fresh User account (email/password) instead of linking existing.
-     */
     public function create()
     {
         return view('agents.create');
     }
 
-    /**
-     * Store a newly created agent — creates a new User account (login)
-     * and links it to the agent record.
-     */
     public function store(Request $request)
     {
         $request->validate([
@@ -62,13 +52,12 @@ class AgentController extends Controller
             'name'            => 'required|string|max:100',
             'phone'           => 'nullable|string|max:20',
             'area'            => 'nullable|string|max:100',
-            'commission_rate' => 'required|numeric|min:0|max:100', // max 100%
+            'commission_rate' => 'required|numeric|min:0|max:100',
             'is_active'       => 'nullable|boolean',
         ]);
 
         DB::beginTransaction();
         try {
-            // ── নতুন User account তৈরি — Agent login করতে পারবে ──
             $user = User::create([
                 'name'              => $request->name,
                 'email'             => $request->email,
@@ -76,8 +65,8 @@ class AgentController extends Controller
                 'email_verified_at' => now(),
             ]);
 
-            // Spatie 'agent' role দাও
-            $user->assignRole('agent');
+            $agentRole = Role::firstOrCreate(['name' => 'agent', 'guard_name' => 'web']);
+            $user->assignRole($agentRole);
 
             $agent = Agent::create([
                 'user_id'         => $user->id,
@@ -92,8 +81,8 @@ class AgentController extends Controller
 
             DB::commit();
 
-            return redirect()->route('agents.index')
-                             ->with('success', "Agent '{$agent->name}' created. Login: {$user->email}");
+            return redirect()->route('agents.show', $agent)
+                             ->with('success', "Agent '{$agent->name}' created successfully. Login: {$user->email}");
 
         } catch (\Throwable $e) {
             DB::rollBack();
@@ -101,32 +90,25 @@ class AgentController extends Controller
         }
     }
 
-    /**
-     * Display the specified agent with customer list and commission history.
-     */
     public function show(Agent $agent)
     {
-        $agent->load(['user', 'customers', 'commissions.payment']);
+        $agent->load(['user', 'customers.zone', 'commissions' => fn($q) => $q->latest()->with('payment')]);
 
-        // Total pending commission not yet paid out
-        $pendingCommission = $agent->commissions()->pending()->sum('amount');
+        $totalCommission   = $agent->commissions->sum('amount');
+        $pendingCommission = $agent->commissions->where('status', 'pending')->sum('amount');
+        $paidCommission    = $agent->commissions->where('status', 'paid')->sum('amount');
 
-        return view('agents.show', compact('agent', 'pendingCommission'));
+        return view('agents.show', compact(
+            'agent', 'totalCommission', 'pendingCommission', 'paidCommission'
+        ));
     }
 
-    /**
-     * Show edit form.
-     */
     public function edit(Agent $agent)
     {
         $agent->load('user');
         return view('agents.edit', compact('agent'));
     }
 
-    /**
-     * Update the specified agent's information.
-     * Optionally updates linked User's email/password too.
-     */
     public function update(Request $request, Agent $agent)
     {
         $request->validate([
@@ -149,20 +131,17 @@ class AgentController extends Controller
                 'is_active'       => $request->boolean('is_active'),
             ]);
 
-            // Linked User account update (optional email/password change)
             if ($agent->user) {
                 $userData = ['name' => $request->name];
-                if ($request->filled('email')) {
-                    $userData['email'] = $request->email;
-                }
-                if ($request->filled('password')) {
-                    $userData['password'] = Hash::make($request->password);
-                }
+                if ($request->filled('email'))    $userData['email']    = $request->email;
+                if ($request->filled('password')) $userData['password'] = Hash::make($request->password);
                 $agent->user->update($userData);
             }
 
+            ActivityLog::log('Agent updated', 'Agent', $agent->id);
+
             DB::commit();
-            return back()->with('success', 'Agent updated successfully.');
+            return redirect()->route('agents.show', $agent)->with('success', 'Agent updated successfully.');
 
         } catch (\Throwable $e) {
             DB::rollBack();
@@ -170,34 +149,40 @@ class AgentController extends Controller
         }
     }
 
-    /**
-     * Delete the specified agent.
-     * Will not delete if customers are linked to this agent.
-     */
     public function destroy(Agent $agent)
     {
-        // Prevent deletion if agent has customers assigned
         if ($agent->customers()->count() > 0) {
             return back()->with('error', 'Cannot delete — customers are linked to this agent.');
         }
 
         ActivityLog::log('Agent deleted', 'Agent', $agent->id, $agent->toArray(), null);
+
+        // Delete linked user account too
+        $agent->user?->delete();
         $agent->delete();
 
-        return redirect()->route('agents.index')
-                         ->with('success', 'Agent deleted successfully.');
+        return redirect()->route('agents.index')->with('success', 'Agent deleted successfully.');
     }
 
-    /**
-     * Mark all pending commissions for the agent as paid.
-     */
+    public function toggle(Agent $agent)
+    {
+        $agent->update(['is_active' => !$agent->is_active]);
+        $status = $agent->is_active ? 'activated' : 'deactivated';
+        return back()->with('success', "Agent '{$agent->name}' {$status}.");
+    }
+
     public function payCommission(Request $request, Agent $agent)
     {
         $request->validate([
             'amount' => 'required|numeric|min:1',
         ]);
 
-        // Update all pending commissions to paid
+        $pending = $agent->commissions()->pending()->sum('amount');
+
+        if ($request->amount > $pending) {
+            return back()->with('error', 'Payment amount exceeds pending commission.');
+        }
+
         $agent->commissions()
               ->pending()
               ->update([
@@ -207,6 +192,6 @@ class AgentController extends Controller
 
         ActivityLog::log('Commission paid', 'Agent', $agent->id);
 
-        return back()->with('success', 'Commission paid successfully.');
+        return back()->with('success', '৳' . number_format($request->amount, 2) . ' commission paid successfully.');
     }
 }

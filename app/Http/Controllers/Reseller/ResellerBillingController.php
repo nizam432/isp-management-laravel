@@ -14,7 +14,6 @@ class ResellerBillingController extends Controller
     {
         $resellerId = Auth::guard('mac_reseller')->id();
 
-        // শুধু এই reseller-এর অধীনে থাকা customer-দের customer_id লিস্ট
         $customerIds = Customer::forReseller($resellerId)->pluck('id');
 
         $query = Invoice::with('customer')
@@ -58,7 +57,6 @@ class ResellerBillingController extends Controller
     {
         $resellerId = Auth::guard('mac_reseller')->id();
 
-        // Ownership check — এই invoice এর customer কি এই reseller এর অধীনে?
         abort_unless(
             $invoice->customer && $invoice->customer->mac_reseller_id === $resellerId,
             403,

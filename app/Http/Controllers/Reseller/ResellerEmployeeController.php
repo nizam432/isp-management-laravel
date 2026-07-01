@@ -16,10 +16,7 @@ class ResellerEmployeeController extends Controller
         'FUND HISTORY', 'TUTORIALS',
     ];
 
-    /**
-     * শুধু Owner (reseller নিজে) এই controller access করতে পারবে —
-     * Employee নিজে অন্য employee তৈরি/edit করতে পারবে না।
-     */
+    /** Block staff employees from managing other employees — owner only. */
     private function ensureOwner(Request $request)
     {
         abort_if($request->session()->get('reseller_employee_id'), 403, 'Only the reseller owner can manage employees.');

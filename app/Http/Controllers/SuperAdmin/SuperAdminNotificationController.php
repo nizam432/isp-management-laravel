@@ -13,7 +13,6 @@ class SuperAdminNotificationController extends Controller
 {
     public function index()
     {
-        // Super Admin আগে যত notification পাঠিয়েছে তার history
         $sentNotifications = Notification::where('sender_type', 'super_admin')
             ->latest()
             ->paginate(25);

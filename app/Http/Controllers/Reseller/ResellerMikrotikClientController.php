@@ -20,10 +20,9 @@ class ResellerMikrotikClientController extends Controller
             ->latest()
             ->paginate(50);
 
-        // ── একই router-এর client গুলোকে group করে, প্রতি router-এর জন্য
-        //    একবারই active connection bulk fetch করছি (N+1 এড়াতে) ──
+        // Group by router so we fetch active sessions once per router, not per client.
         $routerGroups = $clients->getCollection()->groupBy('router_id');
-        $activeMap    = []; // username => ['ip' => .., 'mac' => .., 'uptime' => .., 'protocol' => ..]
+        $activeMap    = []; // username => ['ip', 'mac', 'uptime', 'protocol']
 
         foreach ($routerGroups as $routerId => $groupClients) {
             $router = $groupClients->first()->router;
@@ -32,8 +31,6 @@ class ResellerMikrotikClientController extends Controller
             try {
                 $mikrotik = new MikrotikService();
                 $mikrotik->withRouter($router, function ($m) use (&$activeMap) {
-                    // PPPoE active sessions (MikrotikController::kickCustomer() এ যে
-                    // getActiveSessions()/kickActiveSession() ব্যবহার হয়, সেই একই method)
                     foreach ($m->getActiveSessions() as $conn) {
                         $activeMap[$conn['name'] ?? ''] = [
                             'ip'       => $conn['address'] ?? null,
@@ -42,7 +39,6 @@ class ResellerMikrotikClientController extends Controller
                             'protocol' => 'pppoe',
                         ];
                     }
-                    // Hotspot active sessions (নতুন যোগ করা method)
                     foreach ($m->getActiveHotspotSessions() as $conn) {
                         $activeMap[$conn['user'] ?? ''] = [
                             'ip'       => $conn['address'] ?? null,
@@ -53,12 +49,11 @@ class ResellerMikrotikClientController extends Controller
                     }
                 });
             } catch (\Exception $e) {
-                // Router unreachable হলেও বাকি সব client "offline" দেখাবে, পুরো page ভাঙবে না
+                // Unreachable routers are silently skipped; remaining clients show as offline.
                 continue;
             }
         }
 
-        // ── প্রতিটা client এর সাথে live status merge করছি ──
         $clients->getCollection()->transform(function ($client) use ($activeMap) {
             $live = $activeMap[$client->pppoe_username] ?? null;
             $client->live_status   = $live ? 'online' : 'offline';
@@ -78,11 +73,7 @@ class ResellerMikrotikClientController extends Controller
         ]);
     }
 
-    /**
-     * MikrotikController::kickCustomer() এর মতোই — কিন্তু Reseller Portal এর
-     * নিজস্ব ownership check সহ, এবং PPPoE + Hotspot দুটোই সাপোর্ট করে
-     * (admin এর kickCustomer() শুধু PPPoE করে)।
-     */
+    /** Disconnect a client session (PPPoE or Hotspot) after verifying reseller ownership. */
     public function disconnect(Request $request, Customer $client)
     {
         $resellerId = Auth::guard('mac_reseller')->id();

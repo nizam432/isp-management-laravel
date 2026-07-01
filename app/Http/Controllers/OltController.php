@@ -53,7 +53,7 @@ class OltController extends Controller
         ]);
     }
 
-    /** GET /olt/{olt} — edit modal এর জন্য */
+    /** GET /olt/{olt} — return OLT data for the edit modal. */
     public function show(Olt $olt): JsonResponse
     {
         return response()->json(['success' => true, 'olt' => $olt->load('oltType')]);
@@ -93,7 +93,6 @@ class OltController extends Controller
     /** POST /olt/{olt}/sync */
     public function sync(Olt $olt): JsonResponse
     {
-        // ── আগে reachable কিনা check ──
         if (! $this->pingHost($olt->ip_address)) {
             Log::warning("OLT ping failed [{$olt->ip_address}]");
             return response()->json([
@@ -153,17 +152,12 @@ class OltController extends Controller
     }
 
     // ══════════════════════════════════════════
-    // PRIVATE HELPERS
-    // ══════════════════════════════════════════
-
     /**
-     * Host টি reachable কিনা check করে।
-     * IP:Port format হলে → fsockopen দিয়ে check
-     * শুধু IP হলে → ping দিয়ে check
+     * Check whether a host is reachable.
+     * IP:Port → TCP connect via fsockopen. IP only → ICMP ping.
      */
     private function pingHost(string $input): bool
     {
-        // IP:Port আলাদা করা
         if (str_contains($input, ':')) {
             [$ip, $port] = explode(':', $input, 2);
             $port = (int) $port;
@@ -172,12 +166,10 @@ class OltController extends Controller
             $port = null;
         }
 
-        // IP validate করা
         if (! filter_var($ip, FILTER_VALIDATE_IP)) {
             return false;
         }
 
-        // Port থাকলে fsockopen দিয়ে check
         if ($port) {
             $conn = @fsockopen($ip, $port, $errno, $errstr, 3);
             if ($conn) {
@@ -187,7 +179,6 @@ class OltController extends Controller
             return false;
         }
 
-        // Port না থাকলে ping দিয়ে check
         $cmd = str_starts_with(strtolower(PHP_OS), 'win')
             ? 'ping -n 1 -w 2000 ' . escapeshellarg($ip)
             : 'ping -c 1 -W 2 '    . escapeshellarg($ip);
@@ -196,10 +187,6 @@ class OltController extends Controller
 
         return $exitCode === 0;
     }
-
-    // ══════════════════════════════════════════
-    // OLT USERS (ONU List)
-    // ══════════════════════════════════════════
 
     /** GET /olt/users */
     public function users(Request $request)

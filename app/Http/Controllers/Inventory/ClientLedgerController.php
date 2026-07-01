@@ -11,7 +11,6 @@ class ClientLedgerController extends Controller
 {
     public function index(Request $request)
     {
-        // Due আছে এমন client list
         $clients = Customer::whereHas('inventoryLedger')
                     ->withSum('inventoryLedger as total_credit', 'credit')
                     ->withSum('inventoryLedger as total_debit', 'debit')

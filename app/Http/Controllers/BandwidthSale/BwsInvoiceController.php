@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 namespace App\Http\Controllers\BandwidthSale;
 
@@ -12,7 +12,6 @@ use Illuminate\Support\Facades\DB;
 
 class BwsInvoiceController extends Controller
 {
-    // ── INDEX ─────────────────────────────────────────────────────
     public function index(Request $request)
     {
         $query = BwsInvoice::with(['bwsCustomer', 'createdBy'])
@@ -45,7 +44,6 @@ class BwsInvoiceController extends Controller
             compact('invoices', 'customers', 'employees', 'bwsServices', 'stats'));
     }
 
-    // ── STORE ─────────────────────────────────────────────────────
     public function store(Request $request)
     {
         $request->validate([
@@ -92,7 +90,7 @@ class BwsInvoiceController extends Controller
                     'status'          => 'active',
                     'created_by'      => auth()->id(),
                 ]);
-                // boot event এ recalcDue() automatically call হবে
+                // recalcDue() is triggered automatically via the model's boot event.
             }
             DB::commit();
 
@@ -107,7 +105,6 @@ class BwsInvoiceController extends Controller
         }
     }
 
-    // ── SHOW (AJAX → JSON, normal → view) ─────────────────────────
     public function show(Request $request, BwsInvoice $bwsInvoice)
     {
         $bwsInvoice->load(['bwsCustomer', 'items', 'activePayments.receivedBy', 'createdBy']);
@@ -160,7 +157,6 @@ class BwsInvoiceController extends Controller
         return view('bandwidth-sale.invoices.show', compact('bwsInvoice'));
     }
 
-    // ── EDIT (AJAX → JSON) ────────────────────────────────────────
     public function edit(Request $request, BwsInvoice $bwsInvoice)
     {
         if (!in_array($bwsInvoice->status, ['unpaid', 'overdue'])) {
@@ -202,7 +198,6 @@ class BwsInvoiceController extends Controller
         return view('bandwidth-sale.invoices.edit', compact('bwsInvoice', 'customers'));
     }
 
-    // ── UPDATE ────────────────────────────────────────────────────
     public function update(Request $request, BwsInvoice $bwsInvoice)
     {
         if ($bwsInvoice->isPaid()) {
@@ -245,7 +240,6 @@ class BwsInvoiceController extends Controller
         }
     }
 
-    // ── DESTROY ───────────────────────────────────────────────────
     public function destroy(BwsInvoice $bwsInvoice)
     {
         if (!in_array($bwsInvoice->status, ['unpaid', 'overdue'])) {
@@ -260,7 +254,6 @@ class BwsInvoiceController extends Controller
         return response()->json(['success' => true, 'message' => "Invoice {$no} deleted."]);
     }
 
-    // ── PDF ───────────────────────────────────────────────────────
     public function pdf(BwsInvoice $bwsInvoice)
     {
         $bwsInvoice->load(['bwsCustomer', 'items', 'createdBy']);
@@ -270,7 +263,6 @@ class BwsInvoiceController extends Controller
         return $pdf->download("invoice-{$bwsInvoice->invoice_no}.pdf");
     }
 
-    // ── EXPORT PDF ────────────────────────────────────────────────
     public function exportPdf(Request $request)
     {
         $invoices = $this->getFilteredInvoices($request);
@@ -283,7 +275,6 @@ class BwsInvoiceController extends Controller
         return $pdf->download('bws-invoices-' . now()->format('Y-m-d') . '.pdf');
     }
 
-    // ── EXPORT XLSX ───────────────────────────────────────────────
     public function exportXlsx(Request $request)
     {
         $invoices = $this->getFilteredInvoices($request);
@@ -375,7 +366,6 @@ class BwsInvoiceController extends Controller
         ])->deleteFileAfterSend(true);
     }
 
-    // ── PRIVATE: Get filtered invoices (reusable) ─────────────────
     private function getFilteredInvoices(Request $request)
     {
         return BwsInvoice::with(['bwsCustomer', 'createdBy'])
@@ -388,13 +378,11 @@ class BwsInvoiceController extends Controller
             ->get();
     }
 
-    // ── NEXT INVOICE NO ───────────────────────────────────────────
     public function nextNo()
     {
         return response()->json(['invoice_no' => BwsInvoice::generateNumber()]);
     }
 
-    // ── DUE INVOICES FOR CUSTOMER (AJAX) ─────────────────────────
     public function dueForCustomer(BandwidthSaleCustomer $customer)
     {
         $invoices = BwsInvoice::where('bws_customer_id', $customer->id)
@@ -404,7 +392,6 @@ class BwsInvoiceController extends Controller
         return response()->json(['success' => true, 'invoices' => $invoices]);
     }
 
-    // ── RECEIVE DATA (AJAX GET) ───────────────────────────────────
     public function receiveData(BwsInvoice $bwsInvoice)
     {
         $bwsInvoice->load(['bwsCustomer', 'activePayments']);
@@ -426,7 +413,6 @@ class BwsInvoiceController extends Controller
         ]);
     }
 
-    // ── RECEIVE STORE (AJAX POST) ─────────────────────────────────
     public function receiveStore(Request $request, BwsInvoice $bwsInvoice)
     {
         $request->validate([
@@ -481,7 +467,6 @@ class BwsInvoiceController extends Controller
         }
     }
 
-    // ── VOID PAYMENT ──────────────────────────────────────────────
     public function voidPayment(Request $request, BwsInvoicePayment $payment)
     {
         $request->validate(['reason' => 'required|string|max:255']);
@@ -492,7 +477,6 @@ class BwsInvoiceController extends Controller
         return response()->json(['success' => true, 'message' => 'Payment voided. Income also voided.']);
     }
 
-    // ── DELETE SELECTED ───────────────────────────────────────────
     public function deleteSelected(Request $request)
     {
         $request->validate(['ids' => 'required|array', 'ids.*' => 'integer']);
@@ -511,7 +495,6 @@ class BwsInvoiceController extends Controller
         ]);
     }
 
-    // ── APPROVE SELECTED ──────────────────────────────────────────
     public function approveSelected(Request $request)
     {
         $request->validate(['ids' => 'required|array', 'ids.*' => 'integer']);
@@ -526,7 +509,6 @@ class BwsInvoiceController extends Controller
         ]);
     }
 
-    // ── DAILY BILL ────────────────────────────────────────────────
     public function dailyBill(Request $request)
     {
         $query = BwsInvoicePayment::with(['bwsInvoice', 'bwsCustomer', 'receivedBy', 'createdBy'])
@@ -559,7 +541,6 @@ class BwsInvoiceController extends Controller
             compact('payments', 'customers', 'pops', 'employees'));
     }
 
-    // ── DAILY BILL EXPORT XLSX ────────────────────────────────────
     public function dailyBillExportXlsx(Request $request)
     {
         $payments = $this->getFilteredPayments($request);
@@ -616,7 +597,6 @@ class BwsInvoiceController extends Controller
         ])->deleteFileAfterSend(true);
     }
 
-    // ── DAILY BILL EXPORT PDF ─────────────────────────────────────
     public function dailyBillExportPdf(Request $request)
     {
         $payments = $this->getFilteredPayments($request);
@@ -629,7 +609,6 @@ class BwsInvoiceController extends Controller
         return $pdf->download('payment-history-' . now()->format('Y-m-d') . '.pdf');
     }
 
-    // ── PRIVATE: Get filtered payments ────────────────────────────
     private function getFilteredPayments(Request $request)
     {
         return BwsInvoicePayment::with(['bwsInvoice', 'bwsCustomer', 'receivedBy', 'createdBy'])
@@ -664,7 +643,6 @@ class BwsInvoiceController extends Controller
             compact('invoices', 'customers', 'bwsServices'));
     }
 
-    // ── RECURRING STORE ───────────────────────────────────────────
     public function recurringStore(Request $request)
     {
         $request->validate([
@@ -709,7 +687,6 @@ class BwsInvoiceController extends Controller
         }
     }
 
-    // ── RECURRING EDIT (AJAX → JSON) ─────────────────────────────
     public function recurringEdit(Request $request, BwsInvoice $bwsInvoice)
     {
         $bwsInvoice->load(['bwsCustomer', 'items']);
@@ -749,7 +726,6 @@ class BwsInvoiceController extends Controller
         return view('bandwidth-sale.recurring.edit', compact('bwsInvoice', 'customers'));
     }
 
-    // ── RECURRING UPDATE ──────────────────────────────────────────
     public function recurringUpdate(Request $request, BwsInvoice $bwsInvoice)
     {
         $request->validate([
@@ -783,7 +759,6 @@ class BwsInvoiceController extends Controller
         }
     }
 
-    // ── RECURRING DESTROY ─────────────────────────────────────────
     public function recurringDestroy(BwsInvoice $bwsInvoice)
     {
         $bwsInvoice->items()->delete();
@@ -791,7 +766,6 @@ class BwsInvoiceController extends Controller
         return response()->json(['success' => true, 'message' => 'Recurring invoice deleted.']);
     }
 
-    // ── DASHBOARD ─────────────────────────────────────────────────
     public function dashboard()
     {
         $totalCustomers  = BandwidthSaleCustomer::count();
@@ -811,7 +785,6 @@ class BwsInvoiceController extends Controller
         ));
     }
 
-    // ── PRIVATE: Save items ───────────────────────────────────────
     private function saveItems(int $invoiceId, string $itemsJson): void
     {
         $items = json_decode($itemsJson, true);
@@ -836,7 +809,6 @@ class BwsInvoiceController extends Controller
         }
     }
 
-    // ── PRIVATE: BandwidthService list ───────────────────────────
     private function getBwsServices(): \Illuminate\Support\Collection
     {
         return \App\Models\BandwidthBuy\BandwidthService::orderBy('name')

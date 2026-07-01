@@ -61,7 +61,6 @@ class MyResellerController extends Controller
             return back()->with('error', 'আপনার tenant info পাওয়া যায়নি।');
         }
 
-        // User তৈরি করো
         $user = User::create([
             'name'     => $request->company_name,
             'email'    => $request->email,
@@ -74,7 +73,6 @@ class MyResellerController extends Controller
         // Plan info
         $plan = Plan::findOrFail($request->plan_id);
 
-        // Sub Reseller Tenant তৈরি করো
         $tenant = Tenant::create([
             'id'              => Str::slug($request->subdomain),
             'name'            => $request->company_name,
@@ -87,7 +85,6 @@ class MyResellerController extends Controller
             'plan_expires_at' => now()->addMonth(),
         ]);
 
-        // Domain তৈরি করো
         Domain::create([
             'domain'    => $request->subdomain . '.' . env('APP_DOMAIN', 'innovativeitbd.com'),
             'tenant_id' => $tenant->id,
@@ -96,10 +93,6 @@ class MyResellerController extends Controller
         return redirect()->route('my-resellers.index')
             ->with('success', "Reseller '{$request->company_name}' তৈরি হয়েছে।");
     }
-
-    // ══════════════════════════════════════════════
-    // Toggle Active/Inactive
-    // ══════════════════════════════════════════════
 
     public function toggle(string $id)
     {
@@ -144,7 +137,6 @@ class MyResellerController extends Controller
             'is_active' => $request->is_active,
         ]);
 
-        // Password পরিবর্তন করলে
         if ($request->filled('password')) {
             User::where('email', $reseller->email)
                 ->first()
@@ -156,10 +148,8 @@ class MyResellerController extends Controller
     }    
     
     private function getMyTenant(): ?Tenant{
-        // email দিয়ে খুঁজুন
         $tenant = Tenant::where('email', auth()->user()->email)->first();
-        
-        // না পেলে user id দিয়ে খুঁজুন
+
         if (!$tenant) {
             $tenant = Tenant::where('name', auth()->user()->name)->first();
         }

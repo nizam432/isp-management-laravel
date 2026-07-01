@@ -87,7 +87,6 @@ class InternalConsumptionController extends Controller
         return view('inventory.consumptions.show', compact('consumption'));
     }
 
-    // Draft → Confirmed (Stock কমবে + Expense যাবে)
     public function confirm(InternalConsumption $consumption)
     {
         if (!$consumption->isDraft()) {
@@ -105,10 +104,8 @@ class InternalConsumptionController extends Controller
             $consumption->update(['status' => 'confirmed']);
 
             foreach ($consumption->items as $item) {
-                // Stock কমাও
                 $item->product->decrement('stock_quantity', $item->quantity);
 
-                // Location stock কমাও
                 LocationStock::where('product_id', $item->product_id)
                              ->where('location_id', $consumption->location_id)
                              ->decrement('quantity', $item->quantity);
@@ -127,7 +124,7 @@ class InternalConsumptionController extends Controller
                 ]);
             }
 
-            // Accounting → Expense এ auto entry
+            // Sync to Expense ledger via accounting service.
             app(AccountingService::class)->createConsumptionExpense($consumption);
         });
 
@@ -135,7 +132,6 @@ class InternalConsumptionController extends Controller
                          ->with('success', 'Consumption confirmed. Stock updated.');
     }
 
-    // Confirmed → Void (Stock ফেরত + Expense reverse)
     public function void(Request $request, InternalConsumption $consumption)
     {
         $request->validate([
@@ -155,7 +151,6 @@ class InternalConsumptionController extends Controller
             ]);
 
             foreach ($consumption->items as $item) {
-                // Stock ফেরত
                 $item->product->increment('stock_quantity', $item->quantity);
 
                 LocationStock::where('product_id', $item->product_id)

@@ -72,7 +72,6 @@ class StockTransferController extends Controller
         return view('inventory.transfers.show', compact('transfer'));
     }
 
-    // Draft → Confirmed (Stock move হবে)
     public function confirm(StockTransfer $transfer)
     {
         if (!$transfer->isDraft()) {
@@ -91,12 +90,10 @@ class StockTransferController extends Controller
             $transfer->update(['status' => 'confirmed']);
 
             foreach ($transfer->items as $item) {
-                // From location stock কমাও
                 LocationStock::where('product_id', $item->product_id)
                              ->where('location_id', $transfer->from_location_id)
                              ->decrement('quantity', $item->quantity);
 
-                // To location stock বাড়াও
                 LocationStock::updateOrCreate(
                     ['product_id' => $item->product_id, 'location_id' => $transfer->to_location_id],
                     ['quantity'   => DB::raw('quantity + ' . $item->quantity)]

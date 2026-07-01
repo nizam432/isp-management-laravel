@@ -21,10 +21,8 @@ class ResellerAuthController extends Controller
     }
 
     /**
-     * একই 'mac_reseller' guard ব্যবহার করে — তবে actual Eloquent model
-     * হতে পারে MacReseller (owner) অথবা ResellerEmployee (staff)।
-     * তাই auth attempt() না করে নিজে username+password manually check করছি,
-     * কারণ provider single guard এ একটাই Model আশা করে।
+     * The mac_reseller guard authenticates two model types (MacReseller owner and ResellerEmployee staff).
+     * Because a single guard provider expects one model, we manually check credentials against each table.
      */
     public function login(Request $request)
     {
@@ -33,7 +31,7 @@ class ResellerAuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        // ── ১. আগে MacReseller (owner account) চেষ্টা করো ──────
+        // Try owner account first.
         $reseller = MacReseller::where('username', $credentials['username'])->first();
 
         if ($reseller && Hash::check($credentials['password'], $reseller->password)) {
@@ -51,7 +49,7 @@ class ResellerAuthController extends Controller
             return redirect()->intended(route('reseller.dashboard'));
         }
 
-        // ── ২. না মিললে ResellerEmployee (staff account) চেষ্টা করো ──
+        // Fall back to employee (staff) account.
         $employee = ResellerEmployee::where('username', $credentials['username'])->first();
 
         if ($employee && Hash::check($credentials['password'], $employee->password)) {
@@ -61,8 +59,7 @@ class ResellerAuthController extends Controller
                 ]);
             }
 
-            // mac_reseller guard এ MacReseller (owner) login করানো হচ্ছে,
-            // কিন্তু session এ employee identity রাখা হচ্ছে যাতে permission আলাদা হয়।
+            // Log in as the owner via the guard but store the employee identity in session for permission checks.
             Auth::guard('mac_reseller')->login($employee->macReseller, $request->boolean('remember'));
             $request->session()->regenerate();
             $request->session()->put('reseller_actor_type', 'employee');
@@ -71,7 +68,6 @@ class ResellerAuthController extends Controller
             return redirect()->intended(route('reseller.dashboard'));
         }
 
-        // ── দুটোতেই fail করলে ─────────────────────────────────
         throw ValidationException::withMessages([
             'username' => 'Invalid username or password.',
         ]);

@@ -64,7 +64,6 @@ class StoreLocationController extends Controller
 
     public function destroy(StoreLocation $location)
     {
-        // Location এ কোনো stock বা transaction থাকলে delete করা যাবে না
         if ($location->locationStocks()->where('quantity', '>', 0)->exists()) {
             return back()->with('error', 'This location has stock and cannot be deleted.');
         }
@@ -75,7 +74,6 @@ class StoreLocationController extends Controller
                          ->with('success', 'Location deleted successfully.');
     }
 
-    // Active/Inactive toggle
     public function toggle(StoreLocation $location)
     {
         $location->update(['is_active' => !$location->is_active]);

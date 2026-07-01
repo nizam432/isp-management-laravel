@@ -1,15 +1,15 @@
 @extends('adminlte::page')
-@section('title', 'Add Agent')
+@section('title', 'Edit Agent — ' . $agent->name)
 
 @section('content_header')
     <div class="d-flex justify-content-between align-items-center">
         <div>
             <h4 class="mb-0 font-weight-bold text-dark">
-                <i class="fas fa-user-plus mr-2 text-primary"></i>Add Agent
+                <i class="fas fa-user-edit mr-2 text-warning"></i>Edit Agent
             </h4>
-            <small class="text-muted">Create a new sales agent with login account</small>
+            <small class="text-muted">{{ $agent->name }}</small>
         </div>
-        <a href="{{ route('agents.index') }}" class="btn btn-secondary btn-sm">
+        <a href="{{ route('agents.show', $agent) }}" class="btn btn-secondary btn-sm">
             <i class="fas fa-arrow-left mr-1"></i> Back
         </a>
     </div>
@@ -17,15 +17,9 @@
 
 @section('content')
 
-@if(session('error'))
-<div class="alert alert-danger alert-dismissible shadow-sm">
-    <button type="button" class="close" data-dismiss="alert"><span>&times;</span></button>
-    <i class="fas fa-exclamation-circle mr-2"></i>{{ session('error') }}
-</div>
-@endif
-
-<form action="{{ route('agents.store') }}" method="POST">
+<form action="{{ route('agents.update', $agent) }}" method="POST">
 @csrf
+@method('PUT')
 
 {{-- Login Account --}}
 <div class="card shadow-sm mb-3">
@@ -37,37 +31,22 @@
     <div class="card-body">
         <div class="row">
             <div class="col-md-4 form-group">
-                <label class="font-weight-bold small">Email <span class="text-danger">*</span></label>
+                <label class="font-weight-bold small">Email</label>
                 <input type="email" name="email" class="form-control @error('email') is-invalid @enderror"
-                       value="{{ old('email') }}" placeholder="agent@example.com" required autofocus>
+                       value="{{ old('email', $agent->user?->email) }}" placeholder="agent@example.com">
                 @error('email')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                <small class="text-muted">Agent will use this email to log in.</small>
+                <small class="text-muted">Leave blank to keep current email.</small>
             </div>
             <div class="col-md-4 form-group">
-                <label class="font-weight-bold small">Password <span class="text-danger">*</span></label>
-                <div class="input-group">
-                    <input type="password" name="password" id="password"
-                           class="form-control @error('password') is-invalid @enderror"
-                           placeholder="Min 6 characters" required>
-                    <div class="input-group-append">
-                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="togglePassword('password', this)">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                    </div>
-                    @error('password')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                </div>
+                <label class="font-weight-bold small">New Password</label>
+                <input type="password" name="password" class="form-control @error('password') is-invalid @enderror"
+                       placeholder="Leave blank to keep current">
+                @error('password')<div class="invalid-feedback">{{ $message }}</div>@enderror
             </div>
             <div class="col-md-4 form-group mb-0">
-                <label class="font-weight-bold small">Confirm Password <span class="text-danger">*</span></label>
-                <div class="input-group">
-                    <input type="password" name="password_confirmation" id="password_confirmation"
-                           class="form-control" placeholder="Re-type password" required>
-                    <div class="input-group-append">
-                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="togglePassword('password_confirmation', this)">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                    </div>
-                </div>
+                <label class="font-weight-bold small">Confirm New Password</label>
+                <input type="password" name="password_confirmation" class="form-control"
+                       placeholder="Re-type new password">
             </div>
         </div>
     </div>
@@ -85,20 +64,21 @@
             <div class="col-md-6 form-group">
                 <label class="font-weight-bold small">Agent Name <span class="text-danger">*</span></label>
                 <input type="text" name="name" class="form-control @error('name') is-invalid @enderror"
-                       value="{{ old('name') }}" placeholder="Full name" required>
+                       value="{{ old('name', $agent->name) }}" required>
                 @error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror
             </div>
             <div class="col-md-6 form-group">
                 <label class="font-weight-bold small">Phone</label>
                 <input type="text" name="phone" class="form-control"
-                       value="{{ old('phone') }}" placeholder="01XXXXXXXXX">
+                       value="{{ old('phone', $agent->phone) }}" placeholder="01XXXXXXXXX">
             </div>
             <div class="col-md-6 form-group">
                 <label class="font-weight-bold small">Area / Zone</label>
                 <select name="area" class="form-control">
-                    <option value="">-- Select Area (optional) --</option>
+                    <option value="">-- Select Area --</option>
                     @foreach(\App\Models\Zone::all() as $zone)
-                    <option value="{{ $zone->name }}" {{ old('area') == $zone->name ? 'selected' : '' }}>
+                    <option value="{{ $zone->name }}"
+                        {{ old('area', $agent->area) == $zone->name ? 'selected' : '' }}>
                         {{ $zone->name }}
                     </option>
                     @endforeach
@@ -109,30 +89,28 @@
                 <div class="input-group">
                     <input type="number" name="commission_rate"
                            class="form-control @error('commission_rate') is-invalid @enderror"
-                           value="{{ old('commission_rate', 0) }}"
+                           value="{{ old('commission_rate', $agent->commission_rate) }}"
                            min="0" max="100" step="0.01" required
                            oninput="updateCommissionPreview()">
                     <div class="input-group-append"><span class="input-group-text">%</span></div>
                     @error('commission_rate')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
-                <small class="text-muted" id="commissionPreview">
-                    Percentage of each payment earned by the agent.
-                </small>
+                <small class="text-muted" id="commissionPreview"></small>
             </div>
             <div class="col-md-6 form-group mb-0">
                 <label class="font-weight-bold small d-block">Status</label>
                 <div class="custom-control custom-switch mt-1">
                     <input type="checkbox" class="custom-control-input" id="is_active"
-                           name="is_active" value="1" {{ old('is_active', true) ? 'checked' : '' }}>
+                           name="is_active" value="1" {{ old('is_active', $agent->is_active) ? 'checked' : '' }}>
                     <label class="custom-control-label" for="is_active">Active</label>
                 </div>
             </div>
         </div>
     </div>
     <div class="card-footer text-right bg-light">
-        <a href="{{ route('agents.index') }}" class="btn btn-secondary mr-2">Cancel</a>
-        <button type="submit" class="btn btn-primary font-weight-bold">
-            <i class="fas fa-user-plus mr-1"></i> Create Agent
+        <a href="{{ route('agents.show', $agent) }}" class="btn btn-secondary mr-2">Cancel</a>
+        <button type="submit" class="btn btn-warning font-weight-bold">
+            <i class="fas fa-save mr-1"></i> Save Changes
         </button>
     </div>
 </div>
@@ -144,21 +122,9 @@
 @section('js')
 @parent
 <script>
-function togglePassword(fieldId, btn) {
-    const field = document.getElementById(fieldId);
-    const icon  = btn.querySelector('i');
-    if (field.type === 'password') {
-        field.type = 'text';
-        icon.classList.replace('fa-eye', 'fa-eye-slash');
-    } else {
-        field.type = 'password';
-        icon.classList.replace('fa-eye-slash', 'fa-eye');
-    }
-}
-
 function updateCommissionPreview() {
-    const rate       = parseFloat(document.querySelector('[name=commission_rate]').value) || 0;
-    const commission = (1000 * rate / 100).toFixed(2);
+    var rate = parseFloat(document.querySelector('[name=commission_rate]').value) || 0;
+    var commission = (1000 * rate / 100).toFixed(2);
     document.getElementById('commissionPreview').textContent =
         'Example: ৳1,000 payment → agent earns ৳' + commission;
 }

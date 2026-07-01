@@ -19,11 +19,7 @@ class MacResellerController extends Controller
         'REPORT', 'FUND HISTORY', 'TUTORIALS',
     ];
 
-    /**
-     * Add/Edit MAC Reseller form থেকে Zone dropdown-এর পাশের "+" বাটনে
-     * quick-add করার জন্য — পুরো page reload ছাড়াই নতুন Zone তৈরি করে
-     * dropdown-এ যোগ করে দেয় (AJAX)।
-     */
+    /** AJAX — create a new Zone inline without a full page reload. */
     public function quickAddZone(Request $request)
     {
         $data = $request->validate([
@@ -42,10 +38,7 @@ class MacResellerController extends Controller
         ]);
     }
 
-    /**
-     * District select করলে AJAX দিয়ে সেই District-এর সব Upazila লোড করে
-     * (devfaysal/laravel-bangladesh-geocode package থেকে)।
-     */
+    /** AJAX — return all Upazilas for the selected District. */
     public function getUpazilas(Request $request)
     {
         $request->validate(['district_id' => 'required|integer']);
@@ -57,11 +50,7 @@ class MacResellerController extends Controller
         return response()->json($upazilas);
     }
 
-    /**
-     * Add/Edit MAC Reseller form থেকে Upazila dropdown-এর পাশের "+" বাটনে
-     * quick-add করার জন্য। নোট: bangladesh-geocode প্যাকেজের Upazila টেবিল
-     * একটা নির্দিষ্ট District-এর অধীনে থাকে, তাই district_id লাগবে।
-     */
+    /** AJAX — create a new Upazila under the given District inline. Requires district_id because Upazilas are district-scoped in the geocode package. */
     public function quickAddUpazila(Request $request)
     {
         $data = $request->validate([
@@ -163,7 +152,6 @@ class MacResellerController extends Controller
         $zones     = Zone::active()->orderBy('name')->get();
         $districts = District::orderBy('name')->get(['id', 'name']);
 
-        // বর্তমান reseller-এর district অনুযায়ী আগে থেকেই upazila list লোড করছি
         $currentDistrict = District::where('name', $macReseller->district)->first();
         $upazilas = $currentDistrict
             ? Upazila::where('district_id', $currentDistrict->id)->orderBy('name')->get(['id', 'name'])

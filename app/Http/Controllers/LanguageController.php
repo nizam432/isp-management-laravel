@@ -7,10 +7,7 @@ use Illuminate\Http\Request;
 
 class LanguageController extends Controller
 {
-    /**
-     * GET /language/{locale}
-     * Session এ নতুন locale set করে আগের page এ ফিরিয়ে দেয়।
-     */
+    /** GET /language/{locale} — persist the chosen locale in session and redirect back. */
     public function switch(Request $request, string $locale)
     {
         if (!array_key_exists($locale, SetLocale::SUPPORTED_LOCALES)) {

@@ -10,10 +10,6 @@ use Illuminate\Support\Facades\Auth;
 
 class ResellerMonitoringController extends Controller
 {
-    /**
-     * Mikrotik Client menu-এর মতোই bulk active-session fetch ব্যবহার করছি,
-     * কিন্তু এখানে focus সামারি/গ্রাফ-friendly ডেটার উপর, disconnect action ছাড়া।
-     */
     public function index(Request $request)
     {
         $resellerId = Auth::guard('mac_reseller')->id();
@@ -60,7 +56,6 @@ class ResellerMonitoringController extends Controller
         $onlineClients  = $clients->where('live_status', 'online')->values();
         $offlineClients = $clients->where('live_status', 'offline')->values();
 
-        // ── Package-wise breakdown (কোন প্যাকেজে কতজন online) ──
         $packageBreakdown = $onlineClients->groupBy(fn($c) => $c->package?->name ?? 'Unknown')
             ->map(fn($g) => $g->count())
             ->sortDesc();

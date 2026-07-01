@@ -29,11 +29,7 @@ class ResellerSmsController extends Controller
         return view('reseller.sms.index', compact('clients', 'logs', 'stats'));
     }
 
-    /**
-     * নোট: এই মেথড একটা placeholder যেটা existing SMS gateway service
-     * ব্যবহার করবে (যদি আপনার project এ SmsService/SmsGateway class থাকে,
-     * সেটার মাধ্যমে actual SMS পাঠানো হবে)। আপাতত শুধু SmsLog এ entry তৈরি করছে।
-     */
+    /** TODO: wire up to SmsService/gateway; currently only creates an SmsLog entry. */
     public function send(Request $request)
     {
         $resellerId = Auth::guard('mac_reseller')->id();
@@ -45,12 +41,11 @@ class ResellerSmsController extends Controller
 
         $customer = Customer::forReseller($resellerId)->findOrFail($request->customer_id);
 
-        // TODO: এখানে actual SMS Gateway call বসবে (App\Services\SmsService বা similar)
         SmsLog::create([
             'customer_id' => $customer->id,
             'phone'       => $customer->phone,
             'message'     => $request->message,
-            'status'      => 'sent', // বাস্তবে gateway response অনুযায়ী sent/failed হবে
+            'status'      => 'sent',
             'sent_by'     => 'reseller',
         ]);
 

@@ -15,6 +15,9 @@ use Illuminate\Support\Facades\Log;
 
 class EmployeeController extends Controller
 {
+    /**
+     * List employees with optional search, department, and status filters.
+     */
     public function index(Request $request)
     {
         $employees = Employee::with(['department', 'position'])
@@ -32,6 +35,9 @@ class EmployeeController extends Controller
         return view('hr.employees.index', compact('employees', 'departments'));
     }
 
+    /**
+     * Show the employee creation form.
+     */
     public function create()
     {
         $departments = Department::active()->get();
@@ -39,6 +45,9 @@ class EmployeeController extends Controller
         return view('hr.employees.create', compact('departments', 'positions'));
     }
     
+    /**
+     * Mark an employee as resigned or terminated.
+     */
     public function resignTerminate(Request $request, Employee $employee)
     {
         $request->validate([
@@ -58,6 +67,9 @@ class EmployeeController extends Controller
         return back()->with('success', "Employee '{$employee->name}' has been " . $request->status . ".");
     }
     
+    /**
+     * Validate, create a linked user account, and persist a new employee record.
+     */
     public function store(Request $request)
     {
         $request->validate([
@@ -73,20 +85,17 @@ class EmployeeController extends Controller
 
         DB::beginTransaction();
         try {
-            // Create user account
             $user = User::create([
                 'name'     => $request->name,
                 'email'    => $request->email,
                 'password' => Hash::make($request->password),
             ]);
 
-            // Photo upload
             $photo = null;
             if ($request->hasFile('photo')) {
                 $photo = $request->file('photo')->store('employees/photos', 'public');
             }
 
-            // Create employee
             $employee = Employee::create([
                 'employee_code' => Employee::generateCode(),
                 'user_id'       => $user->id,
@@ -112,7 +121,6 @@ class EmployeeController extends Controller
                 'created_by'     => auth()->id(),
             ]);
 
-            // Documents
             if ($request->hasFile('documents')) {
                 foreach ($request->file('documents') as $index => $file) {
                     $path = $file->store('employees/documents', 'public');
@@ -124,7 +132,6 @@ class EmployeeController extends Controller
                 }
             }
 
-            // Educations
             if ($request->has('educations')) {
                 foreach ($request->educations as $edu) {
                     if (!empty($edu['degree'])) {

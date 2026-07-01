@@ -12,10 +12,6 @@ use Illuminate\Support\Str;
 
 class TenantController extends Controller
 {
-    // ══════════════════════════════════════════════
-    // Dashboard
-    // ══════════════════════════════════════════════
-
     public function dashboard()
     {
         $stats = [
@@ -32,10 +28,7 @@ class TenantController extends Controller
         return view('super-admin.dashboard', compact('stats', 'recentTenants'));
     }
 
-    /**
-     * AJAX endpoint — date filter অনুযায়ী stats reload
-     * GET /super-admin/dashboard/stats
-     */
+    /** GET /super-admin/dashboard/stats — reload tenant stats for the selected date range. */
     public function dashboardStats(Request $request)
     {
         [$from, $to] = $this->resolveDateRange($request->range, $request->from, $request->to);
@@ -83,10 +76,6 @@ class TenantController extends Controller
         };
     }
 
-    // ══════════════════════════════════════════════
-    // ISP Management
-    // ══════════════════════════════════════════════
-
     public function index(Request $request)
     {
         $tenants = Tenant::with(['plan', 'parent'])
@@ -130,7 +119,6 @@ class TenantController extends Controller
             return back()->with('error', 'Sub Reseller এর জন্য Parent ISP select করুন।');
         }
 
-        // User তৈরি করো
         $user = User::create([
             'name'     => $request->company_name,
             'email'    => $request->email,
@@ -140,10 +128,8 @@ class TenantController extends Controller
 
         $user->assignRole('isp-admin');
 
-        // Plan info
         $plan = Plan::findOrFail($request->plan_id);
 
-        // Tenant তৈরি করো
         $tenant = Tenant::create([
             'id'              => Str::slug($request->subdomain),
             'name'            => $request->company_name,
@@ -159,7 +145,6 @@ class TenantController extends Controller
                 : now()->addMonth(),
         ]);
 
-        // Domain তৈরি করো
         $tenant->domains()->create([
             'domain' => $request->subdomain . '.' . env('APP_DOMAIN', 'innovativeitbd.com'),
         ]);
@@ -205,9 +190,6 @@ class TenantController extends Controller
         return back()->with('success', 'ISP আপডেট হয়েছে।');
     }
 
-    /**
-     * ISP Active/Inactive toggle
-     */
     public function toggle(string $id)
     {
         $tenant = Tenant::findOrFail($id);
@@ -217,9 +199,7 @@ class TenantController extends Controller
         return back()->with('success', "{$tenant->name} {$status} করা হয়েছে।");
     }
 
-    /**
-     * Plan change করো
-     */
+    /** Update the tenant's subscription plan and reset the expiry date. */
     public function changePlan(Request $request, string $id)
     {
         $request->validate(['plan_id' => 'required|exists:plans,id']);

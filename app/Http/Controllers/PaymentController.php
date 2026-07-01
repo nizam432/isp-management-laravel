@@ -13,9 +13,7 @@ class PaymentController extends Controller
 {
     public function __construct(protected BillingService $billing) {}
 
-    /**
-     * Payments list — history
-     */
+    /** Display paginated payment history with filters. */
     public function index(Request $request)
     {
         $payments = Payment::with(['invoice', 'customer', 'receivedBy', 'voidLog'])
@@ -33,7 +31,6 @@ class PaymentController extends Controller
             ->paginate($request->get('per_page', 20))
             ->withQueryString();
 
-        // Stats
         $totalThisMonth  = Payment::active()->thisMonth()->sum('amount');
         $totalAllTime    = Payment::active()->sum('amount');
         $cashThisMonth   = Payment::active()->thisMonth()->where('method', 'cash')->sum('amount');
@@ -49,9 +46,7 @@ class PaymentController extends Controller
         ));
     }
 
-    /**
-     * Invoice row এর Pay button — modal payment
-     */
+    /** Process payment for a specific invoice via the invoice list modal. */
     public function payInvoice(Request $request, Invoice $invoice)
     {
         $request->validate([
@@ -70,18 +65,11 @@ class PaymentController extends Controller
 
         $result = $this->billing->collectPayment($customer, $request->all());
 
-        // SMS পাঠানো
-        if ($request->send_sms) {
-            // SMS service call করুন
-        }
-
         return redirect()->route('invoices.index')
             ->with('success', 'Payment সফল হয়েছে।');
     }
 
-    /**
-     * Collect Payment page — customer select করে total due pay
-     */
+    /** Show the collect payment page for manual customer payment. */
     public function collectPage()
     {
         $employees = \App\Models\HR\Employee::select('id', 'name')->where('status', 'active')->get();
@@ -105,10 +93,6 @@ class PaymentController extends Controller
         $customer = Customer::findOrFail($request->customer_id);
         $result   = $this->billing->collectPayment($customer, $request->all());
 
-        if ($request->send_sms) {
-            // SMS service call করুন
-        }
-
         $msg = 'Payment সফল।';
         if ($result['advance_added'] > 0) {
             $msg .= ' ৳' . number_format($result['advance_added'], 2) . ' advance balance এ জমা হয়েছে।';
@@ -117,9 +101,7 @@ class PaymentController extends Controller
         return redirect()->route('payments.collect')->with('success', $msg);
     }
 
-    /**
-     * Customer এর total due — AJAX (Collect Payment page এ)
-     */
+    /** Return a customer's outstanding invoices and advance balance via AJAX. */
     public function customerDue(Customer $customer)
     {
         $due = Invoice::where('customer_id', $customer->id)
@@ -139,16 +121,9 @@ class PaymentController extends Controller
         ]);
     }
 
-    /**
-     * Void payment — শুধু ISP Admin
-     */
+    /** Void a payment and restore the amount to the customer's advance balance. */
     public function void(Request $request, Payment $payment)
     {
-        // TODO: restrict to isp-admin when role system is ready
-        // if (! auth()->user()->hasRole('isp-admin')) {
-        //     return back()->with('error', 'Only ISP Admin can void payments.');
-        // }
-
         if ($payment->isVoid()) {
             return back()->with('error', 'This payment has already been voided.');
         }

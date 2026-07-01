@@ -44,7 +44,6 @@ class ResellerClientController extends Controller
 
     public function show(Customer $client)
     {
-        // Ownership check — অন্য reseller-এর client দেখা যাবে না
         abort_unless(
             $client->mac_reseller_id === Auth::guard('mac_reseller')->id(),
             403,

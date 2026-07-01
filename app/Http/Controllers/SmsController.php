@@ -10,59 +10,40 @@ use Illuminate\Http\Request;
 
 class SmsController extends Controller
 {
-    // ══════════════════════════════════════════════
-    // Gateway Management (SuperAdmin)
-    // ══════════════════════════════════════════════
-
-    /**
-     * GET /admin/sms
-     * সব gateway list + SMS logs
-     */
+    /** GET /admin/sms — list all gateways and recent SMS logs. */
     public function index()
     {
         $gateways    = SmsGateway::all();
         $logs        = SmsLog::latest()->paginate(20);
         $todaySent   = SmsLog::today()->success()->count();
         $todayFailed = SmsLog::today()->failed()->count();
-        $templates   = \App\Models\SmsTemplate::active()->get(); // এই line যোগ করো
+        $templates   = \App\Models\SmsTemplate::active()->get();
 
         return view('sms.index', compact('gateways', 'logs', 'todaySent', 'todayFailed', 'templates'));
     }
 
-    /**
-     * POST /admin/sms/gateway/{gateway}/toggle
-     * Gateway on/off করো
-     */
+    /** POST /admin/sms/gateway/{gateway}/toggle — activate this gateway and deactivate all others. */
     public function toggleGateway(SmsGateway $gateway)
     {
-        // অন্য সব gateway off করো
+        // Only one gateway may be active at a time.
         SmsGateway::where('id', '!=', $gateway->id)->update(['is_active' => false]);
 
-        // এটা toggle করো
         $gateway->update(['is_active' => !$gateway->is_active]);
 
         $status = $gateway->is_active ? 'চালু' : 'বন্ধ';
         return back()->with('success', "{$gateway->name} {$status} করা হয়েছে।");
     }
 
-    /**
-     * POST /admin/sms/gateway/{gateway}/config
-     * Gateway config (API key) আপডেট করো
-     */
+    /** POST /admin/sms/gateway/{gateway}/config — save gateway API credentials. */
     public function updateConfig(Request $request, SmsGateway $gateway)
     {
         $config = $request->input('config', []);
-
-        // Empty value filter করো না — সব save করো
         $gateway->update(['config' => $config]);
 
         return back()->with('success', "{$gateway->name} configuration সংরক্ষণ হয়েছে।");
     }
 
-    /**
-     * POST /admin/sms/test
-     * Test SMS পাঠাও
-     */
+    /** POST /admin/sms/test — send a single test SMS to verify gateway connectivity. */
     public function sendTest(Request $request, SmsService $sms)
     {
         $request->validate([
@@ -78,10 +59,7 @@ class SmsController extends Controller
         );
     }
 
-    /**
-     * POST /admin/sms/send-bulk
-     * সব active customer কে SMS পাঠাও
-     */
+    /** POST /admin/sms/send-bulk — broadcast an SMS to all matching customers. */
     public function sendBulk(Request $request, SmsService $sms)
     {
         $request->validate([
@@ -101,10 +79,7 @@ class SmsController extends Controller
         return back()->with('success', "{$sent} জন customer কে SMS পাঠানো হয়েছে।");
     }
 
-    /**
-     * DELETE /admin/sms/logs
-     * পুরনো SMS log মুছে ফেলো
-     */
+    /** DELETE /admin/sms/logs — purge SMS logs older than 30 days. */
     public function clearLogs()
     {
         SmsLog::where('created_at', '<', now()->subDays(30))->delete();

@@ -65,12 +65,10 @@ class MacResellerTariffController extends Controller
             'name'        => $request->name,
         ]);
 
-        // নতুন package lines যোগ করা হলে (existing lines অপরিবর্তিত থাকবে,
-        // কারণ delete/edit আলাদা endpoint দিয়ে হ্যান্ডেল হয়)
+        // Only append new lines; existing lines are managed via separate endpoints.
         if ($request->has('lines')) {
             foreach ($request->lines as $line) {
-                // এড়িয়ে যাও যদি ইতিমধ্যেই id দিয়ে existing line হয়
-                if (!empty($line['id'])) continue;
+                if (!empty($line['id'])) continue; // skip existing lines
 
                 $tariff->packages()->create([
                     'package_id'           => $line['package_id'],
@@ -87,10 +85,7 @@ class MacResellerTariffController extends Controller
         return response()->json(['success' => true, 'message' => 'Tariff updated successfully.']);
     }
 
-    /**
-     * একটা নির্দিষ্ট Package Line ইনলাইন এডিট করো (শুধু Rate, Validity, Min Activation Days)।
-     * Package/Server/Profile পরিবর্তন হয় না — তাই client এর কোনো ক্ষতি হয় না।
-     */
+    /** Inline-edit a package line (rate, validity, min activation days only; package/server/profile are immutable). */
     public function updateLine(Request $request, MacResellerTariffPackage $line)
     {
         $data = $request->validate([
@@ -108,11 +103,7 @@ class MacResellerTariffController extends Controller
         ]);
     }
 
-    /**
-     * একটা নির্দিষ্ট Package Line ডিলিট করার আগে চেক করো —
-     * এই Tariff কোনো MAC Reseller ব্যবহার করছে কিনা।
-     * করলে ব্লক করো এবং কোন কোন Reseller ব্যবহার করছে তা দেখাও।
-     */
+    /** Block line deletion if any MAC Reseller is currently using this tariff. */
     public function destroyLine(MacResellerTariffPackage $line)
     {
         $tariff = $line->tariff;
@@ -135,7 +126,6 @@ class MacResellerTariffController extends Controller
 
     public function destroy(MacResellerTariff $tariff)
     {
-        // কোনো MAC Reseller এই tariff ব্যবহার করলে delete করা যাবে না
         $resellers = $tariff->resellers()->pluck('business_name');
         if ($resellers->isNotEmpty()) {
             return response()->json([
@@ -145,7 +135,6 @@ class MacResellerTariffController extends Controller
             ], 422);
         }
 
-        // আগে child tariff packages delete করো, তারপর tariff delete
         $tariff->packages()->delete();
         $tariff->delete();
         return response()->json(['success' => true, 'message' => 'Tariff deleted successfully.']);

@@ -19,10 +19,6 @@ use Illuminate\Support\Facades\Log;
 
 class CustomerController extends Controller
 {
-    // =========================================================================
-    // Customer List
-    // =========================================================================
-
     public function index(Request $request)
     {
         $customers = Customer::with(['package', 'agent', 'zone', 'subZone', 'router', 'clientType', 'connectionType', 'protocolType'])
@@ -65,10 +61,6 @@ class CustomerController extends Controller
             'protocolTypes', 'connectionTypes', 'agents', 'smsTemplates'
         ));
     }
-
-    // =========================================================================
-    // Create Customer
-    // =========================================================================
 
     public function create()
     {
@@ -159,10 +151,6 @@ class CustomerController extends Controller
                          ->with('success', 'Customer added successfully.');
     }
 
-    // =========================================================================
-    // Show Customer
-    // =========================================================================
-
     public function show(Customer $customer)
     {
         $customer->load([
@@ -172,10 +160,6 @@ class CustomerController extends Controller
         ]);
         return view('customers.show', compact('customer'));
     }
-
-    // =========================================================================
-    // Edit Customer
-    // =========================================================================
 
     public function edit(Customer $customer)
     {
@@ -234,7 +218,6 @@ class CustomerController extends Controller
         $customer->update($data);
         $customer->refresh();
 
-        // MikroTik sync
         try {
             $router = MikrotikRouter::where('is_active', 1)->first();
             if ($router) {
@@ -250,7 +233,7 @@ class CustomerController extends Controller
                     default => null,
                 };
 
-                // Router থেকে actual status check করে mikrotik_status set করো
+                // Verify actual PPPoE status on the router and update the local record.
                 try {
                     $mikrotik->withRouter($router, function ($m) use ($customer) {
                         $user = $m->getPPPoEUserByName($customer->pppoe_username);
@@ -264,7 +247,7 @@ class CustomerController extends Controller
                         }
                     });
                 } catch (\Exception $e) {
-                    // Check fail হলে assumed status দিয়ে রাখো
+                    // Fallback: infer status from intended state when router check fails.
                     $customer->update(['mikrotik_status' => match ($newStatus) {
                         'active'                           => 'active',
                         'suspended', 'expired', 'inactive' => 'suspended',
@@ -286,10 +269,6 @@ class CustomerController extends Controller
                          ->with('success', 'Customer updated successfully.');
     }
 
-    // =========================================================================
-    // Status Update
-    // =========================================================================
-
     public function updateStatus(Request $request, Customer $customer)
     {
         $request->validate(['status' => 'required|in:active,inactive,suspended,expired']);
@@ -298,34 +277,10 @@ class CustomerController extends Controller
         return back()->with('success', 'Status updated.');
     }
 
-    // =========================================================================
-    // Delete Customer
-    // =========================================================================
-
     public function destroy(Customer $customer)
     {
-       /*  try {
-            $router = MikrotikRouter::where('is_active', 1)->first();
-            if ($router) {
-                $mikrotik = new MikrotikService();
-                $mikrotik->withRouter($router, fn($m) => $m->removeCustomer($customer));
-            }
-        } catch (\Exception $e) {
-            Log::warning('MikroTik remove failed: ' . $e->getMessage());
-        }
-
-        ActivityLog::log('Customer deleted', 'Customer', $customer->id, $customer->toArray(), null);
-        $customer->delete();
-
-        return redirect()->route('customers.index')
-                         ->with('success', 'Customer deleted successfully.'); */
     }
 
-    // =========================================================================
-    // AJAX Helpers
-    // =========================================================================
-
-    // Zone select করলে SubZone load
     public function getSubZones(Request $request)
     {
         $subZones = SubZone::where('zone_id', $request->zone_id)
@@ -334,14 +289,12 @@ class CustomerController extends Controller
         return response()->json($subZones);
     }
 
-    // Package select করলে price load
     public function getPackagePrice(Request $request)
     {
         $package = Package::find($request->package_id);
         return response()->json(['price' => $package?->price ?? 0]);
     }
 
-    // ── Modal AJAX: Zone quick add ────────────────────────
     public function quickAddZone(Request $request)
     {
         $request->validate(['name' => 'required|string|max:100|unique:zones,name']);
@@ -349,7 +302,6 @@ class CustomerController extends Controller
         return response()->json(['success' => true, 'id' => $zone->id, 'name' => $zone->name]);
     }
 
-    // ── Modal AJAX: ConnectionType quick add ──────────────
     public function quickAddConnectionType(Request $request)
     {
         $request->validate(['name' => 'required|string|max:100|unique:connection_types,name']);
@@ -357,7 +309,6 @@ class CustomerController extends Controller
         return response()->json(['success' => true, 'id' => $ct->id, 'name' => $ct->name]);
     }
 
-    // ── Modal AJAX: ClientType quick add ─────────────────
     public function quickAddClientType(Request $request)
     {
         $request->validate(['name' => 'required|string|max:100|unique:client_types,name']);
@@ -365,17 +316,12 @@ class CustomerController extends Controller
         return response()->json(['success' => true, 'id' => $ct->id, 'name' => $ct->name]);
     }
 
-    // ── Modal AJAX: ProtocolType quick add ───────────────
     public function quickAddProtocolType(Request $request)
     {
         $request->validate(['name' => 'required|string|max:100|unique:protocol_types,name']);
         $pt = ProtocolType::create(['name' => $request->name, 'is_active' => true]);
         return response()->json(['success' => true, 'id' => $pt->id, 'name' => $pt->name]);
     }
-
-    // =========================================================================
-    // MikroTik Provision
-    // =========================================================================
 
     protected function provisionToMikrotik(Customer $customer)
     {
@@ -413,7 +359,7 @@ public function mikrotikInfo(Customer $customer)
         try {
             $session = $mikrotik->withRouter($router, fn($m) => $m->getCustomerSession($customer->pppoe_username));
         } catch (\Exception $e) {
-            // session না পেলেও চলবে
+            // Session data is optional; continue without it.
         }
 
         return response()->json([

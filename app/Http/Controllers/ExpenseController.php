@@ -13,10 +13,6 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class ExpenseController extends Controller
 {
-    // =========================================================================
-    // INDEX — Expense list with filters + summary cards
-    // =========================================================================
-
     public function index(Request $request)
     {
         $expenses = Expense::with(['category', 'createdBy'])
@@ -42,7 +38,6 @@ class ExpenseController extends Controller
 
         $categories = ExpenseCategory::active()->ordered()->get();
 
-        // Summary cards — this month
         $thisMonth   = now()->format('Y-m');
         $totalThis   = Expense::active()->byMonth($thisMonth)->sum('amount');
         $totalLast   = Expense::active()->byMonth(now()->subMonth()->format('Y-m'))->sum('amount');
@@ -55,19 +50,11 @@ class ExpenseController extends Controller
         ));
     }
 
-    // =========================================================================
-    // CREATE — Show form
-    // =========================================================================
-
     public function create()
     {
         $categories = ExpenseCategory::active()->ordered()->get();
         return view('expenses.create', compact('categories'));
     }
-
-    // =========================================================================
-    // STORE — Save new expense
-    // =========================================================================
 
     public function store(Request $request)
     {
@@ -119,19 +106,11 @@ class ExpenseController extends Controller
             ->with('success', "Expense {$expense->expense_no} saved successfully.");
     }
 
-    // =========================================================================
-    // SHOW — Expense detail
-    // =========================================================================
-
     public function show(Expense $expense)
     {
         $expense->load(['category', 'createdBy', 'approvedBy']);
         return view('expenses.show', compact('expense'));
     }
-
-    // =========================================================================
-    // EDIT — Show edit form
-    // =========================================================================
 
     public function edit(Expense $expense)
     {
@@ -142,10 +121,6 @@ class ExpenseController extends Controller
         $categories = ExpenseCategory::active()->ordered()->get();
         return view('expenses.edit', compact('expense', 'categories'));
     }
-
-    // =========================================================================
-    // UPDATE — Save changes
-    // =========================================================================
 
     public function update(Request $request, Expense $expense)
     {
@@ -194,10 +169,6 @@ class ExpenseController extends Controller
             ->with('success', 'Expense updated successfully.');
     }
 
-    // =========================================================================
-    // VOID — Soft-cancel an expense (never hard-delete)
-    // =========================================================================
-
     public function void(Request $request, Expense $expense)
     {
         if ($expense->isVoid()) {
@@ -218,10 +189,6 @@ class ExpenseController extends Controller
         return back()->with('success', 'Expense voided. It will no longer appear in reports.');
     }
 
-    // =========================================================================
-    // DESTROY — Hard delete (only void expenses, only admin)
-    // =========================================================================
-
     public function destroy(Expense $expense)
     {
         // Only allow deleting already-voided records
@@ -241,10 +208,6 @@ class ExpenseController extends Controller
             ->with('success', 'Expense permanently deleted.');
     }
 
-    // =========================================================================
-    // P&L REPORT — Income vs Expense, month-wise
-    // =========================================================================
-
     public function profitLoss(Request $request)
     {
         $from = $request->get('from_date', now()->startOfMonth()->format('Y-m-d'));
@@ -252,7 +215,6 @@ class ExpenseController extends Controller
 
         if ($from > $to) [$from, $to] = [$to, $from];
 
-        // Monthly breakdown within date range
         $months  = [];
         $cursor  = \Carbon\Carbon::parse($from)->startOfMonth();
         $endDate = \Carbon\Carbon::parse($to);
@@ -321,10 +283,6 @@ class ExpenseController extends Controller
         ));
     }
 
-    // =========================================================================
-    // P&L PDF EXPORT
-    // =========================================================================
-
     public function profitLossPdf(Request $request)
     {
         $from = $request->get('from_date', now()->startOfMonth()->format('Y-m-d'));
@@ -369,10 +327,6 @@ class ExpenseController extends Controller
         return $pdf->download('profit-loss-' . $from . '-to-' . $to . '.pdf');
     }
 
-    // =========================================================================
-    // AJAX — Monthly expense totals for dashboard chart
-    // =========================================================================
-
     public function chartData(Request $request)
     {
         $months = collect(range(5, 0))->map(function ($i) {
@@ -390,10 +344,6 @@ class ExpenseController extends Controller
 
         return response()->json($months);
     }
-
-    // =========================================================================
-    // CATEGORIES — index / store / update / destroy
-    // =========================================================================
 
     public function categoriesIndex()
     {
@@ -438,12 +388,6 @@ class ExpenseController extends Controller
         return back()->with('success', 'Category deleted.');
     }
 
-    // =========================================================================
-    // QUICK ADD EXPENSE CATEGORY — AJAX
-    // =========================================================================
-    // =========================================================================
-    // EXPORT XLSX
-    // =========================================================================
     public function exportXlsx(Request $request)
     {
         $expenses = $this->getFilteredExpenses($request);
@@ -491,9 +435,6 @@ class ExpenseController extends Controller
         ])->deleteFileAfterSend(true);
     }
 
-    // =========================================================================
-    // EXPORT PDF
-    // =========================================================================
     public function exportPdf(Request $request)
     {
         $expenses = $this->getFilteredExpenses($request);

@@ -19,7 +19,7 @@ class VendorContactController extends Controller
             'is_primary'  => 'boolean',
         ]);
 
-        // অন্য contact থেকে primary সরিয়ে নাও
+        // Demote any existing primary contact before promoting the new one.
         if ($request->is_primary) {
             $vendor->contacts()->update(['is_primary' => false]);
         }

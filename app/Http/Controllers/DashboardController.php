@@ -19,7 +19,6 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        // প্রথমবার page load — default range "today"
         $range = $this->resolveDateRange('all_time');
         $stats = $this->buildStats($range['from'], $range['to']);
 
@@ -59,7 +58,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * AJAX endpoint — date filter পরিবর্তন হলে শুধু stats (16 card) JSON আকারে রিটার্ন করে।
+     * Return dashboard stat cards as JSON when the date filter changes.
      * GET /dashboard/stats?range=last_7_days
      * GET /dashboard/stats?range=custom&from=2026-01-01&to=2026-01-31
      */
@@ -81,9 +80,7 @@ class DashboardController extends Controller
         ]);
     }
 
-    /**
-     * ১৬টা card-এর জন্য সব stats calculate করো, নির্দিষ্ট date range অনুযায়ী।
-     */
+    /** Build all stat values for the given date range. */
     private function buildStats(Carbon $from, Carbon $to): array
     {
         $stats = [
@@ -98,7 +95,7 @@ class DashboardController extends Controller
             'unpaid_customers' => Invoice::where('status', '!=', 'paid')->whereBetween('created_at', [$from, $to])->distinct('customer_id')->count('customer_id'),
 
             // ── Network cards ───────────────────────────
-            'online_clients' => 0, // নিচে MikroTik থেকে fill হবে
+            'online_clients' => 0, // populated below from MikroTik
             'free_clients'   => Customer::whereHas('package', fn ($q) => $q->where('price', 0))
                 ->whereBetween('connection_date', [$from, $to])->count(),
 
@@ -115,7 +112,7 @@ class DashboardController extends Controller
             'closed_tickets'     => ClientSupportTicket::where('status', 'closed')->whereBetween('created_at', [$from, $to])->count(),
         ];
 
-        // ── MikroTik Live Online Count (date filter প্রযোজ্য নয়, সবসময় বর্তমান মুহূর্তের লাইভ সংখ্যা) ──
+        // Live count is always real-time; date filter does not apply here.
         try {
             $router = MikrotikRouter::where('is_active', 1)->first();
             if ($router) {
@@ -133,8 +130,8 @@ class DashboardController extends Controller
     }
 
     /**
-     * Date filter dropdown-এর preset অনুযায়ী from/to Carbon date রিটার্ন করে।
-     * বাংলাদেশ govt financial year ধরা হয়েছে: ১ জুলাই – ৩০ জুন।
+     * Resolve a named date range preset to from/to Carbon instances.
+     * Financial year uses the Bangladesh standard: 1 July – 30 June.
      */
     private function resolveDateRange(string $range, ?string $customFrom = null, ?string $customTo = null): array
     {
@@ -201,10 +198,7 @@ class DashboardController extends Controller
         }
     }
 
-    /**
-     * বাংলাদেশ Financial Year: ১ জুলাই – ৩০ জুন।
-     * $reference তারিখ যে financial year-এ পড়ে, সেটার শুরু-শেষ রিটার্ন করে।
-     */
+    /** Return start and end of the Bangladesh financial year (Jul 1 – Jun 30) containing $reference. */
     private function financialYearRange(Carbon $reference): array
     {
         if ($reference->month >= 7) {

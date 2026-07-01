@@ -13,7 +13,7 @@ class ResellerDashboardController extends Controller
 
         $stats = [
             'remaining_fund'   => $reseller->remaining_fund,
-            'total_clients'    => 0,   // পরবর্তী ধাপে real client count বসবে
+            'total_clients'    => 0,
             'active_clients'   => 0,
             'disabled_clients' => 0,
         ];
@@ -22,10 +22,6 @@ class ResellerDashboardController extends Controller
     }
 }
 
-// ════════════════════════════════════════════════════════
-// Placeholder Controller — Phase 2 এ প্রতিটা মেনুর জন্য
-// আলাদা real controller বানানো হবে। আপাতত "Coming Soon" দেখাবে।
-// ════════════════════════════════════════════════════════
 class ResellerPlaceholderController extends Controller
 {
     public function show(string $menu)

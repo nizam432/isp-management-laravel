@@ -183,15 +183,17 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ── Agents ─────────────────────────────────
-    Route::resource('agents', AgentController::class)->except(['edit'])->middleware([
+    Route::resource('agents', AgentController::class)->middleware([
         'index'   => 'can:agent.view',
         'show'    => 'can:agent.view',
         'create'  => 'can:agent.create',
         'store'   => 'can:agent.create',
+        'edit'    => 'can:agent.edit',
         'update'  => 'can:agent.edit',
         'destroy' => 'can:agent.delete',
     ]);
-    Route::post('agents/{agent}/pay-commission', [AgentController::class, 'payCommission'])->name('agents.pay-commission')->middleware('can:agent.edit');
+    Route::post('agents/{agent}/toggle',         [AgentController::class, 'toggle'])        ->name('agents.toggle')        ->middleware('can:agent.edit');
+    Route::post('agents/{agent}/pay-commission', [AgentController::class, 'payCommission']) ->name('agents.pay-commission') ->middleware('can:agent.edit');
 
     // ── MikroTik ───────────────────────────────
     Route::prefix('mikrotik')->name('mikrotik.')->middleware('can:mikrotik.view')->group(function () {

@@ -64,7 +64,7 @@ class ResellerSupportController extends Controller
             'replied_by' => 'reseller',
         ]);
 
-        // Reply দিলে ticket আবার "open" এ ফিরিয়ে আনছি যদি closed থাকে
+        // Reopen the ticket if a reply arrives after it was closed.
         if ($ticket->status === 'closed') {
             $ticket->update(['status' => 'open']);
         }

@@ -7,10 +7,7 @@ use Illuminate\Support\Facades\Auth;
 
 class NotificationController extends Controller
 {
-    /**
-     * Polling endpoint — শুধু unread count রিটার্ন করে (হালকা, ঘন ঘন কল হবে)
-     * GET /notifications/unread-count
-     */
+    /** GET /notifications/unread-count — lightweight polling endpoint for the bell badge. */
     public function unreadCount()
     {
         $user = Auth::user();
@@ -21,7 +18,7 @@ class NotificationController extends Controller
     }
 
     /**
-     * Bell icon click করলে dropdown এ latest notification list দেখানো
+     * Return the latest notifications for the bell dropdown, or the full notification page.
      * GET /notifications
      */
     public function index(Request $request)
@@ -48,15 +45,11 @@ class NotificationController extends Controller
             ]);
         }
 
-        // Full page list (চাইলে "View All" পেজ হিসেবে)
         $notifications = $user->appNotifications()->paginate(25);
         return view('notifications.index', compact('notifications'));
     }
 
-    /**
-     * একটা নির্দিষ্ট notification read হিসেবে mark করো
-     * POST /notifications/{notification}/read
-     */
+    /** POST /notifications/{id}/read — mark a single notification as read. */
     public function markAsRead($id)
     {
         $user = Auth::user();
@@ -66,10 +59,7 @@ class NotificationController extends Controller
         return response()->json(['success' => true]);
     }
 
-    /**
-     * সব notification একসাথে read করে দাও
-     * POST /notifications/read-all
-     */
+    /** POST /notifications/read-all — mark all notifications as read. */
     public function markAllAsRead()
     {
         $user = Auth::user();

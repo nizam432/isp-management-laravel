@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 
 class PurchasePaymentController extends Controller
 {
-    // ── Initial payment — Purchase create এর সময় call হয় ──────────
+    /** Called internally by PurchaseController when an initial payment is provided at creation. */
     public function createInitialPayment(Purchase $purchase, float $amount, Request $request): PurchasePayment
     {
         $payment = PurchasePayment::create([

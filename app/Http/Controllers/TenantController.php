@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 namespace App\Http\Controllers\SuperAdmin;
 
@@ -12,10 +12,6 @@ use Illuminate\Support\Str;
 
 class TenantController extends Controller
 {
-    // ══════════════════════════════════════════════
-    // Dashboard
-    // ══════════════════════════════════════════════
-
     public function dashboard()
     {
         $stats = [
@@ -32,10 +28,7 @@ class TenantController extends Controller
         return view('super-admin.dashboard', compact('stats', 'recentTenants'));
     }
 
-    /**
-     * AJAX endpoint — date filter অনুযায়ী stats reload
-     * GET /super-admin/dashboard/stats
-     */
+    /** GET /super-admin/dashboard/stats — reload tenant stats for the selected date range. */
     public function dashboardStats(Request $request)
     {
         [$from, $to] = $this->resolveDateRange($request->range, $request->from, $request->to);
@@ -83,10 +76,6 @@ class TenantController extends Controller
         };
     }
 
-    // ══════════════════════════════════════════════
-    // ISP Management
-    // ══════════════════════════════════════════════
-
     public function index(Request $request)
     {
         $tenants = Tenant::with(['plan', 'parent'])
@@ -130,7 +119,6 @@ class TenantController extends Controller
             return back()->with('error', 'Sub Reseller এর জন্য Parent ISP select করুন।');
         }
 
-        // User তৈরি করো
         $user = User::create([
             'name'     => $request->company_name,
             'email'    => $request->email,
@@ -140,10 +128,8 @@ class TenantController extends Controller
 
         $user->assignRole('isp-admin');
 
-        // Plan info
         $plan = Plan::findOrFail($request->plan_id);
 
-        // Tenant তৈরি করো
         $tenant = Tenant::create([
             'id'              => Str::slug($request->subdomain),
             'name'            => $request->company_name,
@@ -160,16 +146,15 @@ class TenantController extends Controller
         ]);
 
 
-        // Domain তৈরি করো
         $tenant->domains()->create([
             'domain' => $request->subdomain . '.' . env('APP_DOMAIN', 'innovativeitbd.com'),
         ]);
 
-        // ── Auto Seed Default Data ────────────────────────────────
+        // Seed default lookup data into the new tenant's database context.
         $tenant->run(function () {
             $now = now();
 
-            // ── 1. Protocol Types (Fixed — edit/delete করা যাবে না) ──
+            // Protocol types are system-managed; tenants cannot edit or delete them.
             $protocols = ['PPPoE', 'Hotspot', 'OVPN', 'PPTP', 'Static IP'];
             foreach ($protocols as $protocol) {
                 \App\Models\ProtocolType::create([
@@ -177,8 +162,6 @@ class TenantController extends Controller
                     'is_active' => true,
                 ]);
             }
-
-            // ── 2. Client Types ───────────────────────────────────────
             $clientTypes = [
                 'Home', 'Corporate', 'SME (Small & Medium Enterprise)',
                 'Student', 'Government', 'NGO', 'Hospital / Clinic',
@@ -190,8 +173,6 @@ class TenantController extends Controller
                     'is_active' => true,
                 ]);
             }
-
-            // ── 3. Connection Types ───────────────────────────────────
             $connectionTypes = [
                 'Fiber Optic', 'Cable', 'Wireless', 'Radio Link',
                 'VSAT', '4G/LTE', 'ADSL', 'VDSL', 'Leased Line', 'Point to Point',
@@ -202,8 +183,6 @@ class TenantController extends Controller
                     'is_active' => true,
                 ]);
             }
-
-            // ── 4. Income Categories ──────────────────────────────────
             $incomeCategories = [
                 ['name' => 'Monthly Bill',   'slug' => 'monthly_bill',   'is_system' => true,  'sort_order' => 1],
                 ['name' => 'Connection Fee', 'slug' => 'connection_fee', 'is_system' => true,  'sort_order' => 2],
@@ -222,7 +201,7 @@ class TenantController extends Controller
                 ]);
             }
 
-            // ── 5. Expense Categories (সব is_system = true) ───────────
+            // All expense categories are system-managed.
             $expenseCategories = [
                 ['name' => 'Bandwidth Purchase',   'slug' => 'bandwidth_purchase',   'sort_order' => 1],
                 ['name' => 'Salary',               'slug' => 'salary',               'sort_order' => 2],
@@ -247,8 +226,6 @@ class TenantController extends Controller
                     'sort_order' => $cat['sort_order'],
                 ]);
             }
-
-            // ── 6. Support Categories ─────────────────────────────────
             $supportCategories = [
                 'Network Issue', 'Slow Speed', 'Connection Down',
                 'Router/ONU Problem', 'Cable Damage', 'IP Conflict',
@@ -261,8 +238,6 @@ class TenantController extends Controller
                     'is_active' => true,
                 ]);
             }
-
-            // ── 7. Bandwidth Services ─────────────────────────────────
             $bandwidthServices = [
                 ['name' => 'IIG',     'description' => 'International Internet Gateway'],
                 ['name' => 'GGC',     'description' => 'Google Global Cache'],
@@ -282,8 +257,6 @@ class TenantController extends Controller
                     'is_active'   => true,
                 ]);
             }
-
-            // ── 8. OLT Types ──────────────────────────────────────────
             $oltTypes = [
                 'BDCOM_EPON', 'BDCOM_GPON',
                 'VSOL_EPON', 'VSOL_EPON_TYPE_2', 'VSOL_GPON',
@@ -314,8 +287,6 @@ class TenantController extends Controller
                     'is_active' => true,
                 ]);
             }
-
-            // ── 9. Roles ──────────────────────────────────────────────
             $roles = [
                 'Admin', 'Support Manager', 'Support Executive',
                 'Accounts Manager', 'Accounts Executive', 'Asst. Manager',
@@ -370,9 +341,6 @@ class TenantController extends Controller
         return back()->with('success', 'ISP আপডেট হয়েছে।');
     }
 
-    /**
-     * ISP Active/Inactive toggle
-     */
     public function toggle(string $id)
     {
         $tenant = Tenant::findOrFail($id);
@@ -382,9 +350,7 @@ class TenantController extends Controller
         return back()->with('success', "{$tenant->name} {$status} করা হয়েছে।");
     }
 
-    /**
-     * Plan change করো
-     */
+    /** Update the tenant's subscription plan and reset the expiry date. */
     public function changePlan(Request $request, string $id)
     {
         $request->validate(['plan_id' => 'required|exists:plans,id']);

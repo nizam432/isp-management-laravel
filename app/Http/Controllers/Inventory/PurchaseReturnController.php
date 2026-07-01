@@ -138,7 +138,6 @@ class PurchaseReturnController extends Controller
                 return back()->withInput()->with('error', 'No valid items to return.');
             }
 
-            // ── Stock check — return করার মতো stock আছে কিনা ──────
             foreach ($itemsData as $item) {
                 $product = Product::find($item['product_id']);
                 if ($product->stock_quantity < $item['quantity']) {
@@ -154,7 +153,7 @@ class PurchaseReturnController extends Controller
                 'return_date'  => $request->return_date,
                 'total_amount' => $totalAmount,
                 'reason'       => $request->reason ?: 'Not specified',
-                'status'       => 'approved', // সরাসরি approved — draft নেই
+                'status'       => 'approved', // always approved on creation; no draft stage
                 'note'         => $request->note,
                 'created_by'   => auth()->id(),
                 'approved_by'  => auth()->id(),
@@ -163,7 +162,6 @@ class PurchaseReturnController extends Controller
             foreach ($itemsData as $item) {
                 $return->items()->create($item);
 
-                // ── Stock কমবে (vendor কে ফেরত যাচ্ছে) ───────────
                 $product = Product::find($item['product_id']);
                 $product->decrement('stock_quantity', $item['quantity']);
 
@@ -184,7 +182,6 @@ class PurchaseReturnController extends Controller
                 ]);
             }
 
-            // ── Purchase total কমাও, due/refund সঠিকভাবে recalculate ──
             $newTotal = max(0, $purchase->total_amount - $totalAmount);
             $paid     = (float) $purchase->paid_amount;
 

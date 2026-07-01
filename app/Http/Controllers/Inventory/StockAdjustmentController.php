@@ -39,7 +39,6 @@ class StockAdjustmentController extends Controller
 
         $product = Product::findOrFail($request->product_id);
 
-        // Subtract হলে stock check
         if ($request->type === 'subtract' && $product->stock_quantity < $request->quantity) {
             return back()->with('error', 'Insufficient stock for this adjustment.');
         }

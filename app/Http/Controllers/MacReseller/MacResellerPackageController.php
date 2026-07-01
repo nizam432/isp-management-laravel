@@ -48,7 +48,6 @@ class MacResellerPackageController extends Controller
 
     public function destroy(MacResellerPackage $package)
     {
-        // কোনো Tariff এ এই package assigned থাকলে delete হবে না
         $tariffCount = $package->tariffPackages()->count();
         if ($tariffCount > 0) {
             $tariffNames = $package->tariffPackages()

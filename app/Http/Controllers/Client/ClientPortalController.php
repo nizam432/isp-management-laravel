@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 namespace App\Http\Controllers\Client;
 
@@ -19,13 +19,7 @@ use Illuminate\Support\Facades\Hash;
 
 class ClientPortalController extends Controller
 {
-    // ══════════════════════════════════════════════════════
-    // AUTH — Login / Logout
-    // ══════════════════════════════════════════════════════
 
-    /**
-     * Login page দেখাও
-     */
     public function loginForm()
     {
         if (Auth::guard('customer')->check()) {
@@ -34,11 +28,7 @@ class ClientPortalController extends Controller
         return view('client.login');
     }
 
-    /**
-     * Login process করো
-     * Login via PPPoE username + pppoe_password
-     * pppoe_password is stored as plain text — direct comparison
-     */
+    /** pppoe_password is stored as plain text — compared directly (not hashed). */
     public function login(Request $request)
     {
         $request->validate([
@@ -52,7 +42,6 @@ class ClientPortalController extends Controller
         $username = trim($request->pppoe_username);
         $password = $request->password;
 
-        // pppoe_username দিয়ে customer খুঁজব
         $customer = Customer::where('pppoe_username', $username)->first();
 
         // pppoe_password is plain text — direct comparison
@@ -83,9 +72,6 @@ class ClientPortalController extends Controller
         return redirect()->route('client.login')->with('success', 'You have been logged out successfully.');
     }
 
-    // ══════════════════════════════════════════════════════
-    // DASHBOARD
-    // ══════════════════════════════════════════════════════
 
     public function dashboard()
     {
@@ -106,7 +92,6 @@ class ClientPortalController extends Controller
         // Total due amount
         $totalDue = $unpaidInvoices->sum('due_amount');
 
-        // সর্বশেষ ৫টি পেমেন্ট
         $recentPayments = Payment::where('customer_id', $customer->id)
             ->where('status', 'active')
             ->with('invoice')
@@ -137,9 +122,6 @@ class ClientPortalController extends Controller
         ));
     }
 
-    // ══════════════════════════════════════════════════════
-    // INVOICES
-    // ══════════════════════════════════════════════════════
 
     public function invoices(Request $request)
     {
@@ -170,7 +152,6 @@ class ClientPortalController extends Controller
     {
         $customer = Auth::guard('customer')->user();
 
-        // অন্য customer এর invoice দেখতে পারবে না
         if ($invoice->customer_id !== $customer->id) {
             abort(403, 'You are not authorized to view this invoice.');
         }
@@ -182,9 +163,6 @@ class ClientPortalController extends Controller
         return view('client.invoice-detail', compact('customer', 'invoice', 'currency', 'footerText'));
     }
 
-    // ══════════════════════════════════════════════════════
-    // SUPPORT TICKETS
-    // ══════════════════════════════════════════════════════
 
     public function tickets(Request $request)
     {
@@ -216,9 +194,6 @@ class ClientPortalController extends Controller
         
     }
 
-    /**
-     * নতুন ticket জমা দাও
-     */
     public function ticketStore(Request $request)
     {
         $customer = Auth::guard('customer')->user();
@@ -315,9 +290,6 @@ class ClientPortalController extends Controller
         return back()->with('success', 'Message পাঠানো হয়েছে।');
     }
 
-    // ══════════════════════════════════════════════════════
-    // LIVE TRAFFIC
-    // ══════════════════════════════════════════════════════
 
     public function liveTraffic()
     {
@@ -366,9 +338,6 @@ class ClientPortalController extends Controller
         }
     }
 
-    // ══════════════════════════════════════════════════════
-    // PACKAGES
-    // ══════════════════════════════════════════════════════
 
     public function packages()
     {
@@ -382,9 +351,6 @@ class ClientPortalController extends Controller
         return view('client.packages', compact('customer', 'packages'));
     }
 
-    // ══════════════════════════════════════════════════════
-    // PROFILE
-    // ══════════════════════════════════════════════════════
 
     public function profile()
     {
@@ -422,7 +388,6 @@ class ClientPortalController extends Controller
         return back()->with('success', 'Password updated successfully.');
     }
 
-    // ── Invoice PDF ───────────────────────────────────────────────
     public function invoicePdf(\App\Models\Invoice $invoice)
     {
         $customer = Auth::guard('customer')->user();

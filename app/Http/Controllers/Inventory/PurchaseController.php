@@ -42,7 +42,10 @@ class PurchaseController extends Controller
         return view('inventory.purchases.create', compact('vendors', 'locations', 'products'));
     }
 
-    // ── STORE — সরাসরি Received, stock তখনই বাড়বে ─────────────────
+    /**
+     * Store a new purchase. The purchase is immediately set to "received" and
+     * stock is incremented at the time of creation — there is no draft stage.
+     */
     public function store(Request $request)
     {
         $request->validate([
@@ -81,10 +84,10 @@ class PurchaseController extends Controller
                 'discount'       => $discount,
                 'tax'            => $tax,
                 'total_amount'   => $totalAmount,
-                'paid_amount'    => 0, // payment আলাদাভাবে PurchasePayment দিয়ে হবে
+                'paid_amount'    => 0, // initial payment handled separately via PurchasePaymentController
                 'due_amount'     => $totalAmount,
                 'payment_status' => 'unpaid',
-                'status'         => 'received', // সরাসরি received — draft নেই
+                'status'         => 'received', // always received on creation; no draft stage
                 'note'           => $request->note,
                 'created_by'     => auth()->id(),
             ]);
@@ -97,7 +100,6 @@ class PurchaseController extends Controller
                     'total_price' => $item['quantity'] * $item['unit_price'],
                 ]);
 
-                // ── Stock তখনই বাড়াও ─────────────────────────────
                 $product = Product::find($item['product_id']);
                 $product->increment('stock_quantity', $item['quantity']);
                 $product->update(['purchase_price' => $item['unit_price']]);
@@ -121,7 +123,6 @@ class PurchaseController extends Controller
                 ]);
             }
 
-            // ── Vendor Ledger ──────────────────────────────────────
             $lastBalance = $purchase->vendor->ledger()->latest('id')->value('balance') ?? 0;
             VendorLedger::create([
                 'vendor_id'    => $purchase->vendor_id,
@@ -135,7 +136,6 @@ class PurchaseController extends Controller
                 'created_by'   => auth()->id(),
             ]);
 
-            // ── Initial Payment (যদি দেওয়া থাকে) ──────────────────
             if ($paidAmount > 0) {
                 app(\App\Http\Controllers\Inventory\PurchasePaymentController::class)
                     ->createInitialPayment($purchase, $paidAmount, $request);
@@ -152,7 +152,6 @@ class PurchaseController extends Controller
         return view('inventory.purchases.show', compact('purchase'));
     }
 
-    // ── EDIT — শুধু payment/return না থাকলে ───────────────────────
     public function edit(Purchase $purchase)
     {
         if (! $purchase->isEditable()) {
@@ -168,7 +167,6 @@ class PurchaseController extends Controller
         return view('inventory.purchases.edit', compact('purchase', 'vendors', 'locations', 'products'));
     }
 
-    // ── UPDATE — stock recalculate ────────────────────────────────
     public function update(Request $request, Purchase $purchase)
     {
         if (! $purchase->isEditable()) {
@@ -190,7 +188,7 @@ class PurchaseController extends Controller
         ]);
 
         DB::transaction(function () use ($request, $purchase) {
-            // ── পুরনো stock revert করো ───────────────────────────
+            // Revert previous stock entries before applying new item quantities.
             foreach ($purchase->items as $oldItem) {
                 $oldItem->product->decrement('stock_quantity', $oldItem->quantity);
                 LocationStock::where('product_id', $oldItem->product_id)
@@ -211,7 +209,6 @@ class PurchaseController extends Controller
             }
             $purchase->items()->delete();
 
-            // ── নতুন items হিসাব ────────────────────────────────
             $subtotal = 0;
             foreach ($request->items as $item) {
                 $subtotal += $item['quantity'] * $item['unit_price'];
@@ -270,7 +267,6 @@ class PurchaseController extends Controller
                          ->with('success', 'Purchase updated successfully.');
     }
 
-    // ── CANCEL — শুধু lock না থাকলে, stock revert ──────────────────
     public function cancel(Request $request, Purchase $purchase)
     {
         if (! $purchase->canCancel()) {
@@ -341,7 +337,6 @@ class PurchaseController extends Controller
                          ->with('success', 'Purchase deleted successfully.');
     }
 
-    // ── DETAIL — AJAX for view modal ──────────────────────────────
     public function detail(Purchase $purchase)
     {
         $purchase->load('vendor', 'location', 'items.product', 'payments.createdBy');
@@ -376,7 +371,6 @@ class PurchaseController extends Controller
         ]);
     }
 
-    // ── EXPORT XLSX ────────────────────────────────────────────────
     public function exportXlsx(Request $request)
     {
         $purchases = $this->getFilteredPurchases($request);
@@ -423,7 +417,6 @@ class PurchaseController extends Controller
         ])->deleteFileAfterSend(true);
     }
 
-    // ── EXPORT PDF ─────────────────────────────────────────────────
     public function exportPdf(Request $request)
     {
         $purchases = $this->getFilteredPurchases($request);

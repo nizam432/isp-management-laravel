@@ -465,7 +465,6 @@ class PayrollController extends Controller
             return response()->json(['success' => false, 'message' => 'Only pending payroll can be deleted.'], 422);
         }
 
-        // Payment history থাকলে delete করা যাবে না
         if ($payroll->payments()->count() > 0) {
             return response()->json(['success' => false, 'message' => 'This payroll has payment history. Cannot delete.'], 422);
         }
