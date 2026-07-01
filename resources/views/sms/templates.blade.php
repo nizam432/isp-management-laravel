@@ -99,6 +99,36 @@
                 </div>
             </div>
         </div>
+        {{-- Fixed Notification Messages --}}
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-bell mr-1"></i> Fixed Notification Messages</h3>
+            </div>
+            <form action="{{ route('sms.mapping.update') }}" method="POST">
+                @csrf
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        System এর নির্দিষ্ট ৫টি event এ যে message যাবে, সেটা এখান থেকে সরাসরি edit করো।
+                        Variable হিসেবে {{ '{name}' }}, {{ '{amount}' }}, {{ '{month}' }} ইত্যাদি ব্যবহার করতে পারবে (উপরের Available Variables দেখো)।
+                    </p>
+                    @foreach($mappings as $mapping)
+                    <div class="form-group">
+                        <label class="font-weight-bold small">
+                            {{ $mapping->label ?? $mapping->type }}
+                            <span class="text-muted">({{ $mapping->type }})</span>
+                        </label>
+                        <textarea name="messages[{{ $mapping->type }}]" class="form-control" rows="2"
+                                  maxlength="500">{{ $mapping->template->body ?? $fixedDefaults[$mapping->type] ?? '' }}</textarea>
+                    </div>
+                    @endforeach
+                </div>
+                <div class="card-footer">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fas fa-save mr-1"></i> Save All Messages
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 
     {{-- Right: Create / Edit Form --}}

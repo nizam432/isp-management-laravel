@@ -168,9 +168,13 @@
                     </td>
                     <td><small><code>{{ $log->gateway }}</code></small></td>
                     <td style="max-width:220px">
-                        <small title="{{ $log->message }}">
-                            {{ Str::limit($log->message, 55) }}
-                        </small>
+                        <a href="javascript:void(0)"
+                           class="text-dark view-message"
+                           data-message="{{ $log->message }}"
+                           data-mobile="{{ $log->mobile }}"
+                           title="ক্লিক করে সম্পূর্ণ message দেখো">
+                            <small>{{ Str::limit($log->message, 55) }}</small>
+                        </a>
                     </td>
                     <td>
                         <span class="badge badge-{{ $log->status === 'success' ? 'success' : 'danger' }}">
@@ -207,4 +211,39 @@
     </div>
 </div>
 
+{{-- Full Message Modal --}}
+<div class="modal fade" id="messageModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-sms mr-1"></i> Full Message</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-1">
+                    <i class="fas fa-mobile-alt mr-1"></i> <code id="modalMobile"></code>
+                </p>
+                <div id="modalMessage" style="white-space:pre-wrap; word-break:break-word;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @endsection
+
+@push('js')
+<script>
+document.querySelectorAll('.view-message').forEach(function (el) {
+    el.addEventListener('click', function () {
+        document.getElementById('modalMobile').textContent  = this.dataset.mobile;
+        document.getElementById('modalMessage').textContent = this.dataset.message;
+        $('#messageModal').modal('show');
+    });
+});
+</script>
+@endpush
