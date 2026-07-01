@@ -20,6 +20,7 @@ class Payment extends Model
         'send_sms'               => 'boolean',
         'set_next_billing_date'  => 'boolean',
         'payment_date'           => 'date',
+        'paid_at'                => 'datetime',
     ];
 
     // Relations

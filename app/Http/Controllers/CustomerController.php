@@ -156,7 +156,7 @@ class CustomerController extends Controller
         $customer->load([
             'package', 'agent', 'zone', 'subZone',
             'connectionType', 'clientType', 'protocolType',
-            'router', 'invoices', 'payments', 'tickets',
+            'router', 'invoices', 'payments', 'supportTickets',
         ]);
         return view('customers.show', compact('customer'));
     }

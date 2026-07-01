@@ -436,7 +436,7 @@
                     <div class="col-6">
                         <div class="card text-center py-3" style="border-left:4px solid #6f42c1;">
                             <div class="font-weight-bold" style="font-size:22px;color:#6f42c1;">
-                                {{ $customer->tickets->count() }}
+                                {{ $customer->supportTickets->count() }}
                             </div>
                             <small class="text-muted">Tickets</small>
                         </div>
@@ -557,22 +557,22 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($customer->tickets->sortByDesc('created_at') as $ticket)
+                        @forelse($customer->supportTickets->sortByDesc('created_at') as $ticket)
                         <tr>
                             <td><small><code>{{ $ticket->ticket_no }}</code></small></td>
                             <td><small>{{ Str::limit($ticket->subject, 40) }}</small></td>
                             <td>
-                                <span class="badge badge-{{ match($ticket->priority) { 'urgent'=>'danger','high'=>'warning','medium'=>'info',default=>'secondary' } }}">
+                                <span class="badge badge-{{ $ticket->priority_badge }}">
                                     {{ ucfirst($ticket->priority) }}
                                 </span>
                             </td>
                             <td>
-                                <span class="badge badge-{{ match($ticket->status) { 'open'=>'danger','resolved','closed'=>'success',default=>'secondary' } }}">
+                                <span class="badge badge-{{ $ticket->status_badge }}">
                                     {{ ucfirst($ticket->status) }}
                                 </span>
                             </td>
                             <td>
-                                <a href="{{ route('tickets.show', $ticket) }}" class="btn btn-xs btn-info">
+                                <a href="{{ route('client-support.chat', $ticket) }}" class="btn btn-xs btn-info">
                                     <i class="fas fa-eye"></i>
                                 </a>
                             </td>
