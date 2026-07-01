@@ -813,4 +813,8 @@ Route::prefix('client/payment')->group(function () {
     Route::post('stripe/webhook', [OnlinePaymentController::class, 'stripeWebhook'])
          ->name('client.payment.stripe-webhook')
          ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+
+    // Payment success page — no auth needed (SSLCommerz redirects here after payment)
+    Route::get('success-page/{ref}', [OnlinePaymentController::class, 'successPage'])
+         ->name('client.payment.success-page');
 });

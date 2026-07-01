@@ -61,7 +61,13 @@ class AmarPayGateway
             throw new \Exception($data['error'] ?? 'AmarPay initiation failed.');
         }
 
-        return ['redirect_url' => $this->baseUrl . $data['payment_url']];
+        // payment_url may be relative (/paynow.php?...) or absolute
+        $paymentUrl = $data['payment_url'];
+        if (!str_starts_with($paymentUrl, 'http')) {
+            $paymentUrl = $this->baseUrl . $paymentUrl;
+        }
+
+        return ['redirect_url' => $paymentUrl];
     }
 
     public function verify(Request $request, PaymentGatewayTransaction $txn): array

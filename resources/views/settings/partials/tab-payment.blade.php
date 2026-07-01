@@ -52,6 +52,15 @@
             ],
             'help' => '<a href="https://aamarpay.com" target="_blank">aamarpay.com <i class="fas fa-external-link-alt fa-xs"></i></a> — Get credentials from the merchant portal.',
         ],
+        'shurjopay' => [
+            'color' => '#E4A11B', 'icon' => 'fas fa-credit-card', 'type' => 'local',
+            'fields' => [
+                ['key' => 'username', 'label' => 'Username', 'type' => 'text'],
+                ['key' => 'password', 'label' => 'Password', 'type' => 'password'],
+                ['key' => 'prefix',   'label' => 'Prefix',   'type' => 'text'],
+            ],
+            'help' => 'ShurjoPay merchant credentials. Contact <a href="mailto:merchant@shurjopay.com.bd">merchant@shurjopay.com.bd</a> for sandbox access.',
+        ],
         // ── International ─────────────────────────────────────────
         'stripe' => [
             'color' => '#6772E5', 'icon' => 'fab fa-stripe-s', 'type' => 'international',

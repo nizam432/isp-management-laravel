@@ -90,6 +90,7 @@
                     'stripe'     => ['label'=>'Stripe',     'color'=>'#6772E5','icon'=>'fab fa-stripe-s',  'bg'=>'#f4f4ff'],
                     'paypal'     => ['label'=>'PayPal',     'color'=>'#003087','icon'=>'fab fa-paypal',    'bg'=>'#f0f4ff'],
                     'razorpay'   => ['label'=>'Razorpay',   'color'=>'#072654','icon'=>'fas fa-credit-card','bg'=>'#f0f2f7'],
+                    'shurjopay'  => ['label'=>'ShurjoPay',  'color'=>'#E4A11B','icon'=>'fas fa-credit-card','bg'=>'#fffbf0'],
                 ];
             @endphp
 
@@ -269,6 +270,7 @@
                     'stripe'     => ['label'=>'Stripe',     'color'=>'#6772E5','icon'=>'fab fa-stripe-s',  'bg'=>'#f4f4ff'],
                     'paypal'     => ['label'=>'PayPal',     'color'=>'#003087','icon'=>'fab fa-paypal',    'bg'=>'#f0f4ff'],
                     'razorpay'   => ['label'=>'Razorpay',   'color'=>'#072654','icon'=>'fas fa-credit-card','bg'=>'#f0f2f7'],
+                    'shurjopay'  => ['label'=>'ShurjoPay',  'color'=>'#E4A11B','icon'=>'fas fa-credit-card','bg'=>'#fffbf0'],
                 ];
             @endphp
 

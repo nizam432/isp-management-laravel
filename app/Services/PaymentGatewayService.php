@@ -12,6 +12,7 @@ use App\Services\Gateways\AmarPayGateway;
 use App\Services\Gateways\StripeGateway;
 use App\Services\Gateways\PaypalGateway;
 use App\Services\Gateways\RazorpayGateway;
+use App\Services\Gateways\ShurjoPayGateway;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -48,6 +49,7 @@ class PaymentGatewayService
             'stripe'     => new StripeGateway($setting),
             'paypal'     => new PaypalGateway($setting),
             'razorpay'   => new RazorpayGateway($setting),
+            'shurjopay'  => new ShurjoPayGateway($setting),
             default      => throw new \Exception("Unknown gateway: {$slug}"),
         };
     }
@@ -102,7 +104,12 @@ class PaymentGatewayService
                 ]);
                 app(BillingService::class)->collectPayment($txn->customer, [
                     'amount'         => $txn->amount,
-                    'method'         => $txn->gateway,
+                    'method'         => match($txn->gateway) {
+                        'sslcommerz' => 'ssl',
+                        'amarpayz'   => 'amarpay',
+                        'shurjopay'  => 'shurjopay',
+                        default      => $txn->gateway,
+                    },
                     'payment_date'   => now()->toDateString(),
                     'transaction_id' => $result['gateway_txn_id'],
                     'remarks'        => 'Online payment via ' . strtoupper($txn->gateway),

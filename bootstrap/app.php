@@ -31,6 +31,16 @@ return Application::configure(basePath: dirname(__DIR__))
             'reseller.active'    => \App\Http\Middleware\EnsureResellerIsActive::class,
             'reseller.menu'      => \App\Http\Middleware\CheckResellerMenuAccess::class,
         ]);
+
+        // Exempt payment gateway callbacks from CSRF
+        $middleware->validateCsrfTokens(except: [
+            'client/payment/*/success',
+            'client/payment/*/fail',
+            'client/payment/*/cancel',
+            'client/payment/*/ipn',
+            'client/payment/*/callback',
+            'client/payment/stripe/webhook',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
 

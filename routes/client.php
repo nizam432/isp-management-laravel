@@ -50,11 +50,10 @@ Route::prefix('client')->name('client.')->group(function () {
         Route::post('change-password',  [ClientPortalController::class, 'changePassword'])->name('password.change');
 
         // ── Online Payment ──────────────────────────────────
-        Route::get ('pay/done/{ref}',         [OnlinePaymentController::class, 'successPage'])->name('payment.success-page');
         Route::get ('pay/{invoice}/select',   [OnlinePaymentController::class, 'selectGateway'])->name('payment.select');
         Route::post('pay/{invoice}/initiate', [OnlinePaymentController::class, 'initiate'])    ->name('payment.initiate');
 
         // ── Invoice PDF ─────────────────────────────────────
-        Route::get ('invoices/{invoice}/pdf', [ClientPortalController::class, 'invoicePdf'])->name('invoice.pdf');
+        Route::get('invoices/{invoice}/pdf', [ClientPortalController::class, 'invoicePdf'])->name('invoice.pdf');
     });
 });

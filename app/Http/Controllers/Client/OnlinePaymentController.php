@@ -36,7 +36,6 @@ class OnlinePaymentController extends Controller
                 ->with('error', 'No online payment gateway is active. Please contact admin.');
         }
 
-        // pay_all=1 হলে customer এর সব unpaid invoices এর total due
         $payAll = request('pay_all') == '1';
         if ($payAll) {
             $allUnpaid   = Invoice::where('customer_id', $customer->id)
@@ -54,7 +53,7 @@ class OnlinePaymentController extends Controller
         ));
     }
 
-    // ── Initiate payment ─────────────────────────────────────────
+    // ── Initiate payment — redirect to gateway ───────────────────
     public function initiate(Request $request, Invoice $invoice)
     {
         $customer = Auth::guard('customer')->user();
@@ -64,31 +63,10 @@ class OnlinePaymentController extends Controller
             return redirect()->route('client.invoices')->with('info', 'Invoice already paid.');
         }
 
-        $request->validate([
-            'gateway' => 'required|string|in:sslcommerz,amarpayz,bkash,nagad,stripe,paypal,razorpay',
-            'amount'  => 'nullable|numeric|min:1',
-        ]);
+        $request->validate(['gateway' => 'required|string|in:sslcommerz,amarpayz,bkash,nagad,stripe,paypal,razorpay,shurjopay']);
 
         $slug     = $request->gateway;
-        $payAll   = $request->pay_all == '1';
         $tenantId = PaymentGatewayService::tenantId();
-
-        // Amount determine
-        $allowPartial = \App\Models\Setting::get('allow_partial_payment', '0') == '1';
-
-        if ($payAll) {
-            // সব unpaid invoice এর total
-            $totalDue = Invoice::where('customer_id', $customer->id)
-                ->whereIn('status', ['unpaid', 'partial', 'overdue'])
-                ->sum('due_amount');
-            $amount = $allowPartial && $request->amount
-                ? min(floatval($request->amount), $totalDue)
-                : $totalDue;
-        } else {
-            $amount = $allowPartial && $request->amount
-                ? min(floatval($request->amount), floatval($invoice->due_amount))
-                : floatval($invoice->due_amount);
-        }
 
         try {
             $result = PaymentGatewayService::initiate(
@@ -96,7 +74,7 @@ class OnlinePaymentController extends Controller
                 slug:         $slug,
                 customerId:   $customer->id,
                 invoiceId:    $invoice->id,
-                amount:       $amount,
+                amount:       floatval($invoice->due_amount),
                 customerData: [
                     'name'    => $customer->name,
                     'email'   => $customer->email   ?? 'customer@isp.com',
@@ -110,22 +88,16 @@ class OnlinePaymentController extends Controller
         } catch (\Exception $e) {
             Log::error("Payment initiate error [{$slug}]: " . $e->getMessage());
             return redirect()->route('client.payment.select', $invoice->id)
-                ->with('error', 'Payment could not be initiated: ' . $e->getMessage());
+                ->with('error', 'Payment শুরু করতে সমস্যা হয়েছে: ' . $e->getMessage());
         }
     }
 
-    // ── SSLCommerz / AmarPay success callback ────────────────────
+    // ── Gateway success/callback ─────────────────────────────────
     public function success(Request $request, string $gateway)
     {
-        $ref = $request->input('ref')
-            ?? $request->input('tran_id')
-            ?? $request->input('mer_txnid')
-            ?? $request->input('session_id'); // stripe fallback key check
-
-        // Stripe uses session_id — ref is passed in URL query
-        if (!$ref && $gateway === 'stripe') {
-            $ref = $request->input('ref');
-        }
+        $ref = $request->input('ref')         // sslcommerz, amarpayz
+            ?? $request->input('tran_id')     // sslcommerz fallback
+            ?? $request->input('mer_txnid');  // amarpayz fallback
 
         if (!$ref) {
             return redirect()->route('client.dashboard')
@@ -135,16 +107,15 @@ class OnlinePaymentController extends Controller
         return $this->processCallback($request, $gateway, $ref);
     }
 
-    // ── bKash / Nagad / Razorpay / Stripe callback ───────────────
+    // ── bKash / Nagad callback URL ───────────────────────────────
     public function callback(Request $request, string $gateway)
     {
         $ref = $request->input('merchantInvoiceNumber') // bKash
-            ?? $request->input('order_id')              // Nagad
-            ?? $request->input('razorpay_payment_link_reference_id') // Razorpay
             ?? $request->input('ref');
 
         if (!$ref) {
-            $paymentId = $request->input('paymentID'); // bKash fallback
+            // bKash paymentID lookup
+            $paymentId = $request->input('paymentID');
             if ($paymentId) {
                 $txn = PaymentGatewayTransaction::where('gateway_txn_id', $paymentId)
                     ->where('gateway', $gateway)->first();
@@ -152,22 +123,27 @@ class OnlinePaymentController extends Controller
             }
         }
 
-        // Razorpay: reference_id is the txn_ref we set
-        if (!$ref && $gateway === 'razorpay') {
-            $ref = $request->input('razorpay_payment_link_reference_id');
+        if (!$ref) {
+            // ShurjoPay & Nagad — order_id = sp_order_id stored as gateway_txn_id
+            $orderId = $request->input('order_id');
+            if ($orderId) {
+                $txn = PaymentGatewayTransaction::where('gateway_txn_id', $orderId)
+                    ->where('gateway', $gateway)->first();
+                if ($txn) {
+                    $ref = $txn->txn_ref;
+                } else {
+                    // order_id might be the txn_ref itself
+                    $ref = $orderId;
+                }
+            }
         }
 
         if (!$ref) {
-            return redirect()->route('client.dashboard')
-                ->with('error', 'Payment reference not found.');
+            return redirect()->route('client.dashboard')->with('error', 'Payment reference not found.');
         }
 
         return $this->processCallback($request, $gateway, $ref);
     }
-
-    // ── PayPal return callback ────────────────────────────────────
-    // PayPal redirects to callback with ?token=ORDER_ID
-    // We find txn by gateway_txn_id (order ID stored at initiate)
 
     // ── Shared: verify & redirect ────────────────────────────────
     private function processCallback(Request $request, string $gateway, string $ref)
@@ -177,27 +153,25 @@ class OnlinePaymentController extends Controller
 
             if ($result['success']) {
                 $txn = $result['txn'];
+                // Redirect to no-auth success page
                 return redirect()->route('client.payment.success-page', $txn->txn_ref)
                     ->with('success', 'Payment successful! Thank you.');
             } else {
-                return redirect()->route('client.invoices')
+                return redirect()->route('client.login')
                     ->with('error', 'Payment failed: ' . ($result['message'] ?? 'Unknown error'));
             }
 
         } catch (\Exception $e) {
             Log::error("Payment callback error [{$gateway}]: " . $e->getMessage());
-            return redirect()->route('client.invoices')
+            return redirect()->route('client.login')
                 ->with('error', 'Could not verify payment. Please contact support.');
         }
     }
 
-    // ── Fail ─────────────────────────────────────────────────────
+    // ── Fail / Cancel ────────────────────────────────────────────
     public function fail(Request $request, string $gateway)
     {
-        $ref = $request->input('ref')
-            ?? $request->input('tran_id')
-            ?? $request->input('mer_txnid');
-
+        $ref = $request->input('ref') ?? $request->input('tran_id') ?? $request->input('mer_txnid');
         if ($ref) {
             PaymentGatewayTransaction::where('txn_ref', $ref)
                 ->where('status', 'pending')
@@ -205,16 +179,12 @@ class OnlinePaymentController extends Controller
         }
 
         return redirect()->route('client.invoices')
-            ->with('error', 'Payment failed. Please try again.');
+            ->with('error', 'Payment ব্যর্থ হয়েছে। আবার চেষ্টা করুন।');
     }
 
-    // ── Cancel ───────────────────────────────────────────────────
     public function cancel(Request $request, string $gateway)
     {
-        $ref = $request->input('ref')
-            ?? $request->input('tran_id')
-            ?? $request->input('token'); // PayPal
-
+        $ref = $request->input('ref') ?? $request->input('tran_id');
         if ($ref) {
             PaymentGatewayTransaction::where('txn_ref', $ref)
                 ->where('status', 'pending')
@@ -222,10 +192,10 @@ class OnlinePaymentController extends Controller
         }
 
         return redirect()->route('client.invoices')
-            ->with('info', 'Payment was cancelled.');
+            ->with('info', 'Payment বাতিল করা হয়েছে।');
     }
 
-    // ── Success page ─────────────────────────────────────────────
+    // ── Success confirmation page ─────────────────────────────────
     public function successPage(string $ref)
     {
         $txn = PaymentGatewayTransaction::where('txn_ref', $ref)
@@ -233,17 +203,16 @@ class OnlinePaymentController extends Controller
             ->with(['customer', 'invoice'])
             ->firstOrFail();
 
-        $customer = Auth::guard('customer')->user();
-        if ($txn->customer_id !== $customer->id) abort(403);
-
+        // No auth check — SSLCommerz callback has no session
+        // txn_ref is unguessable so this is safe
         return view('client.payment.success', compact('txn'));
     }
 
-    // ── IPN — server-to-server ───────────────────────────────────
+    // ── IPN endpoint (SSLCommerz, AmarPay) — no auth ────────────
     public function ipn(Request $request, string $gateway)
     {
-        $ref = $request->input('tran_id')    // sslcommerz
-            ?? $request->input('mer_txnid'); // amarpayz
+        $ref = $request->input('tran_id')      // sslcommerz
+            ?? $request->input('mer_txnid');   // amarpayz
 
         if (!$ref) return response('REF_MISSING', 400);
 
@@ -252,28 +221,6 @@ class OnlinePaymentController extends Controller
             return response($result['success'] ? 'OK' : 'FAILED', 200);
         } catch (\Exception $e) {
             Log::error("IPN error [{$gateway}]: " . $e->getMessage());
-            return response('ERROR', 500);
-        }
-    }
-
-    // ── Stripe Webhook ───────────────────────────────────────────
-    public function stripeWebhook(Request $request)
-    {
-        $payload = json_decode($request->getContent(), true);
-        $txnRef  = $payload['data']['object']['client_reference_id'] ?? null;
-
-        if (!$txnRef) return response('REF_MISSING', 400);
-
-        $txn = PaymentGatewayTransaction::where('txn_ref', $txnRef)
-            ->where('gateway', 'stripe')->first();
-
-        if (!$txn) return response('TXN_NOT_FOUND', 404);
-
-        try {
-            $result = PaymentGatewayService::stripeWebhook($request, $txn->tenant_id);
-            return response($result['success'] ? 'OK' : 'FAILED', 200);
-        } catch (\Exception $e) {
-            Log::error('Stripe webhook error: ' . $e->getMessage());
             return response('ERROR', 500);
         }
     }

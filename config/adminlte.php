@@ -319,7 +319,8 @@ return [
             'icon_color' => 'yellow',
             'can'        => 'super-admin',
         ],
-        ['text' => 'SMS Gateways', 'url' => 'super-admin/sms', 'icon' => 'fas fa-fw fa-sms', 'icon_color' => 'green', 'can' => 'super-admin'],
+        ['text' => 'SMS Gateways',     'url' => 'super-admin/sms',              'icon' => 'fas fa-fw fa-sms',         'icon_color' => 'green',  'can' => 'super-admin'],
+        ['text' => 'Payment Gateways', 'url' => 'super-admin/payment-gateways', 'icon' => 'fas fa-fw fa-credit-card', 'icon_color' => 'purple', 'can' => 'super-admin'],
         [
             'text'       => 'Permissions',
             'url'        => 'super-admin/permissions',
