@@ -10,7 +10,7 @@ use App\Models\AdvanceTransaction;
 use App\Models\Income;
 use App\Models\IncomeCategory;
 use App\Models\Setting;
-use App\Services\NotificationService;
+use App\Services\SmsService;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -114,11 +114,26 @@ class BillingService
             // Auto restore MikroTik if setting enabled and all dues cleared
             $this->checkAndRestoreMikrotik($customer);
 
-            // Send payment confirmation notification
-            try {
-                //(new NotificationService())->paymentConfirm($customer, $totalPaid, $data['method']);
-            } catch (\Exception $e) {
-                \Log::error('Notification failed: ' . $e->getMessage());
+            // Send payment confirmation SMS — requires BOTH:
+            //  1. the global "Payment Confirmation" notification toggle (Settings →
+            //     Notification → payment_confirm_sms) to be enabled, AND
+            //  2. the "send_sms" checkbox on this specific payment form to be checked.
+            // Previously the global toggle wasn't checked at all, so disabling it in
+            // Settings had no effect — SMS still went out as long as the per-payment
+            // checkbox was ticked.
+            $paymentConfirmSmsEnabled = Setting::get('payment_confirm_sms', '1') == '1';
+
+            if ($paymentConfirmSmsEnabled && !empty($data['send_sms'])) {
+                try {
+                    (new SmsService())->sendPaymentConfirm(
+                        $customer->phone,
+                        $customer->name,
+                        $totalPaid,
+                        $data['method']
+                    );
+                } catch (\Exception $e) {
+                    \Log::error('Payment confirmation SMS failed: ' . $e->getMessage());
+                }
             }
 
             return [

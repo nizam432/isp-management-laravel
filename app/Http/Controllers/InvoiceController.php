@@ -10,6 +10,7 @@ use App\Models\Zone;
 use App\Models\ActivityLog;
 use App\Models\Setting;
 use App\Services\BillingService;
+use App\Services\SmsService;
 use Illuminate\Http\Request;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -311,6 +312,39 @@ class InvoiceController extends Controller
     public function bulkSms(Request $request)
     {
         $ids = $request->ids ?? [];
-        return response()->json(['message' => count($ids) . ' SMS queued successfully.']);
+
+        // Uses sendDynamic() so all selected invoices' reminders go out in a single
+        // 24BulkSMS DynamicSMSApi call (each with its own personalized message),
+        // instead of looping sendBillDue() → N separate smsSendApi calls.
+        // buildBillDueMessage() reuses the same DB-driven template (sms_template_mappings)
+        // as the single-send path, so both stay consistent.
+        $invoices = Invoice::with('customer')->whereIn('id', $ids)->get();
+        $sms      = new SmsService();
+
+        $recipients = [];
+        $skipped    = 0;
+
+        foreach ($invoices as $invoice) {
+            $customer = $invoice->customer;
+
+            if (!$customer || !$customer->phone) {
+                $skipped++;
+                continue;
+            }
+
+            $recipients[] = [
+                'mobile'  => $customer->phone,
+                'message' => $sms->buildBillDueMessage($customer->name, floatval($invoice->due_amount), $invoice->month),
+            ];
+        }
+
+        $result = $sms->sendDynamic($recipients, 'bill_due');
+
+        $message = "{$result['sent']} SMS sent successfully.";
+        if ($result['failed'] > 0 || $skipped > 0) {
+            $message .= " " . ($result['failed'] + $skipped) . " failed/skipped (check SMS Reports for details).";
+        }
+
+        return response()->json(['message' => $message]);
     }
 }

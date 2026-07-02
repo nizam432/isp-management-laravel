@@ -193,14 +193,24 @@ class SmsService
         return $fallback;
     }
 
-    public function sendBillDue(string $mobile, string $name, float $amount, string $month): bool
+    /**
+     * Builds the bill-due reminder message from the DB template (or fallback),
+     * without sending it. Used by both sendBillDue() (single) and callers that
+     * batch multiple personalized messages via sendDynamic() (e.g. bulk reminders),
+     * so both paths stay consistent with whatever template is configured in DB.
+     */
+    public function buildBillDueMessage(string $name, float $amount, string $month): string
     {
-        $message = $this->renderTemplate('bill_due', [
+        return $this->renderTemplate('bill_due', [
             'name'   => $name,
             'amount' => $amount,
             'month'  => $month,
         ], "প্রিয় {$name}, আপনার {$month} মাসের ইন্টারনেট বিল {$amount} টাকা বাকি আছে। দ্রুত পরিশোধ করুন।");
+    }
 
+    public function sendBillDue(string $mobile, string $name, float $amount, string $month): bool
+    {
+        $message = $this->buildBillDueMessage($name, $amount, $month);
         return $this->send($mobile, $message, 'bill_due');
     }
 

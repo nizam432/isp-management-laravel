@@ -172,6 +172,7 @@
                            class="text-dark view-message"
                            data-message="{{ $log->message }}"
                            data-mobile="{{ $log->mobile }}"
+                           data-response="{{ $log->response }}"
                            title="ক্লিক করে সম্পূর্ণ message দেখো">
                             <small>{{ Str::limit($log->message, 55) }}</small>
                         </a>
@@ -183,9 +184,14 @@
                         </span>
                     </td>
                     <td style="max-width:120px">
-                        <small class="text-muted" title="{{ $log->response }}">
-                            {{ Str::limit($log->response, 25) }}
-                        </small>
+                        <a href="javascript:void(0)"
+                           class="text-dark view-message"
+                           data-message="{{ $log->message }}"
+                           data-mobile="{{ $log->mobile }}"
+                           data-response="{{ $log->response }}"
+                           title="ক্লিক করে সম্পূর্ণ response দেখো">
+                            <small class="text-muted">{{ Str::limit($log->response, 25) }}</small>
+                        </a>
                     </td>
                     <td>
                         <small>{{ $log->created_at->format('d M Y') }}</small>
@@ -225,7 +231,12 @@
                 <p class="text-muted small mb-1">
                     <i class="fas fa-mobile-alt mr-1"></i> <code id="modalMobile"></code>
                 </p>
-                <div id="modalMessage" style="white-space:pre-wrap; word-break:break-word;"></div>
+                <label class="font-weight-bold small text-muted mb-1">Message</label>
+                <div id="modalMessage" class="mb-3" style="white-space:pre-wrap; word-break:break-word;"></div>
+
+                <label class="font-weight-bold small text-muted mb-1">Gateway Response</label>
+                <div id="modalResponse" class="p-2 bg-light rounded border small text-muted"
+                     style="white-space:pre-wrap; word-break:break-word;"></div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Close</button>
@@ -240,8 +251,9 @@
 <script>
 document.querySelectorAll('.view-message').forEach(function (el) {
     el.addEventListener('click', function () {
-        document.getElementById('modalMobile').textContent  = this.dataset.mobile;
-        document.getElementById('modalMessage').textContent = this.dataset.message;
+        document.getElementById('modalMobile').textContent   = this.dataset.mobile;
+        document.getElementById('modalMessage').textContent  = this.dataset.message;
+        document.getElementById('modalResponse').textContent = this.dataset.response || '—';
         $('#messageModal').modal('show');
     });
 });
