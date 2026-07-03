@@ -14,15 +14,20 @@ class Invoice extends Model
         'invoice_no', 'customer_id', 'package_id', 'month',
         'amount', 'discount', 'due_amount', 'due_date', 'status', 'notes',
         'period_start', 'period_end', 'billing_type',
+        // আগে এটা মিসিং ছিল বলে $invoice->update(['bill_due_sms_sent_at' => now()])
+        // silently drop হয়ে যেত — প্রতিবার billing:send-due-reminders রান করলে
+        // একই invoice-কে বারবার "পাঠানো হয়নি" হিসেবে খুঁজে পেয়ে duplicate SMS পাঠাতো।
+        'bill_due_sms_sent_at',
     ];
 
     protected $casts = [
-        'due_date'     => 'date',
-        'period_start' => 'date',
-        'period_end'   => 'date',
-        'amount'       => 'decimal:2',
-        'discount'     => 'decimal:2',
-        'due_amount'   => 'decimal:2',
+        'due_date'             => 'date',
+        'period_start'         => 'date',
+        'period_end'           => 'date',
+        'amount'               => 'decimal:2',
+        'discount'             => 'decimal:2',
+        'due_amount'           => 'decimal:2',
+        'bill_due_sms_sent_at' => 'datetime',
     ];
 
     // Relations
