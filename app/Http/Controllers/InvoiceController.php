@@ -107,6 +107,20 @@ class InvoiceController extends Controller
 
         ActivityLog::log('Invoice created', 'Invoice', $invoice->id, null, $invoice->toArray());
 
+        // "Invoice Generated" SMS — single customer, single call, respects global toggle
+        if (\App\Models\Setting::get('invoice_generated_sms', '1') == '1' && $customer->phone) {
+            try {
+                (new SmsService())->sendInvoiceGenerated(
+                    $customer->phone,
+                    $customer->name,
+                    floatval($invoice->due_amount),
+                    $invoice->month
+                );
+            } catch (\Exception $e) {
+                \Log::error('Invoice generated SMS failed: ' . $e->getMessage());
+            }
+        }
+
         if ($request->expectsJson()) {
             return response()->json(['success' => true, 'message' => 'Invoice created successfully.']);
         }
@@ -170,6 +184,11 @@ class InvoiceController extends Controller
         $monthCarbon        = Carbon::createFromFormat('Y-m', $request->month);
         $dueDate            = $monthCarbon->copy()->day($defaultBillingDate)->endOfMonth()->toDateString();
 
+        // Same batching pattern as the scheduled commands — collect all generated
+        // invoices, then send ONE sendDynamic() call at the end instead of N
+        // separate SMS calls while looping.
+        $generated = collect();
+
         foreach ($customers as $customer) {
             $exists = Invoice::where('customer_id', $customer->id)
                              ->where('month', $request->month)
@@ -198,7 +217,29 @@ class InvoiceController extends Controller
                 $customer->refresh();
             }
 
+            $generated->push(['customer' => $customer, 'invoice' => $invoice]);
             $created++;
+        }
+
+        // "Invoice Generated" SMS — batched into a single sendDynamic() call
+        if (Setting::get('invoice_generated_sms', '1') == '1' && $generated->isNotEmpty()) {
+            $sms        = new SmsService();
+            $recipients = [];
+
+            foreach ($generated as $item) {
+                $c = $item['customer'];
+                $i = $item['invoice'];
+                if (!$c->phone) continue;
+
+                $recipients[] = [
+                    'mobile'  => $c->phone,
+                    'message' => $sms->buildInvoiceGeneratedMessage($c->name, floatval($i->due_amount), $i->month),
+                ];
+            }
+
+            if (!empty($recipients)) {
+                $sms->sendDynamic($recipients, 'invoice_generated');
+            }
         }
 
         return back()->with('success', "{$created} invoice(s) created, {$skipped} skipped (already existed).");
