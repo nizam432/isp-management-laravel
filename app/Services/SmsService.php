@@ -21,6 +21,22 @@ class SmsService
 
     public function __construct(?string $tenantId = null)
     {
+        // Previously, every `new SmsService()` call across the app (BillingService,
+        // InvoiceController, all commands) passed NO tenant ID, so $this->tenantId
+        // was ALWAYS null. That meant getActiveSetting() NEVER read from
+        // tenant_sms_settings — it always fell back to the global sms_gateways.config
+        // column, even though the correct customer_id/api_key were saved in
+        // tenant_sms_settings all along. This is why "Customer id Missing" kept
+        // happening despite the tenant's settings page showing correct values.
+        //
+        // Fix: auto-detect the current tenant via stancl/tenancy's tenant() helper
+        // when no explicit tenant ID is given, so existing `new SmsService()` calls
+        // everywhere automatically start using the correct tenant-scoped config
+        // without needing to touch every call site.
+        if ($tenantId === null && function_exists('tenant') && tenant()) {
+            $tenantId = tenant()->getTenantKey();
+        }
+
         $this->tenantId = $tenantId;
     }
 
@@ -38,7 +54,15 @@ class SmsService
         }
 
         $gateway = SmsGateway::where('slug', $setting->gateway_slug)->first();
-        if (!$gateway) return false;
+        if (!$gateway) {
+            // Previously this returned false with ZERO logging — no SmsLog entry,
+            // no Log::error, nothing. If you ever see empty sms_logs AND no errors
+            // in laravel.log, THIS is almost certainly why: the tenant's configured
+            // gateway_slug doesn't match any row in sms_gateways (deleted gateway,
+            // typo, data mismatch, etc).
+            Log::error("SMS: gateway slug '{$setting->gateway_slug}' not found in sms_gateways table.");
+            return false;
+        }
 
         $mobile = $this->formatMobile($mobile);
 
@@ -55,9 +79,10 @@ class SmsService
             SmsLog::create([
                 'gateway'  => $gateway->slug,
                 'mobile'   => $mobile,
+                'phone'    => $mobile, // sms_logs.phone has no default and is NOT NULL — mirror mobile to avoid insert failure
                 'message'  => $message,
                 'type'     => $type,
-                'status'   => 'success',
+                'status'   => 'sent', // sms_logs.status is enum('sent','failed','pending') — 'success' is NOT a valid value
                 'response' => $response,
             ]);
 
@@ -69,6 +94,7 @@ class SmsService
             SmsLog::create([
                 'gateway'  => $gateway->slug,
                 'mobile'   => $mobile,
+                'phone'    => $mobile,
                 'message'  => $message,
                 'type'     => $type,
                 'status'   => 'failed',
@@ -115,6 +141,7 @@ class SmsService
 
         $gateway = SmsGateway::where('slug', $setting->gateway_slug)->first();
         if (!$gateway) {
+            Log::error("SMS dynamic: gateway slug '{$setting->gateway_slug}' not found in sms_gateways table.");
             return ['sent' => 0, 'failed' => count($recipients)];
         }
 
@@ -144,9 +171,10 @@ class SmsService
                 SmsLog::create([
                     'gateway'  => $gateway->slug,
                     'mobile'   => $r['mobile'],
+                    'phone'    => $r['mobile'],
                     'message'  => $r['message'],
                     'type'     => $type,
-                    'status'   => 'success',
+                    'status'   => 'sent',
                     'response' => $response,
                 ]);
             }
@@ -160,6 +188,7 @@ class SmsService
                 SmsLog::create([
                     'gateway'  => $gateway->slug,
                     'mobile'   => $r['mobile'],
+                    'phone'    => $r['mobile'],
                     'message'  => $r['message'],
                     'type'     => $type,
                     'status'   => 'failed',
@@ -194,6 +223,21 @@ class SmsService
     }
 
     /**
+     * Formats a 'Y-m' month string (e.g. "2026-06", as stored in Invoice::month)
+     * into a human-readable form (e.g. "June 2026") for use in SMS templates.
+     * Falls back to the original string unchanged if it isn't in 'Y-m' format,
+     * so this never breaks message sending even with unexpected input.
+     */
+    private function formatMonth(string $month): string
+    {
+        try {
+            return \Carbon\Carbon::createFromFormat('Y-m', $month)->format('F Y');
+        } catch (\Exception $e) {
+            return $month;
+        }
+    }
+
+    /**
      * Builds the bill-due reminder message from the DB template (or fallback),
      * without sending it. Used by both sendBillDue() (single) and callers that
      * batch multiple personalized messages via sendDynamic() (e.g. bulk reminders),
@@ -204,8 +248,8 @@ class SmsService
         return $this->renderTemplate('bill_due', [
             'name'   => $name,
             'amount' => $amount,
-            'month'  => $month,
-        ], "প্রিয় {$name}, আপনার {$month} মাসের ইন্টারনেট বিল {$amount} টাকা বাকি আছে। দ্রুত পরিশোধ করুন।");
+            'month'  => $this->formatMonth($month),
+        ], "প্রিয় {$name}, আপনার {$this->formatMonth($month)} মাসের ইন্টারনেট বিল {$amount} টাকা বাকি আছে। দ্রুত পরিশোধ করুন।");
     }
 
     public function sendBillDue(string $mobile, string $name, float $amount, string $month): bool
@@ -254,22 +298,56 @@ class SmsService
         return $this->send($mobile, $message, 'welcome');
     }
 
+    /**
+     * Builds the invoice-generated message from the DB template (or fallback),
+     * without sending it. Used by both sendInvoiceGenerated() (single) and callers
+     * that batch multiple personalized messages via sendDynamic() (e.g. the
+     * date-to-date invoice generation command, so 500 customers = 1 API call
+     * instead of 500).
+     */
+    public function buildInvoiceGeneratedMessage(string $name, float $amount, string $month): string
+    {
+        return $this->renderTemplate('invoice_generated', [
+            'name'   => $name,
+            'amount' => $amount,
+            'month'  => $this->formatMonth($month),
+        ], "প্রিয় {$name}, আপনার {$this->formatMonth($month)} মাসের ইনভয়েস তৈরি হয়েছে। বিল পরিমাণ {$amount} টাকা। দ্রুত পরিশোধ করুন।");
+    }
+
+    /**
+     * Sent when a new invoice/bill is auto-generated (date_to_date or monthly).
+     * Uses the same DB template pattern as other notifications — looks up the
+     * 'invoice_generated' mapping in sms_template_mappings, falls back to the
+     * hardcoded default if not configured yet.
+     */
+    public function sendInvoiceGenerated(string $mobile, string $name, float $amount, string $month): bool
+    {
+        $message = $this->buildInvoiceGeneratedMessage($name, $amount, $month);
+        return $this->send($mobile, $message, 'invoice_generated');
+    }
+
     // ── Private Helpers ────────────────────────────
 
     private function getActiveSetting(): ?TenantSmsSetting
     {
         if ($this->tenantId) {
-            return TenantSmsSetting::where('tenant_id', $this->tenantId)
+            $setting = TenantSmsSetting::where('tenant_id', $this->tenantId)
                 ->where('is_active', true)
                 ->whereHas('gateway', fn($q) => $q->where('is_enabled', true))
                 ->first();
+
+            if ($setting) return $setting;
+
+            // No tenant-specific setting matched — fall through to global.
         }
 
-        // Fallback: old global gateway (backward compatible)
+        // Fallback: global gateway config (backward compatible). This is the
+        // primary path in practice — tenant() detection isn't reliably available
+        // in this app's request lifecycle, same as how the payment gateway
+        // integration also uses a single global config rather than per-tenant.
         $gateway = SmsGateway::where('is_active', true)->first();
         if (!$gateway) return null;
 
-        // Build a fake setting from the global config
         $setting = new TenantSmsSetting();
         $setting->gateway_slug = $gateway->slug;
         $setting->config       = $gateway->config;

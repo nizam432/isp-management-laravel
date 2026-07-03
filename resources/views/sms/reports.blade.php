@@ -57,7 +57,7 @@
                         <label class="small font-weight-bold">Status</label>
                         <select name="status" class="form-control form-control-sm">
                             <option value="">All</option>
-                            <option value="success" {{ request('status') == 'success' ? 'selected' : '' }}>Success</option>
+                            <option value="sent" {{ request('status') == 'sent' ? 'selected' : '' }}>Success</option>
                             <option value="failed"  {{ request('status') == 'failed'  ? 'selected' : '' }}>Failed</option>
                         </select>
                     </div>
@@ -129,7 +129,7 @@
         <div>
             <span class="badge badge-success mr-1">
                 <i class="fas fa-check mr-1"></i>
-                Success: {{ $logs->getCollection()->where('status','success')->count() }}
+                Success: {{ $logs->getCollection()->where('status','sent')->count() }}
             </span>
             <span class="badge badge-danger">
                 <i class="fas fa-times mr-1"></i>
@@ -178,9 +178,9 @@
                         </a>
                     </td>
                     <td>
-                        <span class="badge badge-{{ $log->status === 'success' ? 'success' : 'danger' }}">
-                            <i class="fas fa-{{ $log->status === 'success' ? 'check' : 'times' }} mr-1"></i>
-                            {{ $log->status === 'success' ? 'Sent' : 'Failed' }}
+                        <span class="badge badge-{{ $log->status === 'sent' ? 'success' : 'danger' }}">
+                            <i class="fas fa-{{ $log->status === 'sent' ? 'check' : 'times' }} mr-1"></i>
+                            {{ $log->status === 'sent' ? 'Sent' : 'Failed' }}
                         </span>
                     </td>
                     <td style="max-width:120px">
