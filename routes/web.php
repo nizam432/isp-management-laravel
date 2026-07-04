@@ -610,6 +610,8 @@ Route::middleware(['auth'])->group(function () {
         // Static routes BEFORE {income} to avoid route collision
         Route::get('/',                   [IncomeController::class, 'index'])           ->name('index')->middleware('can:accounting.income.view');
         Route::post('/',                  [IncomeController::class, 'store'])           ->name('store')->middleware('can:accounting.income.create');
+        Route::get('export/xlsx',         [IncomeController::class, 'exportXlsx'])      ->name('export.xlsx')->middleware('can:accounting.income.view');
+        Route::get('export/pdf',          [IncomeController::class, 'exportPdf'])       ->name('export.pdf')->middleware('can:accounting.income.view');
         Route::get('/{income}/edit-data', [IncomeController::class, 'editData'])        ->name('edit-data');
         Route::get('/{income}',           [IncomeController::class, 'show'])            ->name('show');
         Route::put('/{income}',           [IncomeController::class, 'update'])          ->name('update')->middleware('can:accounting.income.edit');
