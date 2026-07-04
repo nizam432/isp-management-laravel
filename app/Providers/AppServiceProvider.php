@@ -20,6 +20,14 @@ class AppServiceProvider extends ServiceProvider
             \BaconQrCode\Renderer\Image\ImagickImageBackEnd::class,
             \BaconQrCode\Renderer\Image\GDLibImageBackEnd::class
         );
+
+        // Point the navbar "Profile" link to our actual /profile page.
+        // Must be in register() (not boot()) — ALL providers' register() methods
+        // run before ANY provider's boot() runs, and AdminLteServiceProvider reads
+        // this config during ITS boot() to build the navbar menu. Setting it in
+        // our own boot() was too late (AdminLTE's menu was already built by then),
+        // which is why the navbar link kept showing the old 'dashboard' href.
+        config(['adminlte.usermenu_profile_url' => 'profile']);
     }
 
     public function boot(): void

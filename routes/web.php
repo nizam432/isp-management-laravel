@@ -21,6 +21,7 @@ use App\Http\Controllers\MyResellerController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\LanguageController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SuperAdmin\TenantController as SuperAdminTenantController;
 use App\Http\Controllers\SuperAdmin\PlanController as SuperAdminPlanController;
 use App\Http\Controllers\SuperAdmin\SmsGatewayController as SuperAdminSmsGatewayController;
@@ -78,6 +79,13 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/unread-count',      [NotificationController::class, 'unreadCount'])    ->name('unread-count');
         Route::post('/{id}/read',        [NotificationController::class, 'markAsRead'])     ->name('read');
         Route::post('/read-all',         [NotificationController::class, 'markAllAsRead'])  ->name('read-all');
+    });
+
+    // ── Profile ─────────────────────────────────
+    Route::prefix('profile')->name('profile.')->group(function () {
+        Route::get('/',           [ProfileController::class, 'show'])           ->name('show');
+        Route::put('/',           [ProfileController::class, 'update'])         ->name('update');
+        Route::put('/password',   [ProfileController::class, 'updatePassword']) ->name('password.update');
     });
 
 
