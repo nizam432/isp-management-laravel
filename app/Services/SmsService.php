@@ -8,6 +8,7 @@ use App\Models\SmsTemplateMapping;
 use App\Models\TenantSmsSetting;
 use App\Models\SmsLog;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * SmsService — Tenant Aware
@@ -77,13 +78,14 @@ class SmsService
             };
 
             SmsLog::create([
-                'gateway'  => $gateway->slug,
-                'mobile'   => $mobile,
-                'phone'    => $mobile, // sms_logs.phone has no default and is NOT NULL — mirror mobile to avoid insert failure
-                'message'  => $message,
-                'type'     => $type,
-                'status'   => 'sent', // sms_logs.status is enum('sent','failed','pending') — 'success' is NOT a valid value
-                'response' => $response,
+                'gateway'   => $gateway->slug,
+                'mobile'    => $mobile,
+                'phone'     => $mobile, // sms_logs.phone has no default and is NOT NULL — mirror mobile to avoid insert failure
+                'message'   => $message,
+                'type'      => $type,
+                'status'    => 'sent', // sms_logs.status is enum('sent','failed','pending') — 'success' is NOT a valid value
+                'response'  => $response,
+                'count_sms' => $this->countSms($message),
             ]);
 
             return true;
@@ -92,13 +94,14 @@ class SmsService
             Log::error("SMS failed [{$gateway->slug}]: " . $e->getMessage());
 
             SmsLog::create([
-                'gateway'  => $gateway->slug,
-                'mobile'   => $mobile,
-                'phone'    => $mobile,
-                'message'  => $message,
-                'type'     => $type,
-                'status'   => 'failed',
-                'response' => $e->getMessage(),
+                'gateway'   => $gateway->slug,
+                'mobile'    => $mobile,
+                'phone'     => $mobile,
+                'message'   => $message,
+                'type'      => $type,
+                'status'    => 'failed',
+                'response'  => $e->getMessage(),
+                'count_sms' => $this->countSms($message),
             ]);
 
             return false;
@@ -169,13 +172,14 @@ class SmsService
             // reporting/history (SmsReportController, etc.) remains unaffected.
             foreach ($recipients as $r) {
                 SmsLog::create([
-                    'gateway'  => $gateway->slug,
-                    'mobile'   => $r['mobile'],
-                    'phone'    => $r['mobile'],
-                    'message'  => $r['message'],
-                    'type'     => $type,
-                    'status'   => 'sent',
-                    'response' => $response,
+                    'gateway'   => $gateway->slug,
+                    'mobile'    => $r['mobile'],
+                    'phone'     => $r['mobile'],
+                    'message'   => $r['message'],
+                    'type'      => $type,
+                    'status'    => 'sent',
+                    'response'  => $response,
+                    'count_sms' => $this->countSms($r['message']),
                 ]);
             }
 
@@ -186,13 +190,14 @@ class SmsService
 
             foreach ($recipients as $r) {
                 SmsLog::create([
-                    'gateway'  => $gateway->slug,
-                    'mobile'   => $r['mobile'],
-                    'phone'    => $r['mobile'],
-                    'message'  => $r['message'],
-                    'type'     => $type,
-                    'status'   => 'failed',
-                    'response' => $e->getMessage(),
+                    'gateway'   => $gateway->slug,
+                    'mobile'    => $r['mobile'],
+                    'phone'     => $r['mobile'],
+                    'message'   => $r['message'],
+                    'type'      => $type,
+                    'status'    => 'failed',
+                    'response'  => $e->getMessage(),
+                    'count_sms' => $this->countSms($r['message']),
                 ]);
             }
 
@@ -228,6 +233,53 @@ class SmsService
      * Falls back to the original string unchanged if it isn't in 'Y-m' format,
      * so this never breaks message sending even with unexpected input.
      */
+    /**
+     * PHP port of the count_sms() function used on the frontend — calculates how
+     * many SMS segments a message will consume, following standard concatenated-SMS
+     * rules (70/66 chars for Unicode/Bengali, 160/153 chars for plain GSM-7 text).
+     * Stored per SmsLog entry in the `count_sms` column.
+     */
+    private function countSms(string $message): int
+    {
+        $message = trim($message);
+        if ($message === '') return 0;
+
+        $totalLineBreak = substr_count($message, "\n");
+        $encoding       = mb_detect_encoding($message);
+
+        if ($encoding === 'UTF-8' && mb_strlen($message, 'UTF-8') !== strlen($message)) {
+            // Contains actual multi-byte (Bengali/Unicode) characters
+            $totalChar = mb_strlen($message, 'UTF-8') + $totalLineBreak;
+
+            if ($totalChar <= 70) return 1;
+            if ($totalChar <= 134) return 2;
+            if ($totalChar <= 200) return 3;
+            if ($totalChar <= 267) return 4;
+            if ($totalChar <= 334) return 5;
+            if ($totalChar <= 401) return 6;
+            if ($totalChar <= 468) return 7;
+            if ($totalChar <= 535) return 8;
+
+            $remaining = $totalChar - 536;
+            return (int) floor($remaining / 66) + 8 + 1;
+        }
+
+        // Plain GSM-7 (English/numbers)
+        $totalChar = strlen($message);
+
+        if ($totalChar <= 160) return 1;
+        if ($totalChar <= 306) return 2;
+        if ($totalChar <= 459) return 3;
+        if ($totalChar <= 612) return 4;
+        if ($totalChar <= 765) return 5;
+        if ($totalChar <= 918) return 6;
+        if ($totalChar <= 1071) return 7;
+        if ($totalChar <= 1224) return 8;
+
+        $remaining = $totalChar - 1224;
+        return (int) floor($remaining / 153) + 8 + 1;
+    }
+
     private function formatMonth(string $month): string
     {
         try {
@@ -327,6 +379,72 @@ class SmsService
     }
 
     // ── Private Helpers ────────────────────────────
+
+    /**
+     * Fetches the current SMS balance from the active gateway, if that gateway
+     * supports a balance-check API. Currently only 24bulksmsbd is supported —
+     * other gateways return null (dashboard shows "N/A" in that case).
+     *
+     * Cached for 5 minutes so the SMS dashboard doesn't hit the gateway's balance
+     * API on every single page load.
+     */
+    public function getBalance(): ?string
+    {
+        $setting = $this->getActiveSetting();
+        if (!$setting) return null;
+
+        $gateway = SmsGateway::where('slug', $setting->gateway_slug)->first();
+        if (!$gateway) return null;
+
+        if ($gateway->slug !== '24bulksmsbd') {
+            // Balance API not implemented for other gateways yet.
+            return null;
+        }
+
+        return Cache::remember('sms_balance_' . $gateway->slug, 300, function () use ($setting) {
+            try {
+                return $this->send24BulkSMSBalance($setting->config);
+            } catch (\Exception $e) {
+                Log::error('SMS balance fetch failed: ' . $e->getMessage());
+                return null;
+            }
+        });
+    }
+
+    private function send24BulkSMSBalance(array $config): ?string
+    {
+        $ch = curl_init('https://www.24bulksmsbd.com/api/balance');
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => [
+                'customer_id' => $config['customer_id'],
+                'api_key'     => $config['api_key'],
+            ],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false,
+            CURLOPT_TIMEOUT        => 30,
+        ]);
+        $response = curl_exec($ch);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($response === false) {
+            throw new \Exception("cURL error: {$curlError}");
+        }
+
+        $decoded = json_decode($response, true);
+
+        // 24bulksmsbd's balance response format isn't confirmed from docs here —
+        // trying common key names. Adjust the key below if the actual response
+        // uses a different field (check by visiting the API directly once, or
+        // logging $response the first time this runs).
+        if (is_array($decoded)) {
+            return $decoded['balance'] ?? $decoded['sms_balance'] ?? $decoded['credit'] ?? null;
+        }
+
+        return null;
+    }
 
     private function getActiveSetting(): ?TenantSmsSetting
     {

@@ -14,7 +14,7 @@ class SmsLog extends Model
         // added earlier in SmsService.php, which never actually took effect because
         // of this. Adding them here makes those fields actually save.
         'gateway', 'mobile', 'phone', 'customer_id', 'message', 'type',
-        'status', 'response', 'gateway_response', 'sent_at',
+        'status', 'response', 'gateway_response', 'sent_at', 'count_sms',
     ];
 
     // SMS types

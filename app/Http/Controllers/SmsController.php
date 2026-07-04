@@ -11,15 +11,40 @@ use Illuminate\Http\Request;
 class SmsController extends Controller
 {
     /** GET /admin/sms — list all gateways and recent SMS logs. */
-    public function index()
+    public function index(SmsService $sms)
     {
         $gateways    = SmsGateway::all();
         $logs        = SmsLog::latest()->paginate(20);
         $todaySent   = SmsLog::today()->success()->count();
         $todayFailed = SmsLog::today()->failed()->count();
         $templates   = \App\Models\SmsTemplate::active()->get();
+        $smsBalance  = $sms->getBalance();
 
-        return view('sms.index', compact('gateways', 'logs', 'todaySent', 'todayFailed', 'templates'));
+        // "Current vs last" comparison data for the redesigned stat cards
+        // (matches invoices/index.blade.php's stat-card style).
+        $yesterdaySent   = SmsLog::whereDate('created_at', today()->subDay())->where('status', 'sent')->count();
+        $yesterdayFailed = SmsLog::whereDate('created_at', today()->subDay())->where('status', 'failed')->count();
+        $totalSmsAllTime = SmsLog::count();
+
+        // Bulk SMS filter dropdown — count per category so admin knows how many
+        // customers each option will actually message before sending.
+        $filterCounts = [
+            'all'       => Customer::count(),
+            'active'    => Customer::where('status', 'active')->count(),
+            'suspended' => Customer::where('status', 'suspended')->count(),
+            'expired'   => Customer::where('status', 'expired')->count(),
+            'paid'      => Customer::whereDoesntHave('invoices', fn($q) =>
+                $q->whereIn('status', ['unpaid', 'partial', 'overdue']))->count(),
+            'due'       => Customer::whereHas('invoices', fn($q) =>
+                $q->whereIn('status', ['unpaid', 'partial']))->count(),
+            'overdue'   => Customer::whereHas('invoices', fn($q) =>
+                $q->where('status', 'overdue'))->count(),
+        ];
+
+        return view('sms.index', compact(
+            'gateways', 'logs', 'todaySent', 'todayFailed', 'templates', 'smsBalance', 'filterCounts',
+            'yesterdaySent', 'yesterdayFailed', 'totalSmsAllTime'
+        ));
     }
 
     /** POST /admin/sms/gateway/{gateway}/toggle — activate this gateway and deactivate all others. */
@@ -64,19 +89,59 @@ class SmsController extends Controller
     {
         $request->validate([
             'message' => 'required|string|max:500',
-            'status'  => 'nullable|in:active,suspended,all',
+            'status'  => 'nullable|in:active,suspended,expired,paid,due,overdue,all',
         ]);
 
         $query = Customer::query();
-        if ($request->status && $request->status !== 'all') {
-            $query->where('status', $request->status);
+
+        switch ($request->status) {
+            case 'active':
+            case 'suspended':
+            case 'expired':
+                $query->where('status', $request->status);
+                break;
+
+            case 'paid':
+                $query->whereDoesntHave('invoices', fn($q) =>
+                    $q->whereIn('status', ['unpaid', 'partial', 'overdue']));
+                break;
+
+            case 'due':
+                $query->whereHas('invoices', fn($q) =>
+                    $q->whereIn('status', ['unpaid', 'partial']));
+                break;
+
+            case 'overdue':
+                $query->whereHas('invoices', fn($q) =>
+                    $q->where('status', 'overdue'));
+                break;
+
+            // 'all' or null — no filter, every customer
         }
 
         $customers = $query->get();
-        $mobiles   = $customers->pluck('phone')->toArray();
-        $sent      = $sms->sendMany($mobiles, $request->message, 'bulk');
 
-        return back()->with('success', "{$sent} জন customer কে SMS পাঠানো হয়েছে।");
+        // sendDynamic() — same message to everyone here, but still batched into a
+        // single DynamicSMSApi call instead of looping sendMany() (N separate
+        // smsSendApi calls). Message is identical per recipient in this case.
+        $recipients = [];
+        foreach ($customers as $customer) {
+            if (!$customer->phone) continue;
+            $recipients[] = ['mobile' => $customer->phone, 'message' => $request->message];
+        }
+
+        if (empty($recipients)) {
+            return back()->with('error', 'পাঠানোর মতো কোনো customer (phone number সহ) পাওয়া যায়নি।');
+        }
+
+        $result = $sms->sendDynamic($recipients, 'bulk');
+
+        $msg = "{$result['sent']} জন customer কে SMS পাঠানো হয়েছে (১টা API call-এ)।";
+        if ($result['failed'] > 0) {
+            $msg .= " {$result['failed']} টি ব্যর্থ হয়েছে।";
+        }
+
+        return back()->with('success', $msg);
     }
 
     /** DELETE /admin/sms/logs — purge SMS logs older than 30 days. */
