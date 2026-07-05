@@ -3,6 +3,7 @@
 use App\Models\User;
 use App\Models\Customer;
 use App\Models\MacReseller;
+use App\Models\SuperAdmin;
 
 return [
 
@@ -29,6 +30,12 @@ return [
             'driver'   => 'session',
             'provider' => 'mac_resellers',
         ],
+
+        // Super Admin (Central) guard (নতুন)
+        'super_admin' => [
+            'driver'   => 'session',
+            'provider' => 'super_admins',
+        ],
     ],
 
     'providers' => [
@@ -51,6 +58,12 @@ return [
             'driver' => 'eloquent',
             'model'  => MacReseller::class,
         ],
+
+        // Super Admin (Central) — email দিয়ে login হবে
+        'super_admins' => [
+            'driver' => 'eloquent',
+            'model'  => SuperAdmin::class,
+        ],
     ],
 
     'passwords' => [
@@ -71,6 +84,13 @@ return [
         'mac_resellers' => [
             'provider' => 'mac_resellers',
             'table'    => 'mac_reseller_password_resets',
+            'expire'   => 60,
+            'throttle' => 60,
+        ],
+
+        'super_admins' => [
+            'provider' => 'super_admins',
+            'table'    => 'super_admin_password_resets',
             'expire'   => 60,
             'throttle' => 60,
         ],
