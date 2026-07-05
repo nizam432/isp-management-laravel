@@ -15,7 +15,7 @@ class SuperAdminSeeder extends Seeder
      *
      * Run: php artisan db:seed --class=SuperAdminSeeder --force
      */
-    public function run(): void
+    public function run(): void 
     {
         // Ensure the 'Super Admin' role exists (spatie/laravel-permission).
         // Uses the default 'web' guard — adjust if your app uses a different one.
