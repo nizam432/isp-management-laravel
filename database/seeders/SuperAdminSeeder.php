@@ -22,7 +22,7 @@ class SuperAdminSeeder extends Seeder
         $role = Role::firstOrCreate(['name' => 'Super Admin']);
 
         $user = User::updateOrCreate(
-            ['email' => 'admin@isp.com'],
+            ['email' => 'admin@isp.com'], 
             [
                 'name'      => 'Super Admin',
                 'password'  => 'ChangeThisPassword123!', // hashed automatically via the 'hashed' cast on User model
