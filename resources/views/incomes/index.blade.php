@@ -8,45 +8,82 @@
     <a href="{{ route('expenses.profit-loss') }}" class="btn btn-info btn-sm ml-1">
         <i class="fas fa-chart-pie mr-1"></i> P&L Report
     </a>
+    <a href="{{ route('incomes.export.xlsx', request()->query()) }}" class="btn btn-outline-success btn-sm ml-1">
+        <i class="fas fa-file-excel mr-1"></i> Export XLSX
+    </a>
+    <a href="{{ route('incomes.export.pdf', request()->query()) }}" class="btn btn-outline-danger btn-sm ml-1">
+        <i class="fas fa-file-pdf mr-1"></i> Export PDF
+    </a>
 @endsection
 @section('page_content')
 
 {{-- Summary Cards --}}
+<style>
+.inc-stat-card {
+    border-radius: 4px;
+    color: #fff;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    overflow: hidden;
+}
+.inc-stat-card .sc-left .sc-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: rgba(255,255,255,.85);
+    margin-bottom: 4px;
+}
+.inc-stat-card .sc-left .sc-value {
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+}
+.inc-stat-card .sc-icon {
+    font-size: 52px;
+    color: rgba(255,255,255,.18);
+}
+</style>
 <div class="row mb-3">
-    <div class="col-md-3">
-        <div class="info-box bg-success">
-            <span class="info-box-icon"><i class="fas fa-arrow-up"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">This Month (Manual)</span>
-                <span class="info-box-number">BDT {{ number_format($totalThis) }}</span>
+    <div class="col-md-3 col-6">
+        <div class="inc-stat-card" style="background:#00a65a;">
+            <div class="sc-left">
+                <div class="sc-label"><i class="fas fa-arrow-up mr-1"></i> This Month (Manual)</div>
+                <div class="sc-value">৳{{ number_format($totalThis) }}</div>
             </div>
+            <div class="sc-icon"><i class="fas fa-arrow-up"></i></div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="info-box bg-primary">
-            <span class="info-box-icon"><i class="fas fa-file-invoice-dollar"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">Monthly Bill (Payments)</span>
-                <span class="info-box-number">BDT {{ number_format($monthlyBillThis) }}</span>
+    <div class="col-md-3 col-6">
+        <div class="inc-stat-card" style="background:#0073b7;">
+            <div class="sc-left">
+                <div class="sc-label"><i class="fas fa-file-invoice-dollar mr-1"></i> Monthly Bill (Payments)</div>
+                <div class="sc-value">৳{{ number_format($monthlyBillThis) }}</div>
             </div>
+            <div class="sc-icon"><i class="fas fa-file-invoice-dollar"></i></div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="info-box bg-warning">
-            <span class="info-box-icon"><i class="fas fa-calendar-minus"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">Last Month (Manual)</span>
-                <span class="info-box-number">BDT {{ number_format($totalLast) }}</span>
+    <div class="col-md-3 col-6">
+        <div class="inc-stat-card" style="background:#f39c12;">
+            <div class="sc-left">
+                <div class="sc-label"><i class="fas fa-calendar-minus mr-1"></i> Last Month (Manual)</div>
+                <div class="sc-value">৳{{ number_format($totalLast) }}</div>
             </div>
+            <div class="sc-icon"><i class="fas fa-calendar-minus"></i></div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="info-box bg-info">
-            <span class="info-box-icon"><i class="fas fa-calendar-day"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">Today</span>
-                <span class="info-box-number">BDT {{ number_format($todayTotal) }}</span>
+    <div class="col-md-3 col-6">
+        <div class="inc-stat-card" style="background:#17a2b8;">
+            <div class="sc-left">
+                <div class="sc-label"><i class="fas fa-calendar-day mr-1"></i> Today</div>
+                <div class="sc-value">৳{{ number_format($todayTotal) }}</div>
             </div>
+            <div class="sc-icon"><i class="fas fa-calendar-day"></i></div>
         </div>
     </div>
 </div>

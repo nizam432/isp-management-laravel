@@ -88,7 +88,7 @@ return [
     'usermenu_enabled'      => true,
     'usermenu_image'        => false,
     'usermenu_desc'         => '',
-    'usermenu_profile_url'  => 'dashboard',  // No profile route — redirect to dashboard
+    'usermenu_profile_url'  => 'profile',  // Profile page added — /profile route
 
     /*
     |--------------------------------------------------------------------------

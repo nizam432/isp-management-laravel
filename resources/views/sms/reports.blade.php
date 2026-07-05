@@ -6,27 +6,39 @@
 {{-- Stats --}}
 <div class="row mb-3">
     <div class="col-md-3">
-        <div class="small-box bg-success">
-            <div class="inner"><h3>{{ $todaySent }}</h3><p>Today Sent</p></div>
-            <div class="icon"><i class="fas fa-paper-plane"></i></div>
+        <div class="info-box bg-success">
+            <span class="info-box-icon"><i class="fas fa-paper-plane"></i></span>
+            <div class="info-box-content">
+                <span class="info-box-text">Today Sent</span>
+                <span class="info-box-number">{{ $todaySent }}</span>
+            </div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="small-box bg-primary">
-            <div class="inner"><h3>{{ number_format($totalSent) }}</h3><p>Total Success</p></div>
-            <div class="icon"><i class="fas fa-check-circle"></i></div>
+        <div class="info-box bg-primary">
+            <span class="info-box-icon"><i class="fas fa-check-circle"></i></span>
+            <div class="info-box-content">
+                <span class="info-box-text">Total Success</span>
+                <span class="info-box-number">{{ number_format($totalSent) }}</span>
+            </div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="small-box bg-danger">
-            <div class="inner"><h3>{{ number_format($totalFailed) }}</h3><p>Total Failed</p></div>
-            <div class="icon"><i class="fas fa-times-circle"></i></div>
+        <div class="info-box bg-danger">
+            <span class="info-box-icon"><i class="fas fa-times-circle"></i></span>
+            <div class="info-box-content">
+                <span class="info-box-text">Total Failed</span>
+                <span class="info-box-number">{{ number_format($totalFailed) }}</span>
+            </div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="small-box bg-info">
-            <div class="inner"><h3>{{ number_format($totalSent + $totalFailed) }}</h3><p>Total SMS</p></div>
-            <div class="icon"><i class="fas fa-sms"></i></div>
+        <div class="info-box bg-info">
+            <span class="info-box-icon"><i class="fas fa-sms"></i></span>
+            <div class="info-box-content">
+                <span class="info-box-text">Total SMS</span>
+                <span class="info-box-number">{{ number_format($totalSent + $totalFailed) }}</span>
+            </div>
         </div>
     </div>
 </div>
@@ -57,7 +69,7 @@
                         <label class="small font-weight-bold">Status</label>
                         <select name="status" class="form-control form-control-sm">
                             <option value="">All</option>
-                            <option value="success" {{ request('status') == 'success' ? 'selected' : '' }}>Success</option>
+                            <option value="sent" {{ request('status') == 'sent' ? 'selected' : '' }}>Success</option>
                             <option value="failed"  {{ request('status') == 'failed'  ? 'selected' : '' }}>Failed</option>
                         </select>
                     </div>
@@ -129,7 +141,7 @@
         <div>
             <span class="badge badge-success mr-1">
                 <i class="fas fa-check mr-1"></i>
-                Success: {{ $logs->getCollection()->where('status','success')->count() }}
+                Success: {{ $logs->getCollection()->where('status','sent')->count() }}
             </span>
             <span class="badge badge-danger">
                 <i class="fas fa-times mr-1"></i>
@@ -178,9 +190,9 @@
                         </a>
                     </td>
                     <td>
-                        <span class="badge badge-{{ $log->status === 'success' ? 'success' : 'danger' }}">
-                            <i class="fas fa-{{ $log->status === 'success' ? 'check' : 'times' }} mr-1"></i>
-                            {{ $log->status === 'success' ? 'Sent' : 'Failed' }}
+                        <span class="badge badge-{{ $log->status === 'sent' ? 'success' : 'danger' }}">
+                            <i class="fas fa-{{ $log->status === 'sent' ? 'check' : 'times' }} mr-1"></i>
+                            {{ $log->status === 'sent' ? 'Sent' : 'Failed' }}
                         </span>
                     </td>
                     <td style="max-width:120px">

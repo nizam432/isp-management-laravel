@@ -9,6 +9,9 @@ use App\Models\Customer;
 use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Barryvdh\DomPDF\Facade\Pdf;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class IncomeController extends Controller
 {
@@ -56,6 +59,92 @@ class IncomeController extends Controller
             'incomes', 'categories', 'allCategories',
             'totalThis', 'totalLast', 'todayTotal', 'monthlyBillThis'
         ));
+    }
+
+    /**
+     * Shared filter logic for index(), exportXlsx(), and exportPdf() — so exports
+     * always match whatever the admin currently has filtered on the Income page.
+     */
+    private function filteredIncomesQuery(Request $request)
+    {
+        return Income::with(['category', 'customer', 'createdBy'])
+            ->when($request->search, fn($q) =>
+                $q->where('description', 'like', "%{$request->search}%")
+                  ->orWhere('payer', 'like', "%{$request->search}%")
+                  ->orWhere('income_no', 'like', "%{$request->search}%"))
+            ->when($request->category_id, fn($q) =>
+                $q->where('category_id', $request->category_id))
+            ->when($request->status, fn($q) =>
+                $q->where('status', $request->status))
+            ->when($request->payment_method, fn($q) =>
+                $q->where('payment_method', $request->payment_method))
+            ->when($request->date_from, fn($q) =>
+                $q->whereDate('income_date', '>=', $request->date_from))
+            ->when($request->date_to, fn($q) =>
+                $q->whereDate('income_date', '<=', $request->date_to))
+            ->when($request->month, fn($q) =>
+                $q->byMonth($request->month))
+            ->orderByDesc('income_date')
+            ->orderByDesc('id');
+    }
+
+    /** GET /incomes/export/xlsx — export the currently filtered income list as XLSX. */
+    public function exportXlsx(Request $request)
+    {
+        $incomes = $this->filteredIncomesQuery($request)->get();
+
+        $spreadsheet = new Spreadsheet();
+        $sheet       = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Income');
+
+        $headers = ['A' => 'Income No', 'B' => 'Date', 'C' => 'Category', 'D' => 'Description',
+                    'E' => 'Payer', 'F' => 'Method', 'G' => 'Amount', 'H' => 'Status'];
+
+        foreach ($headers as $col => $header) {
+            $sheet->setCellValue($col . '1', $header);
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        $sheet->getStyle('A1:H1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:H1')->getFill()
+            ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+            ->getStartColor()->setARGB('FF3C8DBC');
+
+        foreach ($incomes as $row => $inc) {
+            $r = $row + 2;
+            $sheet->setCellValue('A' . $r, $inc->income_no);
+            $sheet->setCellValue('B' . $r, $inc->income_date->format('d M Y'));
+            $sheet->setCellValue('C' . $r, $inc->category->name ?? '-');
+            $sheet->setCellValue('D' . $r, $inc->description ?? '-');
+            $sheet->setCellValue('E' . $r, $inc->payer ?? ($inc->customer?->name ?? '-'));
+            $sheet->setCellValue('F' . $r, strtoupper($inc->payment_method));
+            $sheet->setCellValue('G' . $r, floatval($inc->amount));
+            $sheet->setCellValue('H' . $r, ucfirst($inc->status));
+        }
+
+        $filename = 'income-' . now()->format('Y-m-d') . '.xlsx';
+        $tempPath = storage_path('app/temp/' . $filename);
+
+        if (!file_exists(storage_path('app/temp'))) {
+            mkdir(storage_path('app/temp'), 0755, true);
+        }
+
+        $writer = new Xlsx($spreadsheet);
+        $writer->save($tempPath);
+
+        return response()->download($tempPath, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
+    }
+
+    /** GET /incomes/export/pdf — export the currently filtered income list as PDF. */
+    public function exportPdf(Request $request)
+    {
+        $incomes = $this->filteredIncomesQuery($request)->get();
+        $total   = $incomes->where('status', 'active')->sum('amount');
+
+        $pdf = Pdf::loadView('incomes.pdf', compact('incomes', 'total'));
+        return $pdf->download('income-' . now()->format('Y-m-d') . '.pdf');
     }
 
     // =========================================================================

@@ -4,6 +4,7 @@
 
 protected $commands = [
     \App\Console\Commands\GenerateDateToDateInvoices::class,
+    \App\Console\Commands\GenerateMonthlyInvoices::class,
     \App\Console\Commands\MarkOverdueInvoices::class,
     \App\Console\Commands\SendBillDueReminders::class,
     \App\Console\Commands\SendExpiryReminders::class,

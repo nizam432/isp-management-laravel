@@ -315,8 +315,19 @@ class BillingService
 
         $periodEnd = $periodStart->copy()->addDays(29); // 30 days total
 
-        // Check if already generated for this period
+        // The period must have actually ended before we bill for it — otherwise a
+        // customer's very first invoice (or any subsequent one) gets generated the
+        // moment the command runs, regardless of how many days have actually passed
+        // since connection/last period. This was missing entirely before.
+        if (now()->lt($periodEnd)) {
+            return null;
+        }
+
+        // Check if already generated for this period — filtered by billing_type too,
+        // so this can't accidentally match a differently-typed invoice that happens
+        // to share the same period_start value.
         $exists = Invoice::where('customer_id', $customer->id)
+            ->where('billing_type', 'date_to_date')
             ->where('period_start', $periodStart->toDateString())
             ->exists();
 
@@ -325,23 +336,50 @@ class BillingService
         $dueDays = intval(Setting::get('invoice_due_days', 7));
         $dueDate = $periodStart->copy()->addDays($dueDays);
 
-        $invoice = Invoice::create([
-            'invoice_no'   => Invoice::generateNumber(),
-            'customer_id'  => $customer->id,
-            'package_id'   => $customer->package_id,
-            'month'        => $periodStart->format('Y-m'),
-            'period_start' => $periodStart->toDateString(),
-            'period_end'   => $periodEnd->toDateString(),
-            'billing_type' => 'date_to_date',
-            'amount'       => $customer->package->price ?? 0,
-            'due_amount'   => $customer->package->price ?? 0,
-            'due_date'     => $dueDate->toDateString(),
-            'status'       => 'unpaid',
-        ]);
+        try {
+            $invoice = Invoice::create([
+                'invoice_no'   => Invoice::generateNumber(),
+                'customer_id'  => $customer->id,
+                'package_id'   => $customer->package_id,
+                'month'        => $periodStart->format('Y-m'),
+                'period_start' => $periodStart->toDateString(),
+                'period_end'   => $periodEnd->toDateString(),
+                'billing_type' => 'date_to_date',
+                'amount'       => $customer->package->price ?? 0,
+                'due_amount'   => $customer->package->price ?? 0,
+                'due_date'     => $dueDate->toDateString(),
+                'status'       => 'unpaid',
+            ]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Unique constraint (invoices_customer_period_type_unique) caught a race
+            // condition — another process already created this exact invoice between
+            // our exists() check above and this insert. Treat as "already generated",
+            // not an error.
+            if ($e->getCode() === '23000') {
+                \Log::info("Duplicate date-to-date invoice prevented by DB constraint for customer #{$customer->id}, period {$periodStart->toDateString()}.");
+                return null;
+            }
+            throw $e;
+        }
 
         // Auto-deduct advance if available
         if ($customer->advance_balance > 0) {
             $this->applyAdvanceToInvoice($invoice);
+        }
+
+        // Send "Invoice Generated" SMS if the global notification toggle is on
+        // (Settings → Notification → invoice_generated_sms) and the customer has a phone.
+        if (Setting::get('invoice_generated_sms', '1') == '1' && $customer->phone) {
+            try {
+                (new SmsService())->sendInvoiceGenerated(
+                    $customer->phone,
+                    $customer->name,
+                    floatval($invoice->due_amount),
+                    $invoice->month
+                );
+            } catch (\Exception $e) {
+                \Log::error('Invoice generated SMS failed: ' . $e->getMessage());
+            }
         }
 
         return $invoice;
