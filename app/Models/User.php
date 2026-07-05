@@ -41,7 +41,7 @@ class User extends Authenticatable
      */
     public function adminlte_profile_url(): string
     {
-        return 'dashboard'; // redirect to dashboard (no profile page yet)
+        return 'profile'; // Profile page now exists — see ProfileController + routes/web.php
     }
 
     /**
