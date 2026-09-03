@@ -35,10 +35,11 @@ class Expense extends Model
     ];
 
     // source_type constants
-    const SOURCE_MANUAL             = 'manual';
-    const SOURCE_BANDWIDTH_PURCHASE = 'bandwidth_purchase';
-    const SOURCE_HR_PAYROLL         = 'hr_payroll';
-    const SOURCE_INVENTORY_PURCHASE = 'inventory_purchase';
+    const SOURCE_MANUAL                  = 'manual';
+    const SOURCE_BANDWIDTH_PURCHASE      = 'bandwidth-purchase';
+    const SOURCE_HR_PAYROLL              = 'hr-payroll';
+    const SOURCE_INVENTORY_PURCHASE      = 'stock-purchase';
+    const SOURCE_MAC_RESELLER_SETTLEMENT = 'mac-reseller-settlement';
 
     protected $casts = [
         'amount'       => 'decimal:2',
@@ -197,10 +198,11 @@ class Expense extends Model
     public function getSourceLabelAttribute(): string
     {
         return match ($this->source_type) {
-            self::SOURCE_BANDWIDTH_PURCHASE => 'Bandwidth Purchase',
-            self::SOURCE_HR_PAYROLL         => 'HR Payroll',
-            self::SOURCE_INVENTORY_PURCHASE => 'Inventory Purchase',
-            default                         => 'Manual',
+            self::SOURCE_BANDWIDTH_PURCHASE      => 'Bandwidth Purchase',
+            self::SOURCE_HR_PAYROLL              => 'HR Payroll',
+            self::SOURCE_INVENTORY_PURCHASE      => 'Inventory Purchase',
+            self::SOURCE_MAC_RESELLER_SETTLEMENT => 'MAC Reseller Settlement',
+            default                              => 'Manual',
         };
     }
 
@@ -209,10 +211,13 @@ class Expense extends Model
         if ($this->isDirectSource() || ! $this->source_id) return null;
 
         return match ($this->source_type) {
-            self::SOURCE_BANDWIDTH_PURCHASE => route('bandwidth-buy.purchase.show', $this->source_invoice_id ?? $this->source_id),
-            self::SOURCE_HR_PAYROLL         => route('payroll.show', $this->source_id),
-            self::SOURCE_INVENTORY_PURCHASE => route('inventory.purchases.index'),
-            default                         => null,
+            self::SOURCE_BANDWIDTH_PURCHASE      => route('bandwidth-buy.purchase.show', $this->source_invoice_id ?? $this->source_id),
+            self::SOURCE_HR_PAYROLL              => route('payroll.show', $this->source_id),
+            self::SOURCE_INVENTORY_PURCHASE      => route('inventory.purchases.index'),
+            // No dedicated "show" route exists for a single settlement record yet —
+            // link to the settlement history list instead (filterable there).
+            self::SOURCE_MAC_RESELLER_SETTLEMENT => route('mac-reseller.settlement.history'),
+            default                              => null,
         };
     }
 

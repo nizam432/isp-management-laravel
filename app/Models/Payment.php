@@ -13,6 +13,7 @@ class Payment extends Model
         'invoice_id', 'customer_id','paid_at', 'amount', 'method',
         'transaction_id', 'remarks', 'status', 'received_by',
         'receive_from', 'send_sms', 'set_next_billing_date', 'payment_date',
+        'reseller_employee_id', // ── who at the RESELLER'S own staff collected this (used only for reseller-created payments) ──
     ];
 
     protected $casts = [
@@ -36,7 +37,17 @@ class Payment extends Model
 
     public function receivedBy()
     {
-        return $this->belongsTo(User::class, 'received_by');
+        // Was: belongsTo(User::class, 'received_by') — but the "Received By"
+        // dropdown (PaymentController::collectPage()) is populated from
+        // Employee (staff members who physically receive cash, not all of
+        // whom have a system login/User account). Fixed to match.
+        return $this->belongsTo(\App\Models\HR\Employee::class, 'received_by');
+    }
+
+    // ── Used only when this payment was collected via the Reseller portal ──
+    public function receivedByReseller()
+    {
+        return $this->belongsTo(\App\Models\ResellerEmployee::class, 'reseller_employee_id');
     }
 
     public function voidLog()
@@ -54,10 +65,12 @@ class Payment extends Model
     {
         return $query->where('status', 'void');
     }
+
     public function scopeToday($query)
     {
         return $query->whereDate('payment_date', today());
     }
+
     public function scopeThisMonth($query)
     {
         return $query->whereMonth('payment_date', now()->month)

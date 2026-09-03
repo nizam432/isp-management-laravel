@@ -417,6 +417,10 @@ class IncomeController extends Controller
 
     public function categoryUpdate(Request $request, IncomeCategory $incomeCategory)
     {
+        if($incomeCategory->is_system==1){
+            return back()->with('error', 'This category cannot be updated because it is a built-in system category');
+        }
+        
         $request->validate([
             'name'  => 'required|string|max:100|unique:income_categories,name,' . $incomeCategory->id,
             'color' => 'nullable|string|max:7',
@@ -428,9 +432,15 @@ class IncomeController extends Controller
 
     public function categoryDestroy(IncomeCategory $incomeCategory)
     {
+
         if ($incomeCategory->incomes()->count() > 0) {
             return back()->with('error', 'Cannot delete — income entries are linked to this category.');
         }
+        
+        if($incomeCategory->is_system==1){
+            return back()->with('error', 'This category cannot be deleted because it is a built-in system category');
+        }
+        
         $incomeCategory->delete();
         return back()->with('success', 'Category deleted.');
     }

@@ -1,5 +1,5 @@
 {{-- resources/views/super-admin/tenants/create.blade.php --}}
-@extends('layouts.app')
+@extends('layouts.super-admin')
 @section('page_title', 'Add New ISP')
 @section('page_actions')
     <a href="{{ route('super-admin.tenants.index') }}" class="btn btn-secondary btn-sm">
@@ -44,6 +44,35 @@
                     <div class="form-group">
                         <label>Address</label>
                         <textarea name="address" class="form-control" rows="2">{{ old('address') }}</textarea>
+                    </div>
+
+                    {{-- Database Pool selection --}}
+                    <div class="form-group">
+                        <label>
+                            Database (Pool) <span class="text-danger">*</span>
+                            <span class="badge badge-{{ $availablePools->count() > 0 ? 'success' : 'danger' }}">
+                                {{ $availablePools->count() }} available
+                            </span>
+                        </label>
+                        @if($availablePools->isEmpty())
+                            <div class="alert alert-danger py-2 mb-2">
+                                <i class="fas fa-exclamation-triangle mr-1"></i>
+                                কোনো খালি pool ডেটাবেজ নেই — cPanel-এ নতুন ডেটাবেজ তৈরি করে migrate করে
+                                <code>database_pool</code> টেবিলে যোগ করুন।
+                            </div>
+                        @endif
+                        <select name="database_pool_id" class="form-control" required
+                                {{ $availablePools->isEmpty() ? 'disabled' : '' }}>
+                            <option value="">-- Database Select --</option>
+                            @foreach($availablePools as $pool)
+                            <option value="{{ $pool->id }}" {{ old('database_pool_id') == $pool->id ? 'selected' : '' }}>
+                                {{ $pool->database_name }}
+                            </option>
+                            @endforeach
+                        </select>
+                        <small class="text-muted">
+                            আগে থেকে তৈরি ও migrate করা খালি ডেটাবেজগুলো থেকে একটা বেছে নিন — এই ISP-এর সব ডেটা এখানে থাকবে।
+                        </small>
                     </div>
                 </div>
                 <div class="col-md-6">
@@ -103,7 +132,7 @@
             </div>
         </div>
         <div class="card-footer">
-            <button type="submit" class="btn btn-primary">
+            <button type="submit" class="btn btn-primary" {{ $availablePools->isEmpty() ? 'disabled' : '' }}>
                 <i class="fas fa-save mr-1"></i> Create ISP
             </button>
         </div>

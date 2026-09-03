@@ -1,5 +1,5 @@
 {{-- resources/views/super-admin/tenants/index.blade.php --}}
-@extends('layouts.app')
+@extends('layouts.super-admin')
 @section('page_title', 'ISP Management')
 @section('page_actions')
     <a href="{{ route('super-admin.tenants.create') }}" class="btn btn-primary btn-sm">

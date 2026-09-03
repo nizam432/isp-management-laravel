@@ -6,15 +6,18 @@
         <i class="fas fa-arrow-left mr-1"></i> Back
     </a>
     @if(!$expense->isVoid())
-        <a href="{{ route('expenses.edit', $expense) }}" class="btn btn-warning btn-sm ml-1">
-            <i class="fas fa-edit mr-1"></i> Edit
-        </a>
-        <button type="button" class="btn btn-danger btn-sm ml-1" id="btnVoid">
-            <i class="fas fa-ban mr-1"></i> Void
-        </button>
+        @if($expense->isDirectSource())
+            <a href="{{ route('expenses.edit', $expense) }}" class="btn btn-warning btn-sm ml-1">
+                <i class="fas fa-edit mr-1"></i> Edit
+            </a>
+      
+            <button type="button" class="btn btn-danger btn-sm ml-1" id="btnVoid">
+                <i class="fas fa-ban mr-1"></i> Void
+            </button>
+          @endif 
     @else
         <form action="{{ route('expenses.destroy', $expense) }}" method="POST" class="d-inline ml-1"
-              onsubmit="return confirm('পুরোপুরি delete করবেন?')">
+              onsubmit="return confirm('Aare you want to delete?')">
             @csrf @method('DELETE')
             <button type="submit" class="btn btn-danger btn-sm">
                 <i class="fas fa-trash mr-1"></i> Delete
@@ -40,7 +43,7 @@
                     <div class="col-md-6">
                         <table class="table table-sm table-borderless">
                             <tr>
-                                <td class="text-muted" style="width:40%">তারিখ</td>
+                                <td class="text-muted" style="width:40%">Date</td>
                                 <td class="font-weight-bold">
                                     {{ $expense->expense_date->format('d M Y') }}
                                 </td>
@@ -58,7 +61,7 @@
                                 </td>
                             </tr>
                             <tr>
-                                <td class="text-muted">পরিমাণ</td>
+                                <td class="text-muted">Amount</td>
                                 <td class="font-weight-bold text-danger" style="font-size:20px">
                                     {{ $expense->formattedAmount }}
                                 </td>
@@ -113,7 +116,7 @@
 
                 @if($expense->description)
                 <div class="mt-2 p-3 bg-light rounded">
-                    <small class="text-muted d-block mb-1"><i class="fas fa-sticky-note mr-1"></i> বিবরণ</small>
+                    <small class="text-muted d-block mb-1"><i class="fas fa-sticky-note mr-1"></i> Details</small>
                     {{ $expense->description }}
                 </div>
                 @endif
@@ -145,7 +148,7 @@
                     @else
                         <a href="{{ asset('storage/' . $expense->receipt_path) }}"
                            target="_blank" class="btn btn-outline-secondary">
-                            <i class="fas fa-file-pdf mr-1"></i> PDF Receipt দেখুন
+                            <i class="fas fa-file-pdf mr-1"></i> PDF Receipt
                         </a>
                     @endif
                     <div class="mt-2">
@@ -157,7 +160,7 @@
                 @else
                     <div class="text-muted py-4">
                         <i class="fas fa-file-upload fa-3x mb-2 d-block"></i>
-                        কোনো receipt upload করা হয়নি।
+                       No receipt file has been uploaded.
                     </div>
                 @endif
             </div>
@@ -191,20 +194,20 @@
             <form action="{{ route('expenses.void', $expense) }}" method="POST">
                 @csrf
                 <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title"><i class="fas fa-ban mr-1"></i> Expense Void করুন</h5>
+                    <h5 class="modal-title"><i class="fas fa-ban mr-1"></i> Expense Void </h5>
                     <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
                 </div>
                 <div class="modal-body">
                     <div class="form-group mb-0">
-                        <label class="font-weight-bold">Void করার কারণ <span class="text-danger">*</span></label>
+                        <label class="font-weight-bold">Void Reaso <span class="text-danger">*</span></label>
                         <textarea name="reason" rows="3" class="form-control"
-                                  placeholder="কারণ লিখুন..." required></textarea>
+                                  placeholder="Void Reaso..." required></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">বাতিল</button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Void</button>
                     <button type="submit" class="btn btn-danger btn-sm">
-                        <i class="fas fa-ban mr-1"></i> Void করুন
+                        <i class="fas fa-ban mr-1"></i>Void
                     </button>
                 </div>
             </form>

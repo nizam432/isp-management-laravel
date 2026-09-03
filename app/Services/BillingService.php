@@ -125,7 +125,7 @@ class BillingService
 
             if ($paymentConfirmSmsEnabled && !empty($data['send_sms'])) {
                 try {
-                    (new SmsService())->sendPaymentConfirm(
+                    (new SmsService(macResellerId: $customer->mac_reseller_id))->sendPaymentConfirm(
                         $customer->phone,
                         $customer->name,
                         $totalPaid,
@@ -333,7 +333,20 @@ class BillingService
 
         if ($exists) return null;
 
-        $dueDays = intval(Setting::get('invoice_due_days', 7));
+        // Reseller customers have no package_id (they use mac_reseller_tariff_package_id
+        // instead), so $customer->package is always null for them — falling back to
+        // their own monthly_bill_amount (set at creation/import time) instead of
+        // silently billing them ৳0. Admin customers are completely unaffected.
+        $amount = $customer->mac_reseller_id
+            ? (float) ($customer->monthly_bill_amount ?? 0)
+            : (float) ($customer->package->price ?? 0);
+
+        // Same reasoning for the due-days setting — a reseller's own Settings page
+        // (Billing → Invoice Due After) should govern their own customers' due date,
+        // not the ISP Admin's global setting.
+        $dueDays = $customer->mac_reseller_id
+            ? intval(\App\Models\ResellerSetting::get($customer->mac_reseller_id, 'invoice_due_days', 7))
+            : intval(Setting::get('invoice_due_days', 7));
         $dueDate = $periodStart->copy()->addDays($dueDays);
 
         try {
@@ -345,8 +358,8 @@ class BillingService
                 'period_start' => $periodStart->toDateString(),
                 'period_end'   => $periodEnd->toDateString(),
                 'billing_type' => 'date_to_date',
-                'amount'       => $customer->package->price ?? 0,
-                'due_amount'   => $customer->package->price ?? 0,
+                'amount'       => $amount,
+                'due_amount'   => $amount,
                 'due_date'     => $dueDate->toDateString(),
                 'status'       => 'unpaid',
             ]);
@@ -371,10 +384,16 @@ class BillingService
         // (Settings → Notification → invoice_generated_sms) and the customer has a phone.
         if (Setting::get('invoice_generated_sms', '1') == '1' && $customer->phone) {
             try {
-                (new SmsService())->sendInvoiceGenerated(
+                      
+           $totalDue = Invoice::where('customer_id', $customer->id)
+            ->whereIn('status', ['unpaid', 'partial', 'overdue'])
+            ->sum('due_amount');
+            
+                (new SmsService(macResellerId: $customer->mac_reseller_id))->sendInvoiceGenerated(
                     $customer->phone,
                     $customer->name,
-                    floatval($invoice->due_amount),
+                   // floatval($invoice->due_amount),
+                    floatval($totalDue),
                     $invoice->month
                 );
             } catch (\Exception $e) {
@@ -497,28 +516,34 @@ class BillingService
         $thisMonth = now()->format('Y-m');
         $lastMonth = now()->subMonth()->format('Y-m');
 
-        $paidThis   = Invoice::where('month', $thisMonth)->where('status', 'paid')->count();
-        $paidLast   = Invoice::where('month', $lastMonth)->where('status', 'paid')->count();
+        // ── Admin's stat cards should reflect Admin's own customers only —
+        //    NOT customers added by a MAC Reseller (they get their own stats
+        //    on the reseller portal's Billing page). ──
+        $adminOnly = fn($q) => $q->whereHas('customer', fn($c) => $c->whereNull('mac_reseller_id'));
 
-        $unpaidThis = Invoice::where('month', $thisMonth)->whereIn('status', ['unpaid', 'partial', 'overdue'])->count();
-        $unpaidLast = Invoice::where('month', $lastMonth)->whereIn('status', ['unpaid', 'partial', 'overdue'])->count();
+        $paidThis   = Invoice::where('month', $thisMonth)->where('status', 'paid')->tap($adminOnly)->count();
+        $paidLast   = Invoice::where('month', $lastMonth)->where('status', 'paid')->tap($adminOnly)->count();
 
-        $receivedThis = Payment::active()->thisMonth()->sum('amount');
+        $unpaidThis = Invoice::where('month', $thisMonth)->whereIn('status', ['unpaid', 'partial', 'overdue'])->tap($adminOnly)->count();
+        $unpaidLast = Invoice::where('month', $lastMonth)->whereIn('status', ['unpaid', 'partial', 'overdue'])->tap($adminOnly)->count();
+
+        $receivedThis = Payment::active()->thisMonth()->whereHas('customer', fn($c) => $c->whereNull('mac_reseller_id'))->sum('amount');
         $receivedLast = Payment::active()
             ->whereMonth('payment_date', now()->subMonth()->month)
             ->whereYear('payment_date', now()->subMonth()->year)
+            ->whereHas('customer', fn($c) => $c->whereNull('mac_reseller_id'))
             ->sum('amount');
 
-        $totalDue = Invoice::whereIn('status', ['unpaid', 'partial', 'overdue'])->sum('due_amount');
+        $totalDue = Invoice::whereIn('status', ['unpaid', 'partial', 'overdue'])->tap($adminOnly)->sum('due_amount');
 
-        $generatedThis = Invoice::where('month', $thisMonth)->count();
-        $generatedLast = Invoice::where('month', $lastMonth)->count();
+        $generatedThis = Invoice::where('month', $thisMonth)->tap($adminOnly)->count();
+        $generatedLast = Invoice::where('month', $lastMonth)->tap($adminOnly)->count();
 
-        $advanceTotal    = Customer::sum('advance_balance');
-        $monthlyBillThis = Invoice::where('month', $thisMonth)->sum('amount');
-        $monthlyBillLast = Invoice::where('month', $lastMonth)->sum('amount');
+        $advanceTotal    = Customer::whereNull('mac_reseller_id')->sum('advance_balance');
+        $monthlyBillThis = Invoice::where('month', $thisMonth)->tap($adminOnly)->sum('amount');
+        $monthlyBillLast = Invoice::where('month', $lastMonth)->tap($adminOnly)->sum('amount');
 
-        $totalClients       = Customer::active()->count();
+        $totalClients       = Customer::active()->whereNull('mac_reseller_id')->count();
         $collectionRate     = $totalClients > 0 ? round(($paidThis / $totalClients) * 100) : 0;
         $collectionRateLast = $totalClients > 0 ? round(($paidLast / $totalClients) * 100) : 0;
 

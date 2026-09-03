@@ -42,7 +42,7 @@ class PayrollController extends Controller
             'description'       => "Salary Payment — {$payroll->employee->name} ({$payroll->month})"
                                    . " [Payment: ৳" . number_format($payment->amount, 2) . "]",
             'status'            => 'approved',
-            'source_type'       => 'hr_payroll',
+            'source_type'       => 'hr-payroll',
             'source_id'         => $payroll->id,
             'source_invoice_id' => $payroll->id,
             'created_by'        => auth()->id(),

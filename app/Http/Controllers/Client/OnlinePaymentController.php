@@ -17,8 +17,8 @@ class OnlinePaymentController extends Controller
     public function selectGateway(Invoice $invoice)
     {
         $customer = Auth::guard('customer')->user();
-
-        if ($invoice->customer_id !== $customer->id) {
+        //echo $invoice->customer_id; echo '<br>'; echo $customer->id; exit;
+        if ((int) $invoice->customer_id !== (int) $customer->id) {
             abort(403, 'Unauthorized.');
         }
 
@@ -58,7 +58,11 @@ class OnlinePaymentController extends Controller
     {
         $customer = Auth::guard('customer')->user();
 
-        if ($invoice->customer_id !== $customer->id) abort(403);
+        if ((int) $invoice->customer_id !== (int) $customer->id) {
+            abort(403, 'Unauthorized.');
+        }
+        
+        
         if ($invoice->status === 'paid') {
             return redirect()->route('client.invoices')->with('info', 'Invoice already paid.');
         }
@@ -74,7 +78,8 @@ class OnlinePaymentController extends Controller
                 slug:         $slug,
                 customerId:   $customer->id,
                 invoiceId:    $invoice->id,
-                amount:       floatval($invoice->due_amount),
+                //amount:       floatval($invoice->due_amount),
+                amount:       floatval($request->amount),
                 customerData: [
                     'name'    => $customer->name,
                     'email'   => $customer->email   ?? 'customer@isp.com',

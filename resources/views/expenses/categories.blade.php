@@ -20,10 +20,10 @@
             <thead class="thead-light">
                 <tr>
                     <th style="width:40px">#</th>
-                    <th>নাম</th>
+                    <th>Name</th>
                     <th>Badge Preview</th>
                     <th>Icon</th>
-                    <th>বিবরণ</th>
+                    <th>Description</th>
                     <th class="text-center">Expenses</th>
                     <th class="text-center">Status</th>
                     <th style="width:90px">Action</th>
@@ -33,20 +33,18 @@
                 @forelse($categories as $i => $cat)
                 <tr>
                     <td>{{ $i + 1 }}</td>
-                    <td class="font-weight-bold">{{ $cat->name }}</td>
+                    <td class="font-weight-bold">
+                        @if($cat->icon)
+                            <i class="{{ $cat->icon }}"></i>
+                        @endif
+                    {{ $cat->name }}</td>
                     <td>
                         <span class="badge" style="{{ $cat->badgeStyle }}">
+      
                             {{ $cat->name }}
                         </span>
                     </td>
-                    <td>
-                        @if($cat->icon)
-                            <i class="{{ $cat->icon }}"></i>
-                            <small class="text-muted">{{ $cat->icon }}</small>
-                        @else
-                            <span class="text-muted">—</span>
-                        @endif
-                    </td>
+         
                     <td>{{ Str::limit($cat->description, 50) ?? '—' }}</td>
                     <td class="text-center">
                         <span class="badge badge-secondary">{{ $cat->expenses_count }}</span>
@@ -59,6 +57,7 @@
                         @endif
                     </td>
                     <td>
+                    @if(!$cat->is_system)
                         <button class="btn btn-xs btn-warning btn-edit"
                                 data-id="{{ $cat->id }}"
                                 data-name="{{ $cat->name }}"
@@ -79,6 +78,12 @@
                                 </button>
                             </form>
                         @endif
+
+                    @else
+                            <span class="badge badge-info">
+                                <i class="fas fa-lock"></i> Built-in
+                            </span>
+                        @endif                        
                     </td>
                 </tr>
                 @empty

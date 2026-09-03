@@ -24,6 +24,9 @@ class InvoiceController extends Controller
     public function index(Request $request)
     {
         $invoices = Invoice::with(['customer', 'package'])
+            // ── Admin's invoice list should only show invoices for customers Admin
+            //    created directly — NOT customers added by a MAC Reseller ──
+            ->whereHas('customer', fn($c) => $c->whereNull('mac_reseller_id'))
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->month, fn($q) => $q->where('month', $request->month))
             ->when($request->package_id, fn($q) => $q->where('package_id', $request->package_id))
@@ -53,11 +56,19 @@ class InvoiceController extends Controller
         $connectionTypes = \App\Models\ConnectionType::all();
         $clientTypes     = \App\Models\ClientType::all();
         $billingType     = Setting::get('billing_type', 'monthly');
-
+     
+        $customerIds = $invoices->pluck('customer_id')->unique();
+        $totalDueMap = \App\Models\Invoice::whereIn('customer_id', $customerIds)
+            ->whereHas('customer', fn($c) => $c->whereNull('mac_reseller_id'))
+            ->whereIn('status', ['unpaid', 'partial', 'overdue'])
+            ->selectRaw('customer_id, SUM(due_amount) as total')
+            ->groupBy('customer_id')
+            ->pluck('total', 'customer_id');
+            
         return view('invoices.index', compact(
             'invoices', 'stats', 'packages', 'routers',
-            'zones', 'connectionTypes', 'clientTypes', 'billingType'
-        ));
+            'zones', 'connectionTypes', 'clientTypes', 'billingType','totalDueMap'
+        )); 
     }
 
     public function store(Request $request)
@@ -71,6 +82,18 @@ class InvoiceController extends Controller
             'notes'       => 'nullable|string',
         ]);
 
+        $customer = Customer::find($request->customer_id);
+
+        // Admin's manual invoice creation is only for Admin's own customers —
+        // reseller-owned customers get invoiced through the reseller's own portal.
+        if ($customer->mac_reseller_id) {
+            $msg = 'This customer belongs to a MAC Reseller. Invoices for reseller customers must be created from the reseller portal.';
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => $msg], 422);
+            }
+            return back()->with('error', $msg);
+        }
+
         $exists = Invoice::where('customer_id', $request->customer_id)
                          ->where('month', $request->month)
                          ->exists();
@@ -81,8 +104,6 @@ class InvoiceController extends Controller
             }
             return back()->with('error', 'An invoice already exists for this customer and month.');
         }
-
-        $customer = Customer::find($request->customer_id);
 
         // Calculate due date from settings if not provided
         $dueDate = $request->due_date ?? Invoice::calculateDueDate();
@@ -175,7 +196,7 @@ class InvoiceController extends Controller
             return back()->with('error', 'Bulk generate is not available for Date to Date billing. Invoices are generated automatically via scheduler.');
         }
 
-        $customers = Customer::active()->with('package')->get();
+        $customers = Customer::active()->whereNull('mac_reseller_id')->with('package')->get();
         $created   = 0;
         $skipped   = 0;
 

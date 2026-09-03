@@ -6,6 +6,7 @@ use App\Models\User;
 class Employee extends Model
 {
     protected $fillable = [
+        'mac_reseller_id',
         'employee_code', 'user_id', 'department_id', 'position_id',
         'name', 'phone', 'email', 'nid_number', 'photo',
         'join_date', 'status', 'leaving_date', 'leaving_reason', 'leaving_note',
@@ -74,6 +75,11 @@ class Employee extends Model
     public function scopeActive($query)
     {
         return $query->where('status', 'active');
+    }
+
+    public function scopeForReseller($query, $macResellerId)
+    {
+        return $query->where('mac_reseller_id', $macResellerId);
     }
 
     public static function generateCode(): string

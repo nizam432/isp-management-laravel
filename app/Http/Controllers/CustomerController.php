@@ -22,6 +22,9 @@ class CustomerController extends Controller
     public function index(Request $request)
     {
         $customers = Customer::with(['package', 'agent', 'zone', 'subZone', 'router', 'clientType', 'connectionType', 'protocolType'])
+            // ── Admin's own customer list should only show customers Admin created
+            //    directly — NOT customers added by any MAC Reseller through their portal ──
+            ->whereNull('mac_reseller_id')
             ->when($request->search, fn($q) => $q
                 ->where('name',           'like', "%{$request->search}%")
                 ->orWhere('phone',         'like', "%{$request->search}%")
@@ -39,10 +42,11 @@ class CustomerController extends Controller
             ->latest()
             ->paginate(20);
 
-        $totalCustomers     = Customer::count();
-        $activeCustomers    = Customer::where('status', 'active')->count();
-        $suspendedCustomers = Customer::where('status', 'suspended')->count();
-        $expiredCustomers   = Customer::where('status', 'expired')->count();
+        // summary cards should match the same "Admin's own customers only" scope
+        $totalCustomers     = Customer::whereNull('mac_reseller_id')->count();
+        $activeCustomers    = Customer::whereNull('mac_reseller_id')->where('status', 'active')->count();
+        $suspendedCustomers = Customer::whereNull('mac_reseller_id')->where('status', 'suspended')->count();
+        $expiredCustomers   = Customer::whereNull('mac_reseller_id')->where('status', 'expired')->count();
 
         $packages        = Package::active()->get();
         $routers         = \App\Models\MikrotikRouter::where('is_active', 1)->get();
@@ -328,12 +332,16 @@ class CustomerController extends Controller
         try {
             $router = $customer->router ?? MikrotikRouter::active()->first();
             if (!$router) return;
-            $service = new MikrotikService($router);
-            $service->addPppoeUser(
-                $customer->pppoe_username,
-                $customer->pppoe_password,
-                $customer->package->mikrotik_profile ?? 'default'
-            );
+
+            $mikrotik = new MikrotikService();
+            $mikrotik->withRouter($router, function ($m) use ($customer) {
+                $m->createPPPoEUser([
+                    'username' => $customer->pppoe_username,
+                    'password' => $customer->pppoe_password,
+                    'profile'  => $customer->package->mikrotik_profile ?? 'default',
+                    'comment'  => "ISP-{$customer->customer_code} | {$customer->name}",
+                ]);
+            });
         } catch (\Exception $e) {
             Log::error('MikroTik provision failed: ' . $e->getMessage());
         }

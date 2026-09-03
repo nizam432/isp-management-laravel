@@ -1,5 +1,5 @@
 {{-- resources/views/super-admin/payment-gateways.blade.php --}}
-@extends('adminlte::page')
+@extends('layouts.super-admin')
 
 @section('title', 'Payment Gateway Management')
 

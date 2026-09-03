@@ -23,13 +23,11 @@ Route::prefix('super-admin')->name('super-admin.')->group(function () {
 
         Route::post('/logout', [SuperAdminAuthController::class, 'logout'])->name('logout');
 
-        Route::get('/dashboard', function () {
-            return 'Super Admin Dashboard — placeholder, controller পরে বসবে';
-        })->name('dashboard');
-
-        // এখানে পরে যোগ হবে: tenant list, create tenant, sms gateway config,
-        // plans management ইত্যাদি — যেভাবে reseller.php তে menu-ভিত্তিক
-        // route group করা হয়েছে, একই প্যাটার্নে করা যাবে।
+        // NOTE: dashboard route already exists (SuperAdmin\TenantController@dashboard,
+        // at URI 'super-admin' → name 'super-admin.dashboard'). Removed the
+        // placeholder that was here — it was duplicate-naming the real route.
+        // Full panel (tenants, permissions, plans, roles, sms/payment gateways)
+        // already exists — this file only needed to add the missing login/logout.
     });
 
 });

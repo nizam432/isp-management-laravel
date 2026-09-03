@@ -61,7 +61,8 @@ use App\Http\Controllers\Client\OnlinePaymentController;
 // Public Routes
 // ─────────────────────────────────────────────
 
-Route::get('/', fn() => redirect()->route('login'));
+//Route::get('/', fn() => redirect()->route('login'));
+Route::domain('isp.innovativeitbd.com')->get('/', fn() => redirect('/super-admin/login'));
 
 Route::get('language/{locale}', [LanguageController::class, 'switch'])->name('language.switch');
 
@@ -119,6 +120,7 @@ Route::middleware(['auth'])->group(function () {
         'update'  => 'can:package.edit',
         'destroy' => 'can:package.delete',
     ]);
+    
     Route::patch('packages/{package}/toggle', [PackageController::class, 'toggleStatus'])->name('packages.toggle')->middleware('can:package.edit');
 
     // ── Invoices ───────────────────────────────
@@ -380,7 +382,7 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // ── Super Admin ────────────────────────────
-    Route::prefix('super-admin')->name('super-admin.')->middleware(['superadmin'])->group(function () {
+    Route::prefix('super-admin')->name('super-admin.')->middleware(['superadmin'])->withoutMiddleware(['auth'])->group(function () {
 
         Route::get('/', [SuperAdminTenantController::class, 'dashboard'])->name('dashboard');
         Route::get('/dashboard/stats', [SuperAdminTenantController::class, 'dashboardStats'])->name('dashboard.stats');
@@ -784,43 +786,9 @@ Route::middleware(['auth'])->group(function () {
 // ─────────────────────────────────────────────
 // Client Portal Routes (নিজস্ব guard — auth এর বাইরে)
 // ─────────────────────────────────────────────
-require __DIR__ . '/client.php';
-require __DIR__.'/inventory.php';
 
-// ─────────────────────────────────────────────
-// Payment Gateway Callbacks — No Auth, No CSRF
-// (Gateway redirect করে এখানে — session নেই)
-// ─────────────────────────────────────────────
-Route::prefix('client/payment')->group(function () {
 
-    // SSLCommerz & AmarPay — POST success/fail/cancel
-    Route::post('{gateway}/success', [OnlinePaymentController::class, 'success'])->name('client.payment.success');
-    Route::post('{gateway}/fail',    [OnlinePaymentController::class, 'fail'])   ->name('client.payment.fail');
-    Route::post('{gateway}/cancel',  [OnlinePaymentController::class, 'cancel']) ->name('client.payment.cancel');
 
-    // Razorpay & Stripe cancel — GET
-    Route::get('{gateway}/cancel',   [OnlinePaymentController::class, 'cancel']);
-
-    // Stripe success — GET (has ?session_id=)
-    Route::get('{gateway}/success',  [OnlinePaymentController::class, 'success']);
-
-    // bKash & Nagad & Razorpay — GET/POST callback
-    Route::get ('{gateway}/callback', [OnlinePaymentController::class, 'callback'])->name('client.payment.callback');
-    Route::post('{gateway}/callback', [OnlinePaymentController::class, 'callback']);
-
-    // IPN — server-to-server (SSLCommerz, AmarPay)
-    Route::post('{gateway}/ipn', [OnlinePaymentController::class, 'ipn'])
-         ->name('client.payment.ipn')
-         ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
-
-    // Stripe Webhook
-    Route::post('stripe/webhook', [OnlinePaymentController::class, 'stripeWebhook'])
-         ->name('client.payment.stripe-webhook')
-         ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
-
-    // Payment success page — no auth needed (SSLCommerz redirects here after payment)
-    Route::get('success-page/{ref}', [OnlinePaymentController::class, 'successPage'])
-         ->name('client.payment.success-page');
-});
 
 require __DIR__ . '/super-admin.php';
+require __DIR__.'/inventory.php';

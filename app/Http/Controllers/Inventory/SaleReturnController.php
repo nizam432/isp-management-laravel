@@ -225,7 +225,7 @@ class SaleReturnController extends Controller
     }
 
     // =========================================================================
-    // SHOW
+    // SHOW 
     // =========================================================================
     public function show(SaleReturn $saleReturn)
     {

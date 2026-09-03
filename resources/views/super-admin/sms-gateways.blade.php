@@ -1,5 +1,5 @@
 {{-- resources/views/super-admin/sms-gateways.blade.php --}}
-@extends('layouts.app')
+@extends('layouts.super-admin')
 @section('page_title', 'SMS Gateway Management')
 @section('page_content')
 

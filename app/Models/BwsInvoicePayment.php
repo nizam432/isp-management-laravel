@@ -84,7 +84,7 @@ class BwsInvoicePayment extends Model
             'reference_no'      => $this->payment_no,
             'description'       => "BWS Invoice: {$this->bwsInvoice->invoice_no} | " .
                                    "Customer: {$customer?->customer_name}",
-            'source_type'       => 'bandwidth_sale',
+            'source_type'       => 'bandwidth-sale',
             'source_id'         => $this->id,
             'source_invoice_id' => $this->bws_invoice_id,
             'status'            => 'active',

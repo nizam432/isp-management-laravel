@@ -19,12 +19,13 @@ class Income extends Model
     ];
 
     // source_type constants
-    const SOURCE_DIRECT         = 'manual';
-    const SOURCE_MONTHLY_BILL   = 'monthly_bill';
-    const SOURCE_BANDWIDTH_SALE = 'bandwidth_sale';
-    const SOURCE_PRODUCT_SALE   = 'product_sale';
-    const SOURCE_PRODUCT_RETURN = 'product_return';
-    const SOURCE_CONNECTION_FEE = 'connection_fee';
+    const SOURCE_DIRECT               = 'manual';
+    const SOURCE_MONTHLY_BILL         = 'monthly-bill';
+    const SOURCE_BANDWIDTH_SALE       = 'bandwidth-sale';
+    const SOURCE_PRODUCT_SALE         = 'product-sale';
+    const SOURCE_PRODUCT_RETURN       = 'sale-return';
+    const SOURCE_CONNECTION_FEE       = 'connection-fee';
+    const SOURCE_MAC_RESELLER_FUNDING = 'mac-reseller-funding';
 
     protected $casts = [
         'amount'      => 'decimal:2',
@@ -135,12 +136,13 @@ class Income extends Model
     public function getSourceLabelAttribute(): string
     {
         return match ($this->source_type) {
-            self::SOURCE_MONTHLY_BILL   => 'Monthly Bill',
-            self::SOURCE_BANDWIDTH_SALE => 'Bandwidth Sale',
-            self::SOURCE_PRODUCT_SALE   => 'Product Sale',
-            self::SOURCE_PRODUCT_RETURN => 'Product Return',
-            self::SOURCE_CONNECTION_FEE => 'Connection Fee',
-            default                     => 'Manual',
+            self::SOURCE_MONTHLY_BILL         => 'Monthly Bill',
+            self::SOURCE_BANDWIDTH_SALE       => 'Bandwidth Sale',
+            self::SOURCE_PRODUCT_SALE         => 'Product Sale',
+            self::SOURCE_PRODUCT_RETURN       => 'Product Return',
+            self::SOURCE_CONNECTION_FEE       => 'Connection Fee',
+            self::SOURCE_MAC_RESELLER_FUNDING => 'MAC Reseller Funding',
+            default                           => 'Manual',
         };
     }
 
@@ -158,6 +160,9 @@ class Income extends Model
             self::SOURCE_PRODUCT_SALE   => route('inventory.sales.show', $this->source_invoice_id ?? $this->source_id),
             self::SOURCE_PRODUCT_RETURN => route('inventory.sale-returns.show', $this->source_id),
             self::SOURCE_CONNECTION_FEE => route('connection-fee.show', $this->source_id),
+            // No dedicated "show" route exists for a single funding record yet —
+            // link to the funding history list instead (filterable there).
+            self::SOURCE_MAC_RESELLER_FUNDING => route('mac-reseller.funding.history'),
             default                     => null,
         };
     }

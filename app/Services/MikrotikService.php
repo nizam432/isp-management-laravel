@@ -338,10 +338,6 @@ class MikrotikService
     }
 
     /**
-     * PPPoE profile তৈরি করো
-     */
-
-    /**
      * সব Hotspot User Profile লিস্ট
      */
     public function getHotspotProfiles(): array
@@ -497,7 +493,7 @@ class MikrotikService
 
     /**
      * Customer কে MikroTik এ সম্পূর্ণ provision করো
-     * (PPPoE user + Queue তৈরি)
+     * (PPPoE user + Queue তৈরি) — ADMIN'S OWN CUSTOMERS (mac_reseller_id null)
      */
     public function provisionCustomer(Customer $customer): bool
     {
@@ -523,6 +519,61 @@ class MikrotikService
         }
 
         return true;
+    }
+
+    /**
+     * Customer কে MikroTik এ provision করো — RESELLER'S OWN CUSTOMERS.
+     *
+     * Reseller customers don't have a global `package_id` (they use
+     * `mac_reseller_tariff_package_id` instead), so provisionCustomer()'s
+     * `$customer->package` lookup would always be null for them. This mirrors
+     * that method but reads Server/Profile from the reseller's own Tariff
+     * line (MacResellerTariffPackage) instead.
+     *
+     * NOTE: MacResellerTariffPackage has no bandwidth (speed_download/
+     * speed_upload) fields, so — unlike provisionCustomer() — this does NOT
+     * create a Simple Queue. Only the PPPoE secret (username/password/profile)
+     * is provisioned. Add a Queue manually on the router if bandwidth shaping
+     * is needed, or extend MacResellerTariffPackage with speed fields later.
+     *
+     * Returns true on success, false if provisioning was skipped or failed
+     * (e.g. no server_name set, or the router doesn't match this reseller's
+     * account, or the router couldn't be reached) — callers should NOT block
+     * customer creation on this returning false, just log/notify.
+     */
+    public function provisionResellerCustomer(Customer $customer): bool
+    {
+        if (empty($customer->pppoe_username) || empty($customer->pppoe_password)) {
+            Log::warning("Reseller provisioning skipped — customer #{$customer->id} has no PPPoE username/password.");
+            return false;
+        }
+
+        $tariffPackage = $customer->resellerTariffPackage;
+        if (!$tariffPackage || empty($tariffPackage->server_name)) {
+            Log::warning("Reseller provisioning skipped — customer #{$customer->id} has no Tariff Package / server_name set.");
+            return false;
+        }
+
+        $router = MikrotikRouter::where('name', $tariffPackage->server_name)->first();
+        if (!$router) {
+            Log::warning("Reseller provisioning skipped — no MikrotikRouter found matching server_name '{$tariffPackage->server_name}' (customer #{$customer->id}).");
+            return false;
+        }
+
+        try {
+            $this->withRouter($router, function ($mikrotik) use ($customer, $tariffPackage) {
+                $mikrotik->createPPPoEUser([
+                    'username' => $customer->pppoe_username,
+                    'password' => $customer->pppoe_password,
+                    'profile'  => $tariffPackage->profile ?? 'default',
+                    'comment'  => "RESELLER-{$customer->customer_code} | {$customer->name}",
+                ]);
+            });
+            return true;
+        } catch (\Exception $e) {
+            Log::error("Reseller MikroTik provisioning failed for customer #{$customer->id}: " . $e->getMessage());
+            return false;
+        }
     }
 
     /**

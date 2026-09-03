@@ -1,6 +1,6 @@
 {{-- resources/views/import/csv-preview.blade.php --}}
 @extends('layouts.app')
-@section('page_title', 'CSV Import Preview')
+@section('page_title', 'Excel Import Preview')
 @section('page_actions')
     <a href="{{ route('import.index') }}" class="btn btn-secondary btn-sm">
         <i class="fas fa-arrow-left mr-1"></i> Back
@@ -17,16 +17,15 @@
     <i class="fas fa-info-circle mr-1"></i>
     মোট <strong>{{ count($rows) }}</strong> row পাওয়া গেছে।
     <strong class="text-success">{{ $willImport }}</strong> টি import হবে।
-    <strong class="text-warning">{{ $willSkip }}</strong> টি skip হবে (already আছে)।
+    <strong class="text-warning">{{ $willSkip }}</strong> টি skip হবে।
 </div>
 
 <form action="{{ route('import.csv.execute') }}" method="POST">
     @csrf
-    <input type="hidden" name="package_id" value="{{ $package_id }}">
 
     <div class="card">
         <div class="card-header">
-            <h3 class="card-title">CSV Data Preview</h3>
+            <h3 class="card-title">Excel Data Preview</h3>
         </div>
         <div class="card-body p-0" style="overflow-x:auto">
             <table class="table table-sm table-striped mb-0">
@@ -35,11 +34,12 @@
                         <th>#</th>
                         <th>Status</th>
                         <th>নাম</th>
-                        <th>Phone</th>
+                        <th>Mobile</th>
                         <th>PPPoE Username</th>
-                        <th>PPPoE Password</th>
-                        <th>IP</th>
-                        <th>Area</th>
+                        <th>Zone</th>
+                        <th>Package</th>
+                        <th>Protocol</th>
+                        <th>Reason (if skipped)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -49,31 +49,58 @@
                         <td>
                             @if(!$row['_will_import'])
                                 <span class="badge badge-warning">Skip</span>
-                                @if($row['_exists_username'])
-                                    <small class="text-muted">username exists</small>
-                                @elseif($row['_exists_phone'])
-                                    <small class="text-muted">phone exists</small>
-                                @endif
                             @else
                                 <span class="badge badge-success">Import</span>
                                 {{-- Hidden inputs for rows that will be imported --}}
                                 <input type="hidden" name="rows[{{ $i }}][name]"           value="{{ $row['name'] ?? '' }}">
                                 <input type="hidden" name="rows[{{ $i }}][phone]"          value="{{ $row['phone'] ?? '' }}">
                                 <input type="hidden" name="rows[{{ $i }}][email]"          value="{{ $row['email'] ?? '' }}">
+                                <input type="hidden" name="rows[{{ $i }}][nid]"            value="{{ $row['nid'] ?? '' }}">
                                 <input type="hidden" name="rows[{{ $i }}][address]"        value="{{ $row['address'] ?? '' }}">
-                                <input type="hidden" name="rows[{{ $i }}][area]"           value="{{ $row['area'] ?? '' }}">
+                                <input type="hidden" name="rows[{{ $i }}][zone_id]"        value="{{ $row['_zone_id'] ?? '' }}">
+                                <input type="hidden" name="rows[{{ $i }}][sub_zone_id]"    value="{{ $row['_sub_zone_id'] ?? '' }}">
+                                <input type="hidden" name="rows[{{ $i }}][package_id]"     value="{{ $row['_package_id'] ?? '' }}">
+                                <input type="hidden" name="rows[{{ $i }}][protocol_id]"    value="{{ $row['_protocol_id'] ?? '' }}">
                                 <input type="hidden" name="rows[{{ $i }}][pppoe_username]" value="{{ $row['pppoe_username'] ?? '' }}">
                                 <input type="hidden" name="rows[{{ $i }}][pppoe_password]" value="{{ $row['pppoe_password'] ?? '' }}">
                                 <input type="hidden" name="rows[{{ $i }}][ip_address]"     value="{{ $row['ip_address'] ?? '' }}">
-                                <input type="hidden" name="rows[{{ $i }}][billing_date]"   value="{{ $row['billing_date'] ?? '1' }}">
+                                <input type="hidden" name="rows[{{ $i }}][status]"         value="{{ $row['status'] ?? 'active' }}">
+                                <input type="hidden" name="rows[{{ $i }}][monthly_bill]"   value="{{ $row['monthly_bill'] ?? '' }}">
+                                <input type="hidden" name="rows[{{ $i }}][join_date]"      value="{{ $row['join_date'] ?? '' }}">
                             @endif
                         </td>
                         <td>{{ $row['name'] ?? '—' }}</td>
                         <td>{{ $row['phone'] ?? '—' }}</td>
                         <td><code>{{ $row['pppoe_username'] ?? '—' }}</code></td>
-                        <td><small>{{ $row['pppoe_password'] ?? '—' }}</small></td>
-                        <td>{{ $row['ip_address'] ?? '—' }}</td>
-                        <td>{{ $row['area'] ?? '—' }}</td>
+                        <td>
+                            {{ $row['zone'] ?? '—' }}
+                            @if(!empty($row['zone']) && !$row['_zone_ok'])
+                                <br><small class="text-danger">not found</small>
+                            @endif
+                        </td>
+                        <td>
+                            {{ $row['package'] ?? '—' }}
+                            @if(!empty($row['package']) && !$row['_package_ok'])
+                                <br><small class="text-danger">not found</small>
+                            @endif
+                        </td>
+                        <td>
+                            {{ $row['protocol_type'] ?? '—' }}
+                            @if(!empty($row['protocol_type']) && !$row['_protocol_ok'])
+                                <br><small class="text-danger">not found</small>
+                            @endif
+                        </td>
+                        <td>
+                            <small class="text-muted">
+                                @if($row['_exists_username'] ?? false) Username already exists @endif
+                                @if($row['_exists_phone'] ?? false) Phone already exists @endif
+                                @if(empty($row['pppoe_username'])) PPPoE Username missing @endif
+                                @if(empty($row['pppoe_password'])) PPPoE Password missing @endif
+                                @if(!($row['_zone_ok'] ?? true)) Zone not found @endif
+                                @if(!($row['_package_ok'] ?? true)) Package not found @endif
+                                @if(!($row['_protocol_ok'] ?? true)) Protocol not found @endif
+                            </small>
+                        </td>
                     </tr>
                     @endforeach
                 </tbody>

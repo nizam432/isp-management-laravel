@@ -7,32 +7,18 @@ use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
+    /**
+     * NOTE: `payment_gateways` (the master gateway list Super Admin manages)
+     * was REMOVED from this tenant migration — it was wrongly creating a
+     * separate copy of that table in every tenant's own database, when it's
+     * supposed to be one shared, centrally-managed table. It now lives in
+     * database/migrations/2026_07_06_023537_create_payment_gateways_table.php
+     * (central). This file keeps only the genuinely tenant-scoped tables
+     * (they have foreign keys to this tenant's own customers/invoices).
+     */
     public function up(): void
     {
-        // ── 1. Master gateway list (Super Admin manages) ──────────
-        Schema::create('payment_gateways', function (Blueprint $table) {
-            $table->id();
-            $table->string('name', 60);
-            $table->string('slug', 30)->unique();
-            $table->text('description')->nullable();
-            $table->enum('type', ['local', 'international'])->default('local');
-            $table->boolean('is_enabled')->default(false);
-            $table->timestamps();
-        });
-
-        DB::table('payment_gateways')->insert([
-            // LOCAL
-            ['name' => 'bKash',      'slug' => 'bkash',      'type' => 'local',         'description' => 'বাংলাদেশের সবচেয়ে জনপ্রিয় MFS — bKash Checkout URL API',              'is_enabled' => false, 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'Nagad',      'slug' => 'nagad',      'type' => 'local',         'description' => 'ডাক বিভাগের MFS — Nagad Merchant API',                                  'is_enabled' => false, 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'SSLCommerz', 'slug' => 'sslcommerz', 'type' => 'local',         'description' => 'BD payment aggregator — MFS + Card + বিকাশ + নগদ সব এক জায়গায়',        'is_enabled' => false, 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'AmarPay',    'slug' => 'amarpayz',   'type' => 'local',         'description' => 'AmarPay (aamarpay) — MFS ও card payment gateway',                        'is_enabled' => false, 'created_at' => now(), 'updated_at' => now()],
-            // INTERNATIONAL
-            ['name' => 'Stripe',     'slug' => 'stripe',     'type' => 'international', 'description' => 'Global card payment — Visa, Mastercard, Apple Pay, Google Pay',          'is_enabled' => false, 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'PayPal',     'slug' => 'paypal',     'type' => 'international', 'description' => 'PayPal Orders API v2 — worldwide acceptance',                            'is_enabled' => false, 'created_at' => now(), 'updated_at' => now()],
-            ['name' => 'Razorpay',   'slug' => 'razorpay',   'type' => 'international', 'description' => 'Razorpay Payment Links — card, UPI, net banking',                        'is_enabled' => false, 'created_at' => now(), 'updated_at' => now()],
-        ]);
-
-        // ── 2. ISP-level credentials ──────────────────────────────
+        // ── ISP-level credentials ──────────────────────────
         Schema::create('payment_gateway_settings', function (Blueprint $table) {
             $table->id();
             $table->string('tenant_id', 50);
@@ -45,7 +31,7 @@ return new class extends Migration
             $table->index('tenant_id');
         });
 
-        // ── 3. Transaction log ────────────────────────────────────
+        // ── Transaction log ─────────────────────────────────
         Schema::create('payment_gateway_transactions', function (Blueprint $table) {
             $table->id();
             $table->string('txn_ref', 60)->unique();
@@ -71,6 +57,5 @@ return new class extends Migration
     {
         Schema::dropIfExists('payment_gateway_transactions');
         Schema::dropIfExists('payment_gateway_settings');
-        Schema::dropIfExists('payment_gateways');
     }
 };

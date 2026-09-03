@@ -16,9 +16,9 @@
             <div class="info-box-content">
                 <span class="info-box-text">This Month Income</span>
                 <span class="info-box-number">BDT {{ number_format($thisMonthIncome) }}</span>
-                <span class="info-box-text" style="font-size:11px">
+                    {{--<span class="info-box-text" style="font-size:11px">
                     Bill: {{ number_format($thisMonthBill) }} + Manual: {{ number_format($thisMonthManual) }}
-                </span>
+                    </span>--}}
             </div>
         </div>
     </div>

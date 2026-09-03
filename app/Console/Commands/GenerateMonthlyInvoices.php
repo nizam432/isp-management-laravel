@@ -13,20 +13,18 @@ use Illuminate\Support\Facades\Log;
 /**
  * GenerateMonthlyInvoices
  * ─────────────────────────────────────────────
- * প্রতি মাসের নির্দিষ্ট billing date এ (Settings → Billing → Default Billing Date)
- * স্বয়ংক্রিয়ভাবে চলবে — শুধু billing_type = 'monthly' হলে।
+ * Admin's own customers only. Reseller customers use their own billing_type
+ * (set in the Reseller Portal's Settings) and are handled by
+ * ResellerGenerateMonthlyInvoices instead.
  *
- * সব active customer এর জন্য invoice তৈরি করবে।
- *
- * Run manually (--month দিলে billing date/billing_type check bypass হয়, testing এর জন্য):
- *   php artisan invoices:generate-monthly
- *   php artisan invoices:generate-monthly --month=2026-05
+ * Run manually (--month bypasses billing date check for testing/backfill):
+ * php artisan tenants:run "invoices:generate-monthly"
+ * php artisan tenants:run invoices:generate-monthly --option=month=2026-06
  */
 class GenerateMonthlyInvoices extends Command
 {
-    protected $signature   = 'invoices:generate-monthly {--month= : Y-m format, default current month — দিলে billing_type/billing_date check bypass হয়}';
-    protected $description = 'সব active customer এর জন্য monthly invoice তৈরি করো';
-
+    protected $signature = 'invoices:generate-monthly {--month= : Billing month in Y-m format (defaults to the current month). When provided, the billing date check is skipped.}';
+    protected $description = 'Generate monthly invoices for all active customers.';
     public function __construct(protected BillingService $billing)
     {
         parent::__construct();
@@ -39,50 +37,55 @@ class GenerateMonthlyInvoices extends Command
 
         // Validate month format
         if (!preg_match('/^\d{4}-\d{2}$/', $month)) {
-            $this->error('Month format ভুল। সঠিক format: Y-m (যেমন 2026-05)');
+            $this->error('Invalid month format. Expected format: Y-m (e.g. 2026-05).');
             return;
         }
 
-        // billing_type সবসময় চেক হবে — --month দিয়েও bypass করা যাবে না, কারণ
-        // Date to Date সিস্টেমে ভুল করে Monthly invoice তৈরি হয়ে যাওয়া একটা real
-        // data-integrity সমস্যা, শুধু টেস্টিং সুবিধার জন্য এটা bypass করা ঠিক না।
+        // Always verify billing_type.
+        // Even when --month is provided, this check must not be bypassed because
+        // generating Monthly invoices in a Date-to-Date billing system would create
+        // data integrity issues. The manual option is intended only for testing
+        // or backfilling invoices.
         $billingType = Setting::get('billing_type', 'monthly');
         if ($billingType !== 'monthly') {
-            $this->error("Billing type এখন '{$billingType}' — এই কমান্ড শুধু 'monthly' billing type এর জন্য। বন্ধ করা হলো।");
+            $this->error("Current billing type is '{$billingType}'. This command can only be used when billing_type is 'monthly'.");
             return;
         }
 
-        // --month দিয়ে manually run করলে (e.g. testing/backfill) শুধু "আজ কি সঠিক
-        // billing date" চেকটা skip হয় — billing_type চেক উপরে সবসময়ই হয়।
+        // When running manually with the --month option (e.g. for testing or backfilling),
+        // only the configured billing date check is skipped.
+        // The billing_type validation above is always enforced.
         if (!$manualMonth) {
             $billingDate = intval(Setting::get('default_billing_date', 1));
             if (now()->day !== $billingDate) {
-                $this->info("আজ configured billing date ({$billingDate}) না। Skip করা হলো।");
+               $this->info("Today is not the configured billing date ({$billingDate}). Skipping invoice generation.");
                 return;
             }
         }
 
-        $customers = Customer::active()->with('package')->get();
+        // Admin's own customers only — see class docblock.
+        $customers = Customer::active()->whereNull('mac_reseller_id')->with('package')->get();
 
         if ($customers->isEmpty()) {
-            $this->info('কোনো active customer নেই।');
+           $this->info('No active customers found.');
             return;
         }
 
-        $this->info("মাস: {$month} | মোট customers: {$customers->count()}");
+        $this->info("Month: {$month} | Total customers: {$customers->count()}");
         $bar = $this->output->createProgressBar($customers->count());
         $bar->start();
 
         $created = 0;
         $skipped = 0;
 
-        // Invoice-generated SMS-গুলো লুপের ভেতরে একটা একটা করে পাঠানোর বদলে collect
-        // করে রাখা হচ্ছে, লুপ শেষে একবারে sendDynamic() দিয়ে batch পাঠানো হবে —
-        // 500 customer হলে 500টা আলাদা API call না হয়ে, ১টা call-ই হবে।
+    // Instead of sending invoice-generated SMS messages one by one inside the loop,
+    // collect them first and send them in a single batch using sendDynamic() after
+    // the loop completes. This reduces API requests (e.g. 500 customers = 1 API call
+    // instead of 500 separate calls).
         $generated = collect();
-
+        
         foreach ($customers as $customer) {
-            // আগে থেকে invoice আছে কিনা চেক
+           
             $exists = Invoice::where('customer_id', $customer->id)
                              ->where('month', $month)
                              ->exists();
@@ -93,10 +96,11 @@ class GenerateMonthlyInvoices extends Command
                 continue;
             }
 
-            // Due date: মাসের শেষ দিন
+           // Due date: Last day of the month.
             $dueDate = now()->createFromFormat('Y-m', $month)->endOfMonth()->toDateString();
 
-            // customer এর নিজস্ব override amount থাকলে সেটা, নাহলে package price
+           // Use the customer's overridden monthly bill amount;
+            // otherwise, fall back to the package price.
             $amount = $customer->monthly_bill_amount > 0
                 ? $customer->monthly_bill_amount
                 : ($customer->package->price ?? 0);
@@ -113,13 +117,14 @@ class GenerateMonthlyInvoices extends Command
                 'status'      => 'unpaid',
             ]);
 
-            // Advance balance থাকলে সাথে সাথে apply করো (bulkGenerate() এর মতোই)
+           // Apply the customer's advance balance, if available,
+            // following the same logic as bulkGenerate().
             if ($customer->advance_balance > 0) {
                 $this->billing->applyAdvanceToInvoice($invoice);
                 $customer->refresh();
             }
 
-            // "Invoice Generated" SMS এখনই না পাঠিয়ে, batch করার জন্য collect করা হচ্ছে
+            // Queue the invoice-generated SMS for batch sending.
             $generated->push(['customer' => $customer, 'invoice' => $invoice]);
 
             $created++;
@@ -128,19 +133,30 @@ class GenerateMonthlyInvoices extends Command
 
         $bar->finish();
         $this->newLine();
-        $this->info("✅ তৈরি হয়েছে: {$created} টি invoice।");
-        $this->info("⏭️ Skip হয়েছে: {$skipped} টি (আগে থেকে ছিল)।");
+        $this->info("✅ Invoices created: {$created}");
+        $this->info("⏭️ Invoices skipped: {$skipped} (already existed).");
 
-        // এখন সব invoice-এর SMS একসাথে ১টা batch call-এ পাঠানো হচ্ছে
+        // Send all invoice-generated SMS messages in a single batch API call.
+        // Safe to use a plain (no macResellerId) SmsService here — this command
+        // now only ever processes Admin's own customers.
         $smsEnabled = Setting::get('invoice_generated_sms', '1') == '1';
 
         if ($smsEnabled && $generated->isNotEmpty()) {
             $sms        = new SmsService();
             $recipients = [];
-
+       
+       
+            $totalDueMap = Invoice::whereIn('status', ['unpaid', 'partial', 'overdue'])
+            ->selectRaw('customer_id, SUM(due_amount) as total')
+            ->groupBy('customer_id')
+            ->pluck('total', 'customer_id');
+          
+          
             foreach ($generated as $item) {
                 $customer = $item['customer'];
                 $invoice  = $item['invoice'];
+                 $due = $totalDueMap->get($customer->id, 0);
+           
 
                 if (!$customer->phone) continue;
 
@@ -148,7 +164,7 @@ class GenerateMonthlyInvoices extends Command
                     'mobile'  => $customer->phone,
                     'message' => $sms->buildInvoiceGeneratedMessage(
                         $customer->name,
-                        floatval($invoice->due_amount),
+                        floatval($due),
                         $invoice->month
                     ),
                 ];
@@ -156,7 +172,7 @@ class GenerateMonthlyInvoices extends Command
 
             if (!empty($recipients)) {
                 $result = $sms->sendDynamic($recipients, 'invoice_generated');
-                $this->info("📱 Invoice-generated SMS: {$result['sent']} sent, {$result['failed']} failed (১টা API call-এ)।");
+                $this->info("📱 Invoice-generated SMS: {$result['sent']} sent, {$result['failed']} failed (single API call).");
             }
         }
 

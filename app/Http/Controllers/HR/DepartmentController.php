@@ -1,7 +1,7 @@
 <?php
-
 namespace App\Http\Controllers\HR;
-use App\Http\Controllers\Controller; 
+
+use App\Http\Controllers\Controller;
 use App\Models\HR\Department;
 use App\Models\HR\Position;
 use Illuminate\Http\Request;
@@ -10,33 +10,59 @@ class DepartmentController extends Controller
 {
     public function index()
     {
-        $departments = Department::withCount(['positions', 'employees'])->latest()->get();
-        $positions   = Position::with('department')->latest()->get();
+        $departments = Department::withCount(['positions', 'employees'])
+            ->whereNull('mac_reseller_id')   // shudu isp-admin er department
+            ->latest()
+            ->get();
+
+        $positions = Position::with('department')
+            ->whereHas('department', function ($q) {
+                $q->whereNull('mac_reseller_id');
+            })
+            ->latest()
+            ->get();
+
         return view('hr.departments.index', compact('departments', 'positions'));
     }
 
     public function store(Request $request)
     {
         $request->validate(['name' => 'required|string|max:100|unique:departments,name']);
-        Department::create($request->only('name', 'description') + ['is_active' => true]);
+
+        Department::create($request->only('name', 'description') + [
+            'is_active'       => true,
+            'mac_reseller_id' => null,   // isp-admin er department hishebe create hobe
+        ]);
+
         return back()->with('success', "Department '{$request->name}' created.");
     }
 
     public function update(Request $request, Department $department)
     {
+        // isp-admin sudu tar nijer (mac_reseller_id null) department e access pabe
+        if (!is_null($department->mac_reseller_id)) {
+            abort(403, 'Unauthorized access to this department.');
+        }
+
         $request->validate(['name' => 'required|string|max:100|unique:departments,name,' . $department->id]);
         $department->update($request->only('name', 'description'));
+
         return back()->with('success', 'Department updated.');
     }
 
     public function destroy(Department $department)
     {
+        if (!is_null($department->mac_reseller_id)) {
+            abort(403, 'Unauthorized access to this department.');
+        }
+
         if ($department->employees()->count() > 0) {
             return back()->with('error', 'Cannot delete — employees assigned to this department.');
         }
+
         $department->positions()->delete();
         $department->delete();
+
         return back()->with('success', 'Department deleted.');
     }
 }
-

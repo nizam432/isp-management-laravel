@@ -410,6 +410,7 @@ $('#btnSaveExpense').on('click', function () {
             toastr.success(res.message);
             prependRow(res.expense);
             $('#emptyRow').remove();
+             setTimeout(() => location.reload(), 800);
         },
         error: function (xhr) {
             if (xhr.status === 422) {
@@ -420,7 +421,8 @@ $('#btnSaveExpense').on('click', function () {
             }
         },
         complete: function () {
-            btn.prop('disabled', false).html('<i class="fas fa-save mr-1"></i> Save Expense');
+            Location.reload();
+            //btn.prop('disabled', false).html('<i class="fas fa-save mr-1"></i> Save Expense');
         }
     });
 });
@@ -485,6 +487,7 @@ $('#btnUpdateExpense').on('click', function () {
             $('#editExpenseModal').modal('hide');
             toastr.success(res.message);
             updateRow(res.expense);
+             setTimeout(() => location.reload(), 800);
         },
         error: function (xhr) {
             if (xhr.status === 422) {

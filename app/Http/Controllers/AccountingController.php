@@ -19,9 +19,9 @@ class AccountingController extends Controller
             ->whereYear('payment_date', $y)->whereMonth('payment_date', $mo)->sum('amount');
         $thisMonthManual = (float) Income::active()
             ->whereYear('income_date', $y)->whereMonth('income_date', $mo)->sum('amount');
-        $thisMonthIncome  = $thisMonthBill + $thisMonthManual;
+        $thisMonthIncome  =  $thisMonthManual;
 
-        // This month expense
+        // This month expense 
         $thisMonthExpense = (float) Expense::active()
             ->whereYear('expense_date', $y)->whereMonth('expense_date', $mo)->sum('amount');
 

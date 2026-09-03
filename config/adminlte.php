@@ -417,7 +417,7 @@ return [
         'can'        => 'invoice.view',
         'submenu'    => [
             [
-                'text' => 'Invoices',
+                'text' => 'Bill List',
                 'url'  => 'invoices',
                 'icon' => 'fas fa-fw fa-file-invoice',
             ],
@@ -622,7 +622,7 @@ return [
                 ],
             ],
         ],        
-         ['header' => 'RESELLER', 'can' => 'create-reseller'],
+/*          ['header' => 'RESELLER', 'can' => 'create-reseller'],
         [
             'text'       => 'My Resellers',
             'url'        => 'my-resellers',
@@ -630,7 +630,66 @@ return [
             'icon_color' => 'orange',
             'can'        => 'create-reseller',
         ],   
-
+ */
+ // ── MAC Reseller Management ───────────────
+         [
+            'text'       => 'MACReseller',
+            'icon'       => 'fas fa-fw fa-users-cog',
+            'icon_color' => 'teal',
+            'can'        => 'isp-admin',
+            'submenu'    => [
+                [
+                    'text' => 'Package',
+                    'url'  => 'mac-reseller/package',
+                    'icon' => 'fas fa-fw fa-box',
+                ],
+                [
+                    'text' => 'Tariff Config',
+                    'url'  => 'mac-reseller/tariff',
+                    'icon' => 'fas fa-fw fa-tags',
+                ],
+                [
+                    'text' => 'Add MAC Reseller',
+                    'url'  => 'mac-reseller/list/create',
+                    'icon' => 'fas fa-fw fa-user-plus',
+                ],
+                [
+                    'text' => 'MAC Reseller List',
+                    'url'  => 'mac-reseller/list',
+                    'icon' => 'fas fa-fw fa-list',
+                ],
+                [
+                    'text' => 'Reseller Funding',
+                    'url'  => 'mac-reseller/funding',
+                    'icon' => 'fas fa-fw fa-money-bill-wave',
+                ],
+                [
+                    'text' => 'Funding Payment History',
+                    'url'  => 'mac-reseller/funding/history',
+                    'icon' => 'fas fa-fw fa-history',
+                ],                
+                [
+                    'text' => 'Client PGW Payments',
+                    'url' => 'mac-reseller/pgw',
+                    'icon' => 'fas fa-fw fa-credit-card',
+                ],
+                [
+                    'text' => 'PGW Transaction Settlement',
+                    'url'  => 'mac-reseller/settlement',
+                    'icon' => 'fas fa-fw fa-exchange-alt',
+                ],
+/*                 [
+                    'text' => 'MACReseller Notice',
+                    'url'  => 'mac-reseller/notice',
+                    'icon' => 'fas fa-fw fa-bell',
+                ], */
+               /*  [
+                    'text' => 'Reseller Tutorials',
+                    'url'  => 'mac-reseller/tutorial',
+                    'icon' => 'fas fa-fw fa-graduation-cap',
+                ], */
+            ],
+        ],
         [
             'text'       => 'Bandwidth Buy',
             'icon'       => 'fas fa-fw fa-wifi',

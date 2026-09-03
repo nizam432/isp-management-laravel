@@ -1,5 +1,5 @@
 {{-- resources/views/super-admin/plans/index.blade.php --}}
-@extends('layouts.app')
+@extends('layouts.super-admin')
 @section('page_title', 'Plan Management')
 @section('page_content')
 

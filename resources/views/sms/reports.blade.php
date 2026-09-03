@@ -157,6 +157,7 @@
                     <th>Mobile</th>
                     <th>Type</th>
                     <th>Gateway</th>
+                    <th>Count</th>
                     <th>Message</th>
                     <th>Status</th>
                     <th>Response</th>
@@ -179,6 +180,7 @@
                         </span>
                     </td>
                     <td><small><code>{{ $log->gateway }}</code></small></td>
+                    <td>{{$log->count_sms}}</td>
                     <td style="max-width:220px">
                         <a href="javascript:void(0)"
                            class="text-dark view-message"

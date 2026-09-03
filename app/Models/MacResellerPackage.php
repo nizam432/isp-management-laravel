@@ -3,35 +3,30 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class MacResellerPackage extends Model
 {
-    use SoftDeletes;
+    use HasFactory;
 
-    protected $table = 'mac_reseller_packages';
-
-    protected $fillable = [
-        'name',
-        'bandwidth_mb',
-        'details',
-        'is_active',
-        'created_by',
-    ];
+    protected $fillable = ['mac_reseller_id', 'name', 'details', 'is_active'];
 
     protected $casts = [
         'is_active' => 'boolean',
     ];
 
-    public function tariffPackages(): HasMany
+    public function reseller()
     {
-        return $this->hasMany(MacResellerTariffPackage::class, 'package_id');
+        return $this->belongsTo(MacReseller::class, 'mac_reseller_id');
     }
 
-    public function createdBy(): BelongsTo
+    public function scopeActive($query)
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $query->where('is_active', true);
+    }
+
+    public function scopeForReseller($query, $macResellerId)
+    {
+        return $query->where('mac_reseller_id', $macResellerId);
     }
 }

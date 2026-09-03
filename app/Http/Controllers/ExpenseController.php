@@ -33,6 +33,7 @@ class ExpenseController extends Controller
             ->when($request->month, fn($q) =>
                 $q->byMonth($request->month))
             ->latest('expense_date')
+            ->orderBy('id', 'DESC')
             ->paginate($request->get('per_page', 20))
             ->withQueryString();
 
@@ -208,41 +209,27 @@ class ExpenseController extends Controller
             ->with('success', 'Expense permanently deleted.');
     }
 
-    public function profitLoss(Request $request)
+     public function profitLoss(Request $request)
     {
         $from = $request->get('from_date', now()->startOfMonth()->format('Y-m-d'));
         $to   = $request->get('to_date',   now()->format('Y-m-d'));
-
         if ($from > $to) [$from, $to] = [$to, $from];
 
-        $months  = [];
         $cursor  = \Carbon\Carbon::parse($from)->startOfMonth();
         $endDate = \Carbon\Carbon::parse($to);
-
-        $rows         = [];
-        $grandIncome  = 0;
-        $grandExpense = 0;
+        $rows = []; $grandIncome = 0; $grandExpense = 0;
 
         while ($cursor->lte($endDate)) {
-            // Clamp month to actual from/to dates
             $mFrom = $cursor->copy()->startOfMonth()->lt(\Carbon\Carbon::parse($from))
-                ? $from
-                : $cursor->copy()->startOfMonth()->format('Y-m-d');
+                ? $from : $cursor->copy()->startOfMonth()->format('Y-m-d');
             $mTo = $cursor->copy()->endOfMonth()->gt($endDate)
-                ? $to
-                : $cursor->copy()->endOfMonth()->format('Y-m-d');
+                ? $to : $cursor->copy()->endOfMonth()->format('Y-m-d');
 
-            $monthlyBill = (float) Payment::active()
-                ->whereBetween('payment_date', [$mFrom, $mTo])
-                ->sum('amount');
+            // শুধু Income table — সব source already include (monthly bill, manual, sale etc)
+            $totalIncome = (float) \App\Models\Income::active()
+                ->whereBetween('income_date', [$mFrom, $mTo])
+                ->sum('amount'); 
 
-            $manualIncome = class_exists(\App\Models\Income::class)
-                ? (float) \App\Models\Income::active()
-                    ->whereBetween('income_date', [$mFrom, $mTo])
-                    ->sum('amount')
-                : 0;
-
-            $totalIncome  = $monthlyBill + $manualIncome;
             $totalExpense = (float) Expense::active()
                 ->whereBetween('expense_date', [$mFrom, $mTo])
                 ->sum('amount');
@@ -250,18 +237,16 @@ class ExpenseController extends Controller
             $netProfit = $totalIncome - $totalExpense;
             $margin    = $totalIncome > 0 ? round(($netProfit / $totalIncome) * 100, 1) : 0;
 
-            $rows[] = [
-                'month'         => $cursor->format('Y-m'),
-                'month_label'   => $cursor->format('M Y'),
-                'monthly_bill'  => $monthlyBill,
-                'manual_income' => $manualIncome,
-                'total_income'  => $totalIncome,
-                'total_expense' => $totalExpense,
-                'net_profit'    => $netProfit,
-                'margin'        => $margin,
-            ];
+                $rows[] = [
+                    'month'         => $cursor->format('Y-m'),
+                    'month_label'   => $cursor->format('M Y'),
+                    'total_income'  => $totalIncome,
+                    'total_expense' => $totalExpense,
+                    'net_profit'    => $netProfit,
+                    'margin'        => $margin,
+                ];
 
-            $grandIncome  += $totalIncome;
+            $grandIncome += $totalIncome;
             $grandExpense += $totalExpense;
             $cursor->addMonth();
         }
@@ -275,14 +260,43 @@ class ExpenseController extends Controller
             'expense' => $r['total_expense'],
             'profit'  => $r['net_profit'],
         ])->values();
+        $incomeByCategory = \App\Models\Income::active()
+            ->whereBetween('income_date', [$from, $to])
+            ->join('income_categories', 'incomes.category_id', '=', 'income_categories.id')
+            ->selectRaw('income_categories.name as category_name, SUM(incomes.amount) as total')
+            ->groupBy('income_categories.name')
+            ->orderByDesc('total')
+            ->get();
 
+        $expenseByCategory = Expense::active()
+            ->whereBetween('expense_date', [$from, $to])
+            ->join('expense_categories', 'expenses.category_id', '=', 'expense_categories.id')
+            ->selectRaw('expense_categories.name as category_name, SUM(expenses.amount) as total')
+            ->groupBy('expense_categories.name')
+            ->orderByDesc('total')
+            ->get();
         return view('accounting.profit-loss', compact(
-            'from', 'to', 'rows',
-            'grandIncome', 'grandExpense', 'grandProfit', 'grandMargin',
-            'chartData'
+            'from', 'to', 'rows','expenseByCategory','incomeByCategory',
+            'grandIncome', 'grandExpense', 'grandProfit', 'grandMargin', 'chartData'
         ));
     }
-
+   public function editData(Expense $expense)
+    {
+        return response()->json([
+            'success' => true,
+            'expense' => [
+                'id'             => $expense->id,
+                'category_id'    => $expense->category_id,
+                'amount'         => $expense->amount,
+                'expense_date'   => $expense->expense_date->format('Y-m-d'),
+                'payment_method' => $expense->payment_method,
+                'transaction_id' => $expense->transaction_id ?? '',
+                'payee'          => $expense->payee ?? '',
+                'reference_no'   => $expense->reference_no ?? '',
+                'description'    => $expense->description ?? '',
+            ]
+        ]);
+    }
     public function profitLossPdf(Request $request)
     {
         $from = $request->get('from_date', now()->startOfMonth()->format('Y-m-d'));
@@ -366,6 +380,9 @@ class ExpenseController extends Controller
 
     public function categoryUpdate(Request $request, ExpenseCategory $expenseCategory)
     {
+        if($expenseCategory->is_system==1){
+            return back()->with('error', 'This category cannot be updated because it is a built-in system category');
+        }        
         $request->validate([
             'name'  => 'required|string|max:100|unique:expense_categories,name,' . $expenseCategory->id,
             'color' => 'nullable|string|max:7',
@@ -382,6 +399,10 @@ class ExpenseController extends Controller
         if ($expenseCategory->expenses()->count() > 0) {
             return back()->with('error', 'Cannot delete — expenses are linked to this category.');
         }
+        
+        if($expenseCategory->is_system==1){
+            return back()->with('error', 'This category cannot be deleted because it is a built-in system category');
+        }         
 
         $expenseCategory->delete();
 

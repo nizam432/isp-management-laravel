@@ -1,74 +1,69 @@
 @extends('reseller.layouts.app')
-@section('title', 'Report')
+
+@section('title', 'Reports')
+
 @section('content')
 
-<div class="card border-0 shadow-sm mb-3" style="border-radius:12px">
-    <div class="card-body">
-        <form method="GET" class="row align-items-end">
-            <div class="col-md-4 mb-2">
-                <label class="small font-weight-bold">From Date</label>
-                <input type="date" name="from_date" class="form-control form-control-sm" value="{{ $fromDate }}">
+<h4 class="mb-3">Reports</h4>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card text-center py-3" style="border-left:4px solid #17a2b8;">
+            <div class="text-info font-weight-bold" style="font-size:24px;">{{ $stats['total_clients'] }}</div>
+            <small class="text-muted">Total Clients</small>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center py-3" style="border-left:4px solid #00a65a;">
+            <div class="text-success font-weight-bold" style="font-size:24px;">{{ $stats['active_clients'] }}</div>
+            <small class="text-muted">Active Clients</small>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center py-3" style="border-left:4px solid #6f42c1;">
+            <div class="font-weight-bold" style="font-size:24px;color:#6f42c1;">৳{{ number_format($stats['this_month_paid']) }}</div>
+            <small class="text-muted">Collected This Month</small>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-3 mb-3">
+        <a href="{{ route('reseller.report.btrc') }}" class="card text-decoration-none h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-file-alt fa-2x text-primary mb-2"></i>
+                <h6>BTRC Report</h6>
+                <small class="text-muted">Subscriber summary</small>
             </div>
-            <div class="col-md-4 mb-2">
-                <label class="small font-weight-bold">To Date</label>
-                <input type="date" name="to_date" class="form-control form-control-sm" value="{{ $toDate }}">
+        </a>
+    </div>
+    <div class="col-md-3 mb-3">
+        <a href="{{ route('reseller.report.status-history') }}" class="card text-decoration-none h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-history fa-2x text-warning mb-2"></i>
+                <h6>Enable/Disable History</h6>
+                <small class="text-muted">Client status overview</small>
             </div>
-            <div class="col-md-4 mb-2">
-                <button type="submit" class="btn btn-sm btn-success w-100"><i class="fas fa-filter mr-1"></i> Apply Filter</button>
+        </a>
+    </div>
+    <div class="col-md-3 mb-3">
+        <a href="{{ route('reseller.report.bill-collection') }}" class="card text-decoration-none h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-hand-holding-usd fa-2x text-success mb-2"></i>
+                <h6>Bill Collection</h6>
+                <small class="text-muted">Payments by date</small>
             </div>
-        </form>
+        </a>
+    </div>
+    <div class="col-md-3 mb-3">
+        <a href="{{ route('reseller.report.messages') }}" class="card text-decoration-none h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-comment-dots fa-2x text-info mb-2"></i>
+                <h6>Messages Report</h6>
+                <small class="text-muted">SMS delivery log</small>
+            </div>
+        </a>
     </div>
 </div>
 
-{{-- Client Summary --}}
-<div class="card border-0 shadow-sm mb-3" style="border-radius:12px">
-    <div class="card-body">
-        <h6 class="font-weight-bold mb-3"><i class="fas fa-users text-primary mr-1"></i> Client Summary</h6>
-        <div class="row text-center">
-            <div class="col-md-3"><p class="text-muted small mb-1">Total</p><h5 class="font-weight-bold">{{ $clientStats['total'] }}</h5></div>
-            <div class="col-md-3"><p class="text-muted small mb-1">Active</p><h5 class="font-weight-bold text-success">{{ $clientStats['active'] }}</h5></div>
-            <div class="col-md-3"><p class="text-muted small mb-1">Expired</p><h5 class="font-weight-bold text-danger">{{ $clientStats['expired'] }}</h5></div>
-            <div class="col-md-3"><p class="text-muted small mb-1">New (range)</p><h5 class="font-weight-bold text-info">{{ $clientStats['new_in_range'] }}</h5></div>
-        </div>
-    </div>
-</div>
-
-{{-- Billing Summary --}}
-<div class="card border-0 shadow-sm mb-3" style="border-radius:12px">
-    <div class="card-body">
-        <h6 class="font-weight-bold mb-3"><i class="fas fa-file-invoice-dollar text-warning mr-1"></i> Billing Summary (Selected Range)</h6>
-        <div class="row text-center">
-            <div class="col-md-3"><p class="text-muted small mb-1">Invoices</p><h5 class="font-weight-bold">{{ $billingStats['invoice_count'] }}</h5></div>
-            <div class="col-md-3"><p class="text-muted small mb-1">Total Invoiced</p><h5 class="font-weight-bold">{{ number_format($billingStats['total_invoiced'], 2) }}</h5></div>
-            <div class="col-md-3"><p class="text-muted small mb-1">Paid</p><h5 class="font-weight-bold text-success">{{ number_format($billingStats['total_paid'], 2) }}</h5></div>
-            <div class="col-md-3"><p class="text-muted small mb-1">Unpaid</p><h5 class="font-weight-bold text-danger">{{ number_format($billingStats['total_unpaid'], 2) }}</h5></div>
-        </div>
-    </div>
-</div>
-
-{{-- Fund Summary --}}
-<div class="card border-0 shadow-sm mb-3" style="border-radius:12px">
-    <div class="card-body">
-        <h6 class="font-weight-bold mb-3"><i class="fas fa-wallet text-success mr-1"></i> Fund Summary (Selected Range)</h6>
-        <div class="row text-center">
-            <div class="col-md-6"><p class="text-muted small mb-1">Total Funded</p><h5 class="font-weight-bold text-success">{{ number_format($fundStats['total_funded'], 2) }}</h5></div>
-            <div class="col-md-6"><p class="text-muted small mb-1">Total Due</p><h5 class="font-weight-bold text-danger">{{ number_format($fundStats['total_due'], 2) }}</h5></div>
-        </div>
-    </div>
-</div>
-
-{{-- Package Distribution --}}
-<div class="card border-0 shadow-sm" style="border-radius:12px">
-    <div class="card-body">
-        <h6 class="font-weight-bold mb-3"><i class="fas fa-box text-info mr-1"></i> Client Distribution by Package</h6>
-        @forelse($packageDistribution as $pkg => $count)
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <span class="small">{{ $pkg }}</span>
-            <span class="badge badge-primary">{{ $count }}</span>
-        </div>
-        @empty
-        <p class="text-muted small text-center py-3">No data available.</p>
-        @endforelse
-    </div>
-</div>
-@stop
+@endsection

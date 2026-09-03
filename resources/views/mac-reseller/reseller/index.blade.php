@@ -5,44 +5,71 @@
 @section('content_header')
     <div class="d-flex justify-content-between align-items-center">
         <div>
-            <h1 class="m-0">POPs <small class="text-muted fs-6">All POPs</small></h1>
+            <h1 class="m-0"> <small class="text-muted fs-6">All POPs</small></h1>
         </div>
-        <span class="text-muted"><i class="fas fa-users-cog"></i> POP &rsaquo; POP List <i class="fas fa-sync-alt"></i></span>
     </div>
 @stop
 
 @section('content')
 
 {{-- Summary Cards --}}
+<style>
+.cust-stat-card {
+    border-radius: 4px;
+    color: #fff;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    overflow: hidden;
+}
+.cust-stat-card .sc-left .sc-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: rgba(255,255,255,.85);
+    margin-bottom: 4px;
+}
+.cust-stat-card .sc-left .sc-value {
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+}
+.cust-stat-card .sc-icon {
+    font-size: 52px;
+    color: rgba(255,255,255,.18);
+}
+</style>
 <div class="row mb-3">
-    <div class="col-md-4">
-        <div class="info-box" style="background:linear-gradient(135deg,#17a2b8,#138496);color:#fff">
-            <span class="info-box-icon"><i class="fas fa-user-tie"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">Total POPs</span>
-                <span class="info-box-number">{{ $totalPops }}</span>
-                <span>Total POPs of admin</span>
+    <div class="col-md-4 col-6">
+        <div class="cust-stat-card" style="background:#17a2b8;">
+            <div class="sc-left">
+                <div class="sc-label"><i class="fas fa-user-tie mr-1"></i> Total POPs</div>
+                <div class="sc-value">{{ $totalPops }}</div>
             </div>
+            <div class="sc-icon"><i class="fas fa-user-tie"></i></div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="info-box" style="background:linear-gradient(135deg,#28a745,#218838);color:#fff">
-            <span class="info-box-icon"><i class="fas fa-users"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">Total POP Client</span>
-                <span class="info-box-number">{{ $totalPopClients }}</span>
-                <span>Total running client of POPs</span>
+    <div class="col-md-4 col-6">
+        <div class="cust-stat-card" style="background:#00a65a;">
+            <div class="sc-left">
+                <div class="sc-label"><i class="fas fa-users mr-1"></i> Total POP Client</div>
+                <div class="sc-value">{{ $totalPopClients }}</div>
             </div>
+            <div class="sc-icon"><i class="fas fa-users"></i></div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="info-box" style="background:linear-gradient(135deg,#6f42c1,#5a32a3);color:#fff">
-            <span class="info-box-icon"><i class="fas fa-user-check"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">Online Clients</span>
-                <span class="info-box-number">{{ $onlineClients }}</span>
-                <span>Total exported online client of POPs</span>
+    <div class="col-md-4 col-6">
+        <div class="cust-stat-card" style="background:#6f42c1;">
+            <div class="sc-left">
+                <div class="sc-label"><i class="fas fa-user-check mr-1"></i> Online Clients</div>
+                <div class="sc-value">{{ $onlineClients }}</div>
             </div>
+            <div class="sc-icon"><i class="fas fa-user-check"></i></div>
         </div>
     </div>
 </div>
@@ -150,14 +177,14 @@
                     <th>Company Name</th>
                     <th>Level</th>
                     <th>TarifName</th>
-                    <th>Clients(Running)</th>
+                    {{--<th>Clients(Running)</th>
                     <th>Clients(Enabled)</th>
                     <th>Clients(Disabled)</th>
-                    <th>Clients(Left)</th>
+                    <th>Clients(Left)</th>--}}
                     <th>RemainingFund</th>
-                    <th>ClientEnabled</th>
+                    {{--<th>ClientEnabled</th>
                     <th>FundStart</th>
-                    <th>IsLocked?</th>
+                    <th>IsLocked?</th>--}}
                     <th>Action</th>
                 </tr>
             </thead>
@@ -172,18 +199,23 @@
                         </span>
                     </td>
                     <td>{{ $r->contact_person }}</td>
-                    <td>{{ $r->tariff?->packages->first()?->server_name ?? 'N/A' }}</td>
+                    <td>
+                        @php
+                            $serverNames = $r->tariff?->packages->pluck('server_name')->filter()->unique();
+                        @endphp
+                        {{ $serverNames && $serverNames->isNotEmpty() ? $serverNames->implode(', ') : 'N/A' }}
+                    </td>
                     <td>{{ $r->mobile }}</td>
                     <td>{{ $r->business_name }}</td>
                     <td>{{ ucwords(str_replace('_', ' ', $r->level)) }}</td>
                     <td>{{ $r->tariff?->name ?? 'N/A' }}</td>
+                        {{--<td>0</td>
                     <td>0</td>
                     <td>0</td>
-                    <td>0</td>
-                    <td>0</td>
+                        <td>0</td>--}}
                     <td>{{ number_format($r->remaining_fund, 2) }}</td>
 
-                    {{-- Client Enabled Toggle --}}
+                    {{--
                     <td>
                         <div class="custom-control custom-switch">
                             <input type="checkbox" class="custom-control-input toggle-client"
@@ -193,7 +225,7 @@
                         </div>
                     </td>
 
-                    {{-- Fund Start Toggle --}}
+                    
                     <td>
                         <div class="custom-control custom-switch">
                             <input type="checkbox" class="custom-control-input toggle-fund"
@@ -203,7 +235,7 @@
                         </div>
                     </td>
 
-                    {{-- IsLocked Toggle --}}
+                  
                     <td>
                         <div class="custom-control custom-switch">
                             <input type="checkbox" class="custom-control-input toggle-locked"
@@ -212,7 +244,8 @@
                             <label class="custom-control-label" for="lk-{{ $r->id }}"></label>
                         </div>
                     </td>
-
+                    --}}
+                    {{-- Action --}}
                     <td>
                         <div class="dropdown">
                             <button class="btn btn-sm btn-secondary dropdown-toggle" data-toggle="dropdown">
@@ -221,6 +254,14 @@
                             <div class="dropdown-menu dropdown-menu-right">
                                 <a class="dropdown-item" href="{{ route('mac-reseller.list.edit', $r->id) }}">
                                     <i class="fas fa-edit mr-2 text-success"></i> Edit
+                                </a>
+                                <a class="dropdown-item change-password-btn" href="#"
+                                   data-id="{{ $r->id }}" data-name="{{ $r->business_name }}">
+                                    <i class="fas fa-key mr-2 text-warning"></i> Change Password
+                                </a>
+                                <a class="dropdown-item" href="{{ route('mac-reseller.list.login-as', $r->id) }}"
+                                   target="_blank">
+                                    <i class="fas fa-sign-in-alt mr-2 text-primary"></i> Login
                                 </a>
                             </div>
                         </div>
@@ -234,6 +275,41 @@
         </div>
 
         {{ $resellers->links() }}
+    </div>
+</div>
+
+{{-- Change Password Modal --}}
+<div class="modal fade" id="changePasswordModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="changePasswordForm">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title">Change Password &mdash; <span id="cp-name"></span></h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="cp-id" name="reseller_id">
+                    <div class="form-group">
+                        <label>New Password</label>
+                        <input type="password" name="password" class="form-control" required minlength="6">
+                    </div>
+                    <div class="form-group">
+                        <label>Confirm Password</label>
+                        <input type="password" name="password_confirmation" class="form-control" required minlength="6">
+                    </div>
+                    <div id="cp-error" class="text-danger small"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save mr-1"></i> Update Password
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 @stop
@@ -264,6 +340,39 @@ $('#searchInput').on('keyup', function() {
     $('#resellerTable tbody tr').each(function() {
         $(this).toggle($(this).text().toLowerCase().includes(val));
     });
+});
+
+// Open Change Password modal
+$(document).on('click', '.change-password-btn', function(e) {
+    e.preventDefault();
+    $('#changePasswordForm')[0].reset();
+    $('#cp-error').text('');
+    $('#cp-id').val($(this).data('id'));
+    $('#cp-name').text($(this).data('name'));
+    $('#changePasswordModal').modal('show');
+});
+
+// Submit Change Password
+$('#changePasswordForm').on('submit', function(e) {
+    e.preventDefault();
+    const id = $('#cp-id').val();
+    $('#cp-error').text('');
+
+    $.post(`/mac-reseller/list/${id}/change-password`, $(this).serialize())
+        .done(function(res) {
+            $('#changePasswordModal').modal('hide');
+            if (window.toastr) {
+                toastr.success(res.message || 'Password updated successfully.');
+            } else {
+                alert(res.message || 'Password updated successfully.');
+            }
+        })
+        .fail(function(xhr) {
+            const msg = xhr.responseJSON?.message
+                || Object.values(xhr.responseJSON?.errors ?? {}).flat().join(' ')
+                || 'Failed to update password.';
+            $('#cp-error').text(msg);
+        });
 });
 </script>
 @stop

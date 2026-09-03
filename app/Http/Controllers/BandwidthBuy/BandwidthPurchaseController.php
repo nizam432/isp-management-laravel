@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 namespace App\Http\Controllers\BandwidthBuy;
 
@@ -19,8 +19,8 @@ class BandwidthPurchaseController extends Controller
     // ── Bandwidth expense category ────────────────────────────────
     private function getBandwidthCategoryId(): ?int
     {
-        return ExpenseCategory::where('slug', 'isp-bandwidth')
-            ->orWhere('name', 'ISP Bandwidth Cost')
+        return ExpenseCategory::where('slug', 'bandwidth-purchase')
+            ->orWhere('name', 'Bandwidth Purchase')
             ->value('id');
     }
 
@@ -49,9 +49,9 @@ class BandwidthPurchaseController extends Controller
             'payee'             => $purchase->provider->company_name,
             'reference_no'      => $purchase->invoice_no,
             'description'       => $this->expenseDescription($purchase)
-                                   . " [Payment: ৳" . number_format($payment->amount, 2) . "]",
+                                   . " [Payment: " . number_format($payment->amount, 2) . "]",
             'status'            => 'approved',
-            'source_type'       => 'bandwidth_purchase',
+            'source_type'       => 'bandwidth-purchase',
             'source_id'         => $payment->id,
             'source_invoice_id' => $purchase->id,
             'created_by'        => auth()->id(),

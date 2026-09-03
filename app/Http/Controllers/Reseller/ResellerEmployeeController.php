@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Reseller;
 
 use App\Http\Controllers\Controller;
+use App\Models\HR\Employee;
 use App\Models\ResellerEmployee;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -29,14 +30,21 @@ class ResellerEmployeeController extends Controller
         $resellerId = Auth::guard('mac_reseller')->id();
         $employees  = ResellerEmployee::where('mac_reseller_id', $resellerId)->latest()->paginate(25);
 
-        return view('reseller.employees.index', compact('employees'));
+        // For the "Link to HR Employee" dropdown on the Add/Edit Staff modal —
+        // lets the owner pick an existing HR & Payroll employee instead of
+        // re-typing name/designation/phone from scratch.
+        $hrEmployees = Employee::forReseller($resellerId)->active()->with('position')->orderBy('name')->get();
+
+        return view('reseller.employees.index', compact('employees', 'hrEmployees'));
     }
 
     public function store(Request $request)
     {
         $this->ensureOwner($request);
+        $resellerId = Auth::guard('mac_reseller')->id();
 
         $data = $request->validate([
+            'employee_id'  => 'nullable|exists:employees,id',
             'name'         => 'required|string|max:255',
             'email'        => 'nullable|email',
             'phone'        => 'nullable|string|max:20',
@@ -46,13 +54,17 @@ class ResellerEmployeeController extends Controller
             'allowed_menus'=> 'nullable|array',
         ]);
 
-        $data['mac_reseller_id'] = Auth::guard('mac_reseller')->id();
+        if (!empty($data['employee_id'])) {
+            Employee::forReseller($resellerId)->findOrFail($data['employee_id']);
+        }
+
+        $data['mac_reseller_id'] = $resellerId;
         $data['password']        = Hash::make($data['password']);
         $data['allowed_menus']   = $request->input('allowed_menus', []);
 
         ResellerEmployee::create($data);
 
-        return response()->json(['success' => true, 'message' => 'Employee added successfully.']);
+        return response()->json(['success' => true, 'message' => 'Staff added successfully.']);
     }
 
     public function edit(Request $request, ResellerEmployee $employee)
@@ -67,8 +79,10 @@ class ResellerEmployeeController extends Controller
     {
         $this->ensureOwner($request);
         $this->authorizeOwnership($employee);
+        $resellerId = Auth::guard('mac_reseller')->id();
 
         $data = $request->validate([
+            'employee_id'  => 'nullable|exists:employees,id',
             'name'         => 'required|string|max:255',
             'email'        => 'nullable|email',
             'phone'        => 'nullable|string|max:20',
@@ -78,6 +92,10 @@ class ResellerEmployeeController extends Controller
             'allowed_menus'=> 'nullable|array',
             'is_active'    => 'nullable|boolean',
         ]);
+
+        if (!empty($data['employee_id'])) {
+            Employee::forReseller($resellerId)->findOrFail($data['employee_id']);
+        }
 
         if (!empty($data['password'])) {
             $data['password'] = Hash::make($data['password']);
@@ -90,7 +108,7 @@ class ResellerEmployeeController extends Controller
 
         $employee->update($data);
 
-        return response()->json(['success' => true, 'message' => 'Employee updated successfully.']);
+        return response()->json(['success' => true, 'message' => 'Staff updated successfully.']);
     }
 
     public function destroy(Request $request, ResellerEmployee $employee)
@@ -100,7 +118,7 @@ class ResellerEmployeeController extends Controller
 
         $employee->delete();
 
-        return response()->json(['success' => true, 'message' => 'Employee removed.']);
+        return response()->json(['success' => true, 'message' => 'Staff removed.']);
     }
 
     public function toggle(Request $request, ResellerEmployee $employee)

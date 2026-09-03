@@ -9,6 +9,7 @@ use App\Models\HR\Department;
 use App\Models\HR\Employee;
 use App\Models\Zone;
 use App\Models\User;
+use App\Services\SmsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -36,21 +37,28 @@ class ClientSupportController extends Controller
         $solvedTickets     = ClientSupportTicket::solved()->count();
 
         $categories  = SupportCategory::active()->orderBy('name')->get();
-        $zones       = \App\Models\Zone::orderBy('name')->get();
+        $zones       = Zone::orderBy('name')->get();
         $employees   = Employee::where('status', 'active')->orderBy('name')->get();
         $departments = Department::active()->orderBy('name')->get();
+        // NOTE: "Created By" / "Solved By" filters store User IDs (see model:
+        // createdBy()/solvedBy() belongsTo User::class), not Employee IDs.
+        // If those two filter dropdowns are meant to filter created_by/solved_by,
+        // populate them from User::all() instead of $employees in the Blade view.
 
         return view('client_support.index', compact(
             'tickets', 'totalTickets', 'pendingTickets', 'processingTickets', 'solvedTickets',
             'categories', 'zones', 'employees', 'departments'
-        ));    }
+        ));
+    }
 
     // AJAX — load customer info by username/pppoe_username
     public function customerInfo(Request $request)
     {
         $customer = Customer::with(['zone', 'package'])
-            ->where('pppoe_username', $request->username)
-            ->orWhere('customer_code', $request->username)
+            ->where(function ($q) use ($request) {
+                $q->where('pppoe_username', $request->username)
+                  ->orWhere('customer_code', $request->username);
+            })
             ->first();
 
         if (!$customer) {
@@ -85,11 +93,17 @@ class ClientSupportController extends Controller
             'remarks'             => 'required|string',
         ]);
 
-        $data               = $request->except('attachment');
-        $data['ticket_no']  = ClientSupportTicket::generateNumber();
-        $data['created_by'] = auth()->id();
+        // Whitelisted fields only — do NOT use $request->except('attachment') here.
+        // That previously allowed status/solved_by/solved_at/created_by to be
+        // mass-assigned directly from the form, bypassing solve()/auth().
+        $data = $request->only([
+            'customer_id', 'support_category_id', 'priority',
+            'complained_no', 'subject', 'remarks',
+        ]);
+        $data['ticket_no']    = ClientSupportTicket::generateNumber();
+        $data['created_by']   = auth()->id();
         $data['created_from'] = 'admin';
-        $data['send_sms']   = $request->boolean('send_sms');
+        $data['send_sms']     = $request->boolean('send_sms');
 
         if ($request->hasFile('attachment')) {
             $data['attachment'] = $request->file('attachment')->store('tickets/attachments', 'public');
@@ -97,6 +111,23 @@ class ClientSupportController extends Controller
 
         $ticket = ClientSupportTicket::create($data);
         $ticket->load(['customer', 'category', 'createdBy', 'assignees']);
+
+        // ── SMS to customer on ticket creation ──
+        if (\App\Models\Setting::get('support_ticket_created_sms', '1') == '1'
+            && $ticket->send_sms
+            && $ticket->customer?->phone) {
+            try {
+                (new SmsService())->sendTicketCreated(
+                    $ticket->customer->phone,
+                    $ticket->customer->name,
+                    $ticket->ticket_no,
+                    $ticket->category->name ?? '',
+                    $ticket->complained_no
+                );
+            } catch (\Exception $e) {
+                \Log::error('Support ticket created SMS failed: ' . $e->getMessage());
+            }
+        }
 
         return response()->json([
             'success' => true,
@@ -120,7 +151,11 @@ class ClientSupportController extends Controller
             'remarks'             => 'required|string',
         ]);
 
-        $data = $request->except('attachment');
+        // Whitelisted fields only — same reasoning as store().
+        $data = $request->only([
+            'support_category_id', 'priority',
+            'complained_no', 'subject', 'remarks',
+        ]);
         $data['send_sms'] = $request->boolean('send_sms');
 
         if ($request->hasFile('attachment')) {
@@ -157,34 +192,26 @@ class ClientSupportController extends Controller
         $customer = $ticket->customer;
 
         try {
-            // MikroTik API check via existing service
             $routerId = $customer->router_id;
             if (!$routerId || !$customer->pppoe_username) {
-                return response()->json([
-                    'online'      => false,
-                    'uptime'      => 'N/A',
-                    'last_logout' => 'N/A',
-                ]);
+                return response()->json(['online' => false, 'uptime' => 'N/A', 'last_logout' => 'N/A']);
             }
 
-            $router   = \App\Models\MikrotikRouter::find($routerId);
+            $router = \App\Models\MikrotikRouter::find($routerId);
             if (!$router) {
                 return response()->json(['online' => false, 'uptime' => 'N/A', 'last_logout' => 'N/A']);
             }
 
-            $api      = new \App\Services\MikrotikService($router);
-            $sessions = $api->getActiveSessions();
-            $session  = collect($sessions)->firstWhere('name', $customer->pppoe_username);
+            $sessions = (new \App\Services\MikrotikService())->withRouter($router, function ($api) {
+                return $api->getActiveSessions();
+            });
+
+            $session = collect($sessions)->firstWhere('name', $customer->pppoe_username);
 
             if ($session) {
-                return response()->json([
-                    'online'      => true,
-                    'uptime'      => $session['uptime'] ?? '—',
-                    'last_logout' => '—',
-                ]);
+                return response()->json(['online' => true, 'uptime' => $session['uptime'] ?? '—', 'last_logout' => '—']);
             }
 
-            // Not active — get last logout from log
             return response()->json([
                 'online'      => false,
                 'uptime'      => '—',
@@ -192,14 +219,13 @@ class ClientSupportController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            return response()->json([
-                'online'      => false,
-                'uptime'      => 'N/A',
-                'last_logout' => 'N/A',
+            \Log::error('Mikrotik status check FAILED', [
+                'ticket_id' => $ticket->id,
+                'error' => $e->getMessage(),
             ]);
+            return response()->json(['online' => false, 'uptime' => 'N/A', 'last_logout' => 'N/A']);
         }
     }
-
 
     // ── Admin Chat ────────────────────────────────────────────────
 
@@ -281,6 +307,23 @@ class ClientSupportController extends Controller
             'solved_at' => now(),
         ]);
 
+        $ticket->load('customer');
+
+        // ── SMS to customer on ticket solve ──
+        if (\App\Models\Setting::get('support_ticket_solved_sms', '1') == '1'
+            && $ticket->send_sms
+            && $ticket->customer?->phone) {
+            try {
+                (new SmsService())->sendTicketSolved(
+                    $ticket->customer->phone,
+                    $ticket->customer->name,
+                    $ticket->ticket_no
+                );
+            } catch (\Exception $e) {
+                \Log::error('Support ticket solved SMS failed: ' . $e->getMessage());
+            }
+        }
+
         return response()->json([
             'success'  => true,
             'message'  => 'Ticket marked as solved.',
@@ -291,6 +334,7 @@ class ClientSupportController extends Controller
     // Reassign employees
     public function reassign(Request $request, ClientSupportTicket $ticket)
     {
+       
         $request->validate([
             'employee_ids'  => 'required|array',
             'employee_ids.*'=> 'exists:employees,id',
@@ -299,7 +343,31 @@ class ClientSupportController extends Controller
         $ticket->assignees()->sync($request->employee_ids);
         $ticket->update(['status' => 'processing']);
 
-        $names = Employee::whereIn('id', $request->employee_ids)->pluck('name')->implode(', ');
+        $employees = Employee::whereIn('id', $request->employee_ids)->get(['id', 'name', 'phone']);
+        $names     = $employees->pluck('name')->implode(', ');
+
+        // ── SMS to assigned employees ──
+        // NOTE: requires the frontend to send `sms` in the AJAX payload
+        // (btnConfirmReassign handler must add: sms: $('#reassign_sms').is(':checked') ? 1 : 0)
+        if ($request->boolean('sms')) {// \App\Models\Setting::get('support_ticket_assigned_sms', '1') == '1'
+         
+           $smsService = new SmsService();
+            foreach ($employees as $emp) {
+                if ($emp->phone) {
+                    try {
+                        $smsService->sendTicketAssigned(
+                            $emp->phone,
+                            $emp->name,
+                            $ticket->ticket_no,
+                            $ticket->complained_no
+                        );
+                    } catch (\Exception $e) {
+                        \Log::error('Support ticket assigned SMS failed: ' . $e->getMessage());
+                    }
+                }
+            }
+              
+        }
 
         return response()->json([
             'success' => true,
@@ -325,13 +393,13 @@ class ClientSupportController extends Controller
         return [
             'id'            => $t->id,
             'ticket_no'     => $t->ticket_no,
-            'client_code'   => $customer->customer_code ?? '—',
-            'pppoe_username'=> $customer->pppoe_username ?? '—',
-            'customer_name' => $customer->name ?? '—',
-            'mobile'        => $customer->phone ?? '—',
+            'client_code'   => $customer?->customer_code ?? '—',
+            'pppoe_username'=> $customer?->pppoe_username ?? '—',
+            'customer_name' => $customer?->name ?? '—',
+            'mobile'        => $customer?->phone ?? '—',
             'complained_no' => $t->complained_no,
-            'zone'          => $customer->zone->name ?? '—',
-            'sub_zone'      => $customer->subZone->name ?? '—',
+            'zone'          => $customer?->zone?->name ?? '—',
+            'sub_zone'      => $customer?->subZone?->name ?? '—',
             'category'      => $t->category->name ?? '—',
             'priority'      => $t->priority,
             'priority_badge'=> $t->priority_badge,
@@ -342,8 +410,8 @@ class ClientSupportController extends Controller
             'solved_at'     => $t->solved_at?->format('d M Y H:i A'),
             'solved_by'     => $t->solvedBy->name ?? '—',
             'duration'      => $t->solved_at ? $t->duration : null,
-            'mac_address'   => $customer->mac_address ?? '',
-            'ip_address'    => $customer->ip_address ?? '',
+            'mac_address'   => $customer?->mac_address ?? '',
+            'ip_address'    => $customer?->ip_address ?? '',
             'assignees'     => $t->assignees->map(fn($e) => ['id' => $e->id, 'name' => $e->name]),
         ];
     }

@@ -22,7 +22,6 @@
                     <th style="width:40px">#</th>
                     <th>Name</th>
                     <th>Badge</th>
-                    <th>Icon</th>
                     <th>Description</th>
                     <th class="text-center">Entries</th>
                     <th class="text-center">Status</th>
@@ -33,14 +32,16 @@
                 @forelse($categories as $i => $cat)
                 <tr>
                     <td>{{ $i + 1 }}</td>
-                    <td class="font-weight-bold">{{ $cat->name }}</td>
-                    <td><span class="badge" style="{{ $cat->badgeStyle }}">{{ $cat->name }}</span></td>
-                    <td>
-                        @if($cat->icon)
+                    <td class="font-weight-bold">            @if($cat->icon)
                             <i class="{{ $cat->icon }}"></i>
-                            <small class="text-muted ml-1">{{ $cat->icon }}</small>
-                        @else <span class="text-muted">—</span> @endif
-                    </td>
+                        @endif
+                        {{ $cat->name }}</td>
+                    <td><span class="badge" style="{{ $cat->badgeStyle }}">
+        
+                    {{ $cat->name }}
+                    
+                    </span></td>
+    
                     <td>{{ Str::limit($cat->description, 45) ?? '—' }}</td>
                     <td class="text-center"><span class="badge badge-secondary">{{ $cat->incomes_count }}</span></td>
                     <td class="text-center">
@@ -51,6 +52,7 @@
                         @endif
                     </td>
                     <td>
+                     @if(!$cat->is_system)
                         <button class="btn btn-xs btn-warning btn-edit-income-cat"
                                 data-id="{{ $cat->id }}"
                                 data-name="{{ $cat->name }}"
@@ -60,7 +62,7 @@
                                 data-active="{{ $cat->is_active ? 1 : 0 }}">
                             <i class="fas fa-edit"></i>
                         </button>
-                        @if($cat->incomes_count == 0)
+                        @if($cat->incomes_count == 0 )
                         <form action="{{ route('income-categories.destroy', $cat) }}"
                               method="POST" class="d-inline"
                               onsubmit="return confirm('Delete this category?')">
@@ -70,6 +72,11 @@
                             </button>
                         </form>
                         @endif
+                    @else
+                        <span class="badge badge-info">
+                            <i class="fas fa-lock"></i> Built-in
+                        </span>
+                    @endif
                     </td>
                 </tr>
                 @empty

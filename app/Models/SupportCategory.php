@@ -9,7 +9,7 @@ class SupportCategory extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'department_id', 'category_type', 'details', 'is_active'];
+    protected $fillable = ['mac_reseller_id', 'name', 'department_id', 'category_type', 'details', 'is_active'];
 
     protected $casts = ['is_active' => 'boolean'];
 
@@ -26,6 +26,11 @@ class SupportCategory extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    public function scopeForReseller($query, $macResellerId)
+    {
+        return $query->where('mac_reseller_id', $macResellerId);
     }
 
     public function getCategoryTypeLabelAttribute(): string

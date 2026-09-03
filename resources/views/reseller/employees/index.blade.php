@@ -1,6 +1,6 @@
 @extends('reseller.layouts.app')
 
-@section('title', 'Employees')
+@section('title', 'Staff Login')
 
 @section('content')
 
@@ -11,9 +11,9 @@
 <div class="card border-0 shadow-sm" style="border-radius:12px">
     <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h6 class="font-weight-bold mb-0"><i class="fas fa-users text-primary mr-1"></i> My Employees</h6>
+            <h6 class="font-weight-bold mb-0"><i class="fas fa-user-shield text-primary mr-1"></i> My Staff</h6>
             <button class="btn btn-sm btn-success" data-toggle="modal" data-target="#addEmployeeModal">
-                <i class="fas fa-plus mr-1"></i> Add Employee
+                <i class="fas fa-plus mr-1"></i> Add Staff
             </button>
         </div>
 
@@ -60,7 +60,7 @@
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="6" class="text-center text-muted py-4">No employees added yet.</td></tr>
+                    <tr><td colspan="6" class="text-center text-muted py-4">No staff added yet.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -69,28 +69,43 @@
     </div>
 </div>
 
-{{-- Add Employee Modal --}}
+{{-- Add Staff Modal --}}
 <div class="modal fade" id="addEmployeeModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Add Employee</h5>
+                <h5 class="modal-title">Add Staff</h5>
                 <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
             </div>
             <div class="modal-body">
                 <form id="addEmpForm">
                     @csrf
                     <div class="form-group">
+                        <label class="small font-weight-bold">Link to HR Employee (optional)</label>
+                        <select name="employee_id" id="add_employee_id" class="form-control form-control-sm">
+                            <option value="">— None, enter details manually —</option>
+                            @foreach($hrEmployees as $he)
+                                <option value="{{ $he->id }}"
+                                    data-name="{{ $he->name }}"
+                                    data-phone="{{ $he->phone }}"
+                                    data-designation="{{ $he->position->name ?? '' }}">
+                                    {{ $he->name }} ({{ $he->employee_code }})
+                                </option>
+                            @endforeach
+                        </select>
+                        <small class="text-muted">Selecting an HR Employee auto-fills their info below — you can still edit it.</small>
+                    </div>
+                    <div class="form-group">
                         <label class="small font-weight-bold">Name *</label>
-                        <input type="text" name="name" class="form-control form-control-sm" required>
+                        <input type="text" name="name" id="add_name" class="form-control form-control-sm" required>
                     </div>
                     <div class="form-group">
                         <label class="small font-weight-bold">Designation</label>
-                        <input type="text" name="designation" class="form-control form-control-sm">
+                        <input type="text" name="designation" id="add_designation" class="form-control form-control-sm">
                     </div>
                     <div class="form-group">
                         <label class="small font-weight-bold">Phone</label>
-                        <input type="text" name="phone" class="form-control form-control-sm">
+                        <input type="text" name="phone" id="add_phone" class="form-control form-control-sm">
                     </div>
                     <div class="form-group">
                         <label class="small font-weight-bold">Email</label>
@@ -111,11 +126,11 @@
                     <div class="form-group">
                         <label class="small font-weight-bold">Allowed Menus</label>
                         <div class="row">
-                            @foreach(['CONFIGURATION','MIKROTIK CLIENT','CLIENT','BILLING','MONITORING','CLIENT SUPPORT','SMS SERVICE','REPORT','FUND HISTORY','TUTORIALS'] as $m)
+                            @foreach(['CONFIGURATION' => 'Configuration', 'MIKROTIK CLIENT' => 'Mikrotik Client', 'CLIENT' => 'Client', 'BILLING' => 'Billing', 'MONITORING' => 'Monitoring', 'CLIENT SUPPORT' => 'Support & Ticketing', 'SMS SERVICE' => 'Sms Service', 'REPORT' => 'Report', 'FUND HISTORY' => 'Fund History', 'TUTORIALS' => 'Tutorials'] as $m => $label)
                             <div class="col-md-6">
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" name="allowed_menus[]" value="{{ $m }}" id="add-{{ Str::slug($m) }}">
-                                    <label class="form-check-label small" for="add-{{ Str::slug($m) }}">{{ ucwords(strtolower($m)) }}</label>
+                                    <label class="form-check-label small" for="add-{{ Str::slug($m) }}">{{ $label }}</label>
                                 </div>
                             </div>
                             @endforeach
@@ -128,12 +143,12 @@
     </div>
 </div>
 
-{{-- Edit Employee Modal --}}
+{{-- Edit Staff Modal --}}
 <div class="modal fade" id="editEmployeeModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Edit Employee</h5>
+                <h5 class="modal-title">Edit Staff</h5>
                 <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
             </div>
             <div class="modal-body">
@@ -179,11 +194,11 @@
                     <div class="form-group">
                         <label class="small font-weight-bold">Allowed Menus</label>
                         <div class="row" id="editMenusWrap">
-                            @foreach(['CONFIGURATION','MIKROTIK CLIENT','CLIENT','BILLING','MONITORING','CLIENT SUPPORT','SMS SERVICE','REPORT','FUND HISTORY','TUTORIALS'] as $m)
+                            @foreach(['CONFIGURATION' => 'Configuration', 'MIKROTIK CLIENT' => 'Mikrotik Client', 'CLIENT' => 'Client', 'BILLING' => 'Billing', 'MONITORING' => 'Monitoring', 'CLIENT SUPPORT' => 'Support & Ticketing', 'SMS SERVICE' => 'Sms Service', 'REPORT' => 'Report', 'FUND HISTORY' => 'Fund History', 'TUTORIALS' => 'Tutorials'] as $m => $label)
                             <div class="col-md-6">
                                 <div class="form-check">
                                     <input class="form-check-input edit-menu-cb" type="checkbox" name="allowed_menus[]" value="{{ $m }}" id="edit-{{ Str::slug($m) }}">
-                                    <label class="form-check-label small" for="edit-{{ Str::slug($m) }}">{{ ucwords(strtolower($m)) }}</label>
+                                    <label class="form-check-label small" for="edit-{{ Str::slug($m) }}">{{ $label }}</label>
                                 </div>
                             </div>
                             @endforeach
@@ -195,10 +210,19 @@
         </div>
     </div>
 </div>
-@stop
+@endsection
 
 @section('js')
 <script>
+$('#add_employee_id').on('change', function () {
+    var opt = $(this).find(':selected');
+    if ($(this).val()) {
+        $('#add_name').val(opt.data('name'));
+        $('#add_designation').val(opt.data('designation'));
+        $('#add_phone').val(opt.data('phone'));
+    }
+});
+
 $('#addEmpForm').on('submit', function(e) {
     e.preventDefault();
     $.ajax({
@@ -244,7 +268,7 @@ $('#editEmpForm').on('submit', function(e) {
 
 $(document).on('click', '.delete-emp-btn', function() {
     const id = $(this).data('id');
-    if (!confirm('Remove this employee?')) return;
+    if (!confirm('Remove this staff member?')) return;
     $.ajax({
         url: `/reseller/employees/${id}`,
         method: 'POST',
@@ -253,4 +277,4 @@ $(document).on('click', '.delete-emp-btn', function() {
     });
 });
 </script>
-@stop
+@endsection

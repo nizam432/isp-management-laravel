@@ -1,80 +1,206 @@
 @extends('reseller.layouts.app')
 
-@section('title', 'Invoice Details')
+@section('title', 'Invoice: ' . $invoice->invoice_no)
+
+@section('css')
+<style>
+.invoice-accent { color: #00a65a; }
+.invoice-border-top { border-top: 3px solid #00a65a; }
+.invoice-table thead tr { border-bottom: 2px solid #00a65a; }
+.invoice-table tfoot tr { border-top: 2px solid #00a65a; }
+.invoice-total { color: #00a65a; font-size: 18px; font-weight: 600; }
+.section-label { color: #00a65a; font-size: 11px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 8px; }
+</style>
+@endsection
 
 @section('content')
 
-<div class="mb-3">
-    <a href="{{ route('reseller.billing.index') }}" class="btn btn-sm btn-light">
-        <i class="fas fa-arrow-left"></i> Back to Billing
-    </a>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="m-0">Invoice: {{ $invoice->invoice_no }}</h4>
+    <div>
+        <a href="{{ route('reseller.billing.index') }}" class="btn btn-default btn-sm">
+            <i class="fas fa-arrow-left mr-1"></i> Go Back
+        </a>
+        <a href="{{ route('reseller.billing.pdf', $invoice) }}" class="btn btn-danger btn-sm ml-1">
+            <i class="fas fa-file-pdf mr-1"></i> Download PDF
+        </a>
+    </div>
 </div>
 
-@php
-    $total = $invoice->amount ?? 0;
-    $paid  = $invoice->total_paid ?? 0;
-    $due   = $invoice->due_amount ?? ($total - $paid);
-    $badgeColor = match($invoice->status) {
-        'paid' => 'success', 'unpaid' => 'danger',
-        'overdue' => 'warning', default => 'secondary',
-    };
-@endphp
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card">
 
-<div class="row">
-    <div class="col-md-8 mb-3">
-        <div class="card border-0 shadow-sm" style="border-radius:12px">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="font-weight-bold mb-0">{{ $invoice->invoice_no ?? ('INV-' . $invoice->id) }}</h5>
-                    <span class="badge badge-{{ $badgeColor }} px-3 py-2">{{ ucfirst($invoice->status ?? 'unpaid') }}</span>
+            {{-- Header --}}
+            <div class="card-body pb-2 invoice-border-top">
+                <div class="row align-items-start">
+                    <div class="col-md-6">
+                        @php
+                            $resellerId     = auth('mac_reseller')->id();
+                            $companyName    = \App\Models\ResellerSetting::get($resellerId, 'company_name', auth('mac_reseller')->user()->business_name ?? config('app.name'));
+                            $companyPhone   = \App\Models\ResellerSetting::get($resellerId, 'company_phone', '');
+                            $companyEmail   = \App\Models\ResellerSetting::get($resellerId, 'company_email', '');
+                            $companyAddress = \App\Models\ResellerSetting::get($resellerId, 'company_address', '');
+                            $companyLogo    = \App\Models\ResellerSetting::get($resellerId, 'company_logo', '');
+                            $packageName    = $invoice->customer->resellerTariffPackage->package->name ?? '-';
+                        @endphp
+                        <div class="d-flex align-items-center mb-1">
+                            @if($companyLogo)
+                                <img src="{{ asset('storage/' . $companyLogo) }}" alt="Logo" style="height:40px; margin-right:10px;">
+                            @endif
+                            <h4 class="font-weight-500 mb-0">{{ $companyName }}</h4>
+                        </div>
+                        @if($companyAddress)
+                        <p class="text-muted mb-0" style="font-size:13px;">{{ $companyAddress }}</p>
+                        @endif
+                        <p class="text-muted mb-0" style="font-size:13px;">
+                            @if($companyPhone) Phone: {{ $companyPhone }} @endif
+                            @if($companyEmail) | Email: {{ $companyEmail }} @endif
+                        </p>
+                    </div>
+                    <div class="col-md-6 text-right">
+                        <h2 class="invoice-accent mb-0" style="letter-spacing:2px;">INVOICE</h2>
+                        <p class="text-muted mb-1" style="font-size:13px;">{{ $invoice->invoice_no }}</p>
+                        @if($invoice->status === 'paid')
+                            <span class="badge badge-success">Paid</span>
+                        @elseif($invoice->status === 'partial')
+                            <span class="badge badge-warning">Partial</span>
+                        @elseif($invoice->status === 'overdue')
+                            <span class="badge badge-danger">Overdue</span>
+                        @else
+                            <span class="badge badge-secondary">Unpaid</span>
+                        @endif
+                    </div>
                 </div>
-                <table class="table table-sm table-borderless mb-0" style="font-size:.875rem">
-                    <tr><td class="text-muted" style="width:180px">Client</td><td>{{ $invoice->customer?->name }} ({{ $invoice->customer?->customer_code }})</td></tr>
-                    <tr><td class="text-muted">Invoice Date</td><td>{{ $invoice->created_at?->format('d M Y') }}</td></tr>
-                    <tr><td class="text-muted">Total Amount</td><td class="font-weight-bold">{{ number_format($total, 2) }}</td></tr>
-                    <tr><td class="text-muted">Paid Amount</td><td class="text-success">{{ number_format($paid, 2) }}</td></tr>
-                    <tr><td class="text-muted">Due Amount</td><td class="text-danger font-weight-bold">{{ number_format($due, 2) }}</td></tr>
+            </div>
+
+            <hr class="mt-0 mb-0">
+
+            {{-- Customer + Invoice Info --}}
+            <div class="card-body py-3">
+                <div class="row">
+                    <div class="col-md-6 border-right">
+                        <div class="section-label">Bill To</div>
+                        <h6 class="font-weight-bold mb-1">{{ $invoice->customer->name }}</h6>
+                        <p class="text-muted mb-0" style="font-size:13px;">{{ $invoice->customer->phone }}</p>
+                        <p class="text-muted mb-0" style="font-size:13px;">Username: {{ $invoice->customer->pppoe_username ?? '-' }}</p>
+                        <p class="text-muted mb-0" style="font-size:13px;">Package: {{ $packageName }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="section-label">Invoice Info</div>
+                        <table class="table table-sm table-borderless mb-0" style="font-size:13px;">
+                            <tr>
+                                <td class="text-muted pl-0">Month:</td>
+                                <td class="text-right pr-0">{{ $invoice->month }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted pl-0">Issue Date:</td>
+                                <td class="text-right pr-0">{{ $invoice->created_at->format('d M Y') }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted pl-0">Due Date:</td>
+                                <td class="text-right pr-0">{{ $invoice->due_date?->format('d M Y') ?? '-' }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <hr class="mt-0 mb-0">
+
+            {{-- Items Table --}}
+            <div class="card-body py-3">
+                <table class="table table-sm invoice-table mb-0" style="font-size:13px;">
+                    <thead>
+                        <tr>
+                            <th class="pl-0 text-muted font-weight-500">Description</th>
+                            <th class="pr-0 text-right text-muted font-weight-500">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="pl-0">Internet Bill — {{ \Carbon\Carbon::createFromFormat('Y-m', $invoice->month)->format('F Y') }} — {{ $packageName }}</td>
+                            <td class="pr-0 text-right">{{ $currency }} {{ number_format($invoice->amount, 2) }}</td>
+                        </tr>
+                        @if($invoice->discount > 0)
+                        <tr>
+                            <td class="pl-0 text-muted">Discount</td>
+                            <td class="pr-0 text-right text-muted">- {{ $currency }} {{ number_format($invoice->discount, 2) }}</td>
+                        </tr>
+                        @endif
+                        @php $advancePaid = $invoice->payments->where('method', 'advance')->where('status', 'active')->sum('amount'); @endphp
+                        @if($advancePaid > 0)
+                        <tr>
+                            <td class="pl-0 text-muted">Advance Paid</td>
+                            <td class="pr-0 text-right text-muted">- {{ $currency }} {{ number_format($advancePaid, 2) }}</td>
+                        </tr>
+                        @endif
+                        @if($vatPercent > 0)
+                        @php $vatAmount = ($invoice->amount - $invoice->discount) * ($vatPercent / 100); @endphp
+                        <tr>
+                            <td class="pl-0 text-muted">VAT ({{ $vatPercent }}%)</td>
+                            <td class="pr-0 text-right text-muted">+ {{ $currency }} {{ number_format($vatAmount, 2) }}</td>
+                        </tr>
+                        @endif
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td class="pl-0 font-weight-bold">Total Due</td>
+                            <td class="pr-0 text-right invoice-total">{{ $currency }} {{ number_format($invoice->due_amount, 2) }}</td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
-        </div>
-    </div>
 
-    <div class="col-md-4 mb-3">
-        <div class="card border-0 shadow-sm" style="border-radius:12px">
-            <div class="card-body text-center">
-                <div style="width:70px;height:70px;border-radius:50%;background:#eff6ff;display:flex;align-items:center;justify-content:center;margin:0 auto 12px">
-                    <i class="fas fa-file-invoice-dollar fa-2x text-primary"></i>
-                </div>
-                <h6 class="font-weight-bold mb-1">{{ number_format($total, 2) }}</h6>
-                <p class="text-muted small mb-0">Invoice Total</p>
+            <hr class="mt-0 mb-0">
+
+            {{-- Payment History --}}
+            <div class="card-body py-3">
+                <div class="section-label">Payment History</div>
+                <table class="table table-sm table-hover mb-0" style="font-size:13px;">
+                    <thead class="bg-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Method</th>
+                            <th>Transaction ID</th>
+                            <th>Received By</th>
+                            <th class="text-right">Amount</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($invoice->payments as $pay)
+                        <tr class="{{ $pay->isVoid() ? 'text-muted' : '' }}">
+                            <td>{{ optional($pay->paid_at)->format('d M Y') ?? optional($pay->payment_date)->format('d M Y') ?? '-' }}</td>
+                            <td><span class="badge badge-info">{{ strtoupper($pay->method) }}</span></td>
+                            <td>{{ $pay->transaction_id ?? '-' }}</td>
+                            <td>{{ $pay->receivedByReseller->name ?? $pay->receivedBy->name ?? '-' }}</td>
+                            <td class="text-right">{{ $currency }} {{ number_format($pay->amount, 2) }}</td>
+                            <td>
+                                @if($pay->isVoid())
+                                    <span class="badge badge-danger">Void</span>
+                                @else
+                                    <span class="badge badge-success">Active</span>
+                                @endif
+                            </td>
+                        </tr>
+                        @empty
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-3">No payments yet.</td>
+                        </tr>
+                        @endforelse
+                    </tbody>
+                </table>
             </div>
+
+            {{-- Footer --}}
+            <div class="card-footer d-flex justify-content-between align-items-center">
+                <small class="text-muted">{{ $footerText }}</small>
+                <small class="text-muted">Support: {{ $companyPhone }}</small>
+            </div>
+
         </div>
     </div>
 </div>
 
-@if($invoice->payments->isNotEmpty())
-<div class="card border-0 shadow-sm" style="border-radius:12px">
-    <div class="card-body">
-        <h6 class="font-weight-bold mb-3"><i class="fas fa-history text-info mr-1"></i> Payment History</h6>
-        <div class="table-responsive">
-            <table class="table table-sm table-bordered" style="font-size:.85rem">
-                <thead style="background:#f4f6f9">
-                    <tr><th>Payment ID</th><th>Amount</th><th>Method</th><th>Date</th></tr>
-                </thead>
-                <tbody>
-                    @foreach($invoice->payments as $p)
-                    <tr>
-                        <td>{{ $p->id }}</td>
-                        <td>{{ number_format($p->amount ?? 0, 2) }}</td>
-                        <td>{{ ucfirst($p->payment_method ?? $p->method ?? '—') }}</td>
-                        <td>{{ $p->created_at?->format('d M Y h:i A') }}</td>
-                    </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-@endif
-
-@stop
+@endsection

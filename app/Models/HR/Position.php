@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
  
 class Position extends Model
 {
-    protected $fillable = ['department_id', 'name', 'description', 'is_active'];
+    protected $fillable = ['mac_reseller_id', 'department_id', 'name', 'description', 'is_active'];
     protected $casts    = ['is_active' => 'boolean'];
  
     public function department()
@@ -23,5 +23,9 @@ class Position extends Model
     {
         return $query->where('is_active', true);
     }
+
+    public function scopeForReseller($query, $macResellerId)
+    {
+        return $query->where('mac_reseller_id', $macResellerId);
+    }
 }
- 

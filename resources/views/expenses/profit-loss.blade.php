@@ -1,26 +1,34 @@
-{{-- resources/views/expenses/profit-loss.blade.php --}}
-@extends('layouts.app')
-@section('page_title', 'Profit & Loss Report')
-@section('page_actions')
-    <a href="{{ route('expenses.profit-loss.pdf', ['month' => $month]) }}"
-       class="btn btn-danger btn-sm">
+@extends('adminlte::page')
+@section('title', 'Profit & Loss')
+
+@section('content_header')
+<div class="d-flex justify-content-between align-items-center">
+    <h4 class="mb-0 font-weight-bold"><i class="fas fa-chart-pie mr-2"></i>Profit & Loss Report</h4>
+    <a href="{{ route('expenses.profit-loss.pdf', request()->query()) }}" class="btn btn-danger btn-sm">
         <i class="fas fa-file-pdf mr-1"></i> PDF Export
     </a>
+</div>
 @endsection
-@section('page_content')
 
-{{-- Month Filter --}}
-<div class="card mb-3">
+@section('content')
+
+{{-- Filter --}}
+<div class="card mb-3 shadow-sm">
     <div class="card-body py-2">
-        <form method="GET" class="form-inline">
-            <label class="mr-2 font-weight-bold">Month:</label>
-            <input type="month" name="month" class="form-control form-control-sm mr-2"
-                   value="{{ $month }}">
-            <button class="btn btn-sm btn-primary">
+        <form method="GET" class="form-inline flex-wrap gap-2">
+            <label class="mr-1 font-weight-bold small">From:</label>
+            <input type="date" name="from_date" class="form-control form-control-sm mr-2" value="{{ $from }}">
+            <label class="mr-1 font-weight-bold small">To:</label>
+            <input type="date" name="to_date" class="form-control form-control-sm mr-2" value="{{ $to }}">
+            <button type="submit" class="btn btn-primary btn-sm mr-1">
                 <i class="fas fa-search mr-1"></i> Filter
             </button>
-            <span class="ml-3 text-muted">
-                {{ \Carbon\Carbon::parse($month . '-01')->format('F Y') }}
+            <a href="{{ route('expenses.profit-loss') }}" class="btn btn-secondary btn-sm mr-3">
+                <i class="fas fa-redo mr-1"></i> Reset
+            </a>
+            <span class="text-muted small">
+                {{ \Carbon\Carbon::parse($from)->format('d M Y') }} — {{ \Carbon\Carbon::parse($to)->format('d M Y') }}
+                ({{ \Carbon\Carbon::parse($from)->diffInMonths(\Carbon\Carbon::parse($to)) + 1 }} month)
             </span>
         </form>
     </div>
@@ -28,230 +36,180 @@
 
 {{-- Summary Cards --}}
 <div class="row mb-3">
-    <div class="col-md-3">
-        <div class="info-box bg-success">
+    <div class="col-md-3 col-6">
+        <div class="info-box bg-success shadow-sm mb-3">
             <span class="info-box-icon"><i class="fas fa-arrow-up"></i></span>
             <div class="info-box-content">
-                <span class="info-box-text">মোট আয় (Income)</span>
-                <span class="info-box-number">৳{{ number_format($totalIncome) }}</span>
+                <span class="info-box-text">Total Income</span>
+                <span class="info-box-number">BDT {{ number_format($grandIncome) }}</span>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="info-box bg-danger">
+    <div class="col-md-3 col-6">
+        <div class="info-box bg-danger shadow-sm mb-3">
             <span class="info-box-icon"><i class="fas fa-arrow-down"></i></span>
             <div class="info-box-content">
-                <span class="info-box-text">মোট ব্যয় (Expense)</span>
-                <span class="info-box-number">৳{{ number_format($totalExpense) }}</span>
+                <span class="info-box-text">Total Expense</span>
+                <span class="info-box-number">BDT {{ number_format($grandExpense) }}</span>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="info-box {{ $netProfit >= 0 ? 'bg-primary' : 'bg-warning' }}">
+    <div class="col-md-3 col-6">
+        <div class="info-box bg-primary shadow-sm mb-3">
             <span class="info-box-icon"><i class="fas fa-chart-line"></i></span>
             <div class="info-box-content">
-                <span class="info-box-text">নেট মুনাফা (Net Profit)</span>
-                <span class="info-box-number">৳{{ number_format($netProfit) }}</span>
+                <span class="info-box-text">Net Profit</span>
+                <span class="info-box-number">BDT {{ number_format($grandProfit) }}</span>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="info-box bg-info">
+    <div class="col-md-3 col-6">
+        <div class="info-box bg-info shadow-sm mb-3">
             <span class="info-box-icon"><i class="fas fa-percent"></i></span>
             <div class="info-box-content">
                 <span class="info-box-text">Profit Margin</span>
-                <span class="info-box-number">{{ $profitMargin }}%</span>
+                <span class="info-box-number">{{ $grandMargin }}%</span>
             </div>
         </div>
     </div>
 </div>
 
 <div class="row">
-    {{-- P&L Statement --}}
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">
-                    <i class="fas fa-file-invoice-dollar mr-1"></i>
-                    P&L Statement — {{ \Carbon\Carbon::parse($month.'-01')->format('F Y') }}
-                </h3>
+    {{-- Monthly Breakdown --}}
+    <div class="col-lg-5">
+        <div class="card shadow-sm">
+            <div class="card-header py-2">
+                <h6 class="m-0 font-weight-bold"><i class="fas fa-table mr-1"></i> Monthly Breakdown</h6>
             </div>
             <div class="card-body p-0">
-                <table class="table table-sm mb-0">
-
-                    {{-- Income section --}}
-                    <thead class="thead-light">
+                <table class="table table-sm table-hover mb-0">
+                    <thead style="background:#f8f9fa; border-bottom:2px solid #dee2e6;">
                         <tr>
-                            <th colspan="2" class="text-success">
-                                <i class="fas fa-plus-circle mr-1"></i> আয় (Income)
-                            </th>
+                            <th style="padding:10px 12px;">Month</th>
+                            <th class="text-right" style="padding:10px 12px;">Income</th>
+                            <th class="text-right" style="padding:10px 12px;">Expense</th>
+                            <th class="text-right" style="padding:10px 12px;">Net Profit</th>
+                            <th class="text-center" style="padding:10px 12px;">Margin</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($incomeByMethod as $method => $amount)
+                        @forelse($rows as $row)
                         <tr>
-                            <td class="pl-4 text-muted">{{ strtoupper($method) }} collections</td>
-                            <td class="text-right text-success">৳{{ number_format($amount, 2) }}</td>
-                        </tr>
-                        @endforeach
-                        <tr class="font-weight-bold bg-light">
-                            <td class="pl-2">মোট আয়</td>
-                            <td class="text-right text-success">৳{{ number_format($totalIncome, 2) }}</td>
-                        </tr>
-                    </tbody>
-
-                    {{-- Expense section --}}
-                    <thead class="thead-light">
-                        <tr>
-                            <th colspan="2" class="text-danger">
-                                <i class="fas fa-minus-circle mr-1"></i> ব্যয় (Expense)
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($expenseBreakdown as $item)
-                        <tr>
-                            <td class="pl-4 text-muted">
-                                @if($item['category'])
-                                    <span class="badge" style="{{ $item['category']->badgeStyle }}">
-                                        {{ $item['category']->name }}
-                                    </span>
-                                @else
-                                    Uncategorized
-                                @endif
-                                <small class="ml-1">({{ $item['count'] }} items)</small>
+                            <td style="padding:10px 12px;" class="font-weight-bold">{{ $row['month_label'] }}</td>
+                            <td class="text-right text-success font-weight-bold" style="padding:10px 12px;">
+                                BDT {{ number_format($row['total_income']) }}
                             </td>
-                            <td class="text-right text-danger">৳{{ number_format($item['total'], 2) }}</td>
+                            <td class="text-right text-danger" style="padding:10px 12px;">
+                                BDT {{ number_format($row['total_expense']) }} 
+                            </td>
+                            <td class="text-right font-weight-bold {{ $row['net_profit'] >= 0 ? 'text-primary' : 'text-danger' }}" style="padding:10px 12px;">
+                                BDT {{ number_format($row['net_profit']) }}
+                            </td>
+                            <td class="text-center" style="padding:10px 12px;">
+                                <span class="badge badge-{{ $row['margin'] >= 50 ? 'success' : ($row['margin'] >= 20 ? 'warning' : 'danger') }}">
+                                    {{ $row['margin'] }}%
+                                </span>
+                            </td>
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="2" class="text-center text-muted">কোনো expense নেই।</td>
+                            <td colspan="5" class="text-center py-4 text-muted">No data found.</td>
                         </tr>
                         @endforelse
-                        <tr class="font-weight-bold bg-light">
-                            <td class="pl-2">মোট ব্যয়</td>
-                            <td class="text-right text-danger">৳{{ number_format($totalExpense, 2) }}</td>
-                        </tr>
                     </tbody>
-
-                    {{-- Net Profit --}}
-                    <tfoot>
-                        <tr style="border-top:2px solid #dee2e6;">
-                            <td class="font-weight-bold" style="font-size:16px">নেট মুনাফা</td>
-                            <td class="text-right font-weight-bold {{ $netProfit >= 0 ? 'text-primary' : 'text-warning' }}"
-                                style="font-size:18px">
-                                ৳{{ number_format($netProfit, 2) }}
+                    @if(count($rows) > 1)
+                    <tfoot style="background:#f8f9fa; border-top:2px solid #dee2e6;">
+                        <tr>
+                            <td class="font-weight-bold" style="padding:10px 12px;">Total</td>
+                            <td class="text-right font-weight-bold text-success" style="padding:10px 12px;">BDT {{ number_format($grandIncome) }}</td>
+                            <td class="text-right font-weight-bold text-danger" style="padding:10px 12px;">BDT {{ number_format($grandExpense) }}</td>
+                            <td class="text-right font-weight-bold text-primary" style="padding:10px 12px;">BDT {{ number_format($grandProfit) }}</td>
+                            <td class="text-center" style="padding:10px 12px;">
+                                <span class="badge badge-{{ $grandMargin >= 50 ? 'success' : ($grandMargin >= 20 ? 'warning' : 'danger') }}">{{ $grandMargin }}%</span>
                             </td>
                         </tr>
-                        <tr>
-                            <td class="text-muted">Profit Margin</td>
-                            <td class="text-right text-muted">{{ $profitMargin }}%</td>
-                        </tr>
                     </tfoot>
+                    @endif
                 </table>
             </div>
         </div>
     </div>
 
-    {{-- 6-month trend chart --}}
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">
-                    <i class="fas fa-chart-bar mr-1"></i> ৬ মাসের Income vs Expense
-                </h3>
+    {{-- Chart --}}
+    <div class="col-lg-7">
+        <div class="card shadow-sm">
+            <div class="card-header py-2">
+                <h6 class="m-0 font-weight-bold"><i class="fas fa-chart-bar mr-1"></i> Income vs Expense</h6>
             </div>
             <div class="card-body">
-                <canvas id="trendChart" height="250"></canvas>
+                <canvas id="plChart" height="200"></canvas>
             </div>
         </div>
-
-        {{-- Expense category pie --}}
-        @if($expenseBreakdown->count() > 0)
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">
-                    <i class="fas fa-chart-pie mr-1"></i> Expense Breakdown
-                </h3>
-            </div>
-            <div class="card-body">
-                <canvas id="pieChart" height="200"></canvas>
-            </div>
-        </div>
-        @endif
     </div>
 </div>
 
-@push('js')
+@endsection
+
+@section('js')
+@parent
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-// ── Trend chart (bar) ──────────────────────────────────────────
-const trendData = @json($trend);
-
-new Chart(document.getElementById('trendChart'), {
+var chartData = @json($chartData);
+var ctx = document.getElementById('plChart').getContext('2d');
+new Chart(ctx, {
     type: 'bar',
     data: {
-        labels: trendData.map(d => d.month),
+        labels: chartData.map(r => r.month),
         datasets: [
             {
                 label: 'Income',
-                data: trendData.map(d => d.income),
-                backgroundColor: 'rgba(40,167,69,0.75)',
-                borderRadius: 3,
+                data: chartData.map(r => r.income),
+                backgroundColor: 'rgba(40,167,69,0.7)',
+                borderColor: '#28a745',
+                borderWidth: 1,
             },
             {
                 label: 'Expense',
-                data: trendData.map(d => d.expense),
-                backgroundColor: 'rgba(220,53,69,0.75)',
-                borderRadius: 3,
+                data: chartData.map(r => r.expense),
+                backgroundColor: 'rgba(220,53,69,0.7)',
+                borderColor: '#dc3545',
+                borderWidth: 1,
             },
-        ]
-    },
-    options: {
-        responsive: true,
-        plugins: { legend: { position: 'top' } },
-        scales: {
-            x: { grid: { display: false } },
-            y: {
-                ticks: {
-                    callback: v => '৳' + Number(v).toLocaleString()
-                }
-            }
-        }
-    }
-});
-
-// ── Pie chart ─────────────────────────────────────────────────
-@if($expenseBreakdown->count() > 0)
-const pieData = @json($expenseBreakdown);
-
-new Chart(document.getElementById('pieChart'), {
-    type: 'doughnut',
-    data: {
-        labels: pieData.map(d => d.category ? d.category.name : 'Other'),
-        datasets: [{
-            data: pieData.map(d => d.total),
-            backgroundColor: [
-                '#534AB7','#185FA5','#0F6E56','#BA7517',
-                '#993C1D','#5F5E5A','#993556','#888780',
-            ],
-            borderWidth: 2,
-        }]
+            {
+                label: 'Net Profit',
+                data: chartData.map(r => r.profit),
+                type: 'line',
+                fill: false,
+                borderColor: '#007bff',
+                borderWidth: 2,
+                pointBackgroundColor: '#007bff',
+                tension: 0.3,
+            },
+        ],
     },
     options: {
         responsive: true,
         plugins: {
-            legend: { position: 'right' },
+            legend: { position: 'top' },
             tooltip: {
                 callbacks: {
-                    label: ctx => ctx.label + ': ৳' + Number(ctx.raw).toLocaleString()
+                    label: function(ctx) {
+                        return ctx.dataset.label + ': BDT ' + Number(ctx.parsed.y).toLocaleString();
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(v) {
+                        return 'BDT ' + Number(v).toLocaleString();
+                    }
                 }
             }
         }
     }
 });
-@endif
 </script>
-@endpush
-
-@endsection
+@stop

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\HR\Employee;
 use App\Models\Payment;
 use App\Models\Invoice;
 use App\Models\Customer;
@@ -17,6 +18,9 @@ class PaymentController extends Controller
     public function index(Request $request)
     {
         $payments = Payment::with(['invoice', 'customer', 'receivedBy', 'voidLog'])
+            // ── Admin's payment list should only show payments for Admin's own
+            //    customers — NOT customers added by a MAC Reseller ──
+            ->whereHas('customer', fn($c) => $c->whereNull('mac_reseller_id'))
             ->when($request->search, fn($q) => $q->whereHas('customer', fn($c) =>
                 $c->where('name', 'like', "%{$request->search}%")
                   ->orWhere('phone', 'like', "%{$request->search}%")))
@@ -31,13 +35,15 @@ class PaymentController extends Controller
             ->paginate($request->get('per_page', 20))
             ->withQueryString();
 
-        $totalThisMonth  = Payment::active()->thisMonth()->sum('amount');
-        $totalAllTime    = Payment::active()->sum('amount');
-        $cashThisMonth   = Payment::active()->thisMonth()->where('method', 'cash')->sum('amount');
+        $totalThisMonth  = Payment::active()->thisMonth()->whereHas('customer', fn($c) => $c->whereNull('mac_reseller_id'))->sum('amount');
+        $totalAllTime    = Payment::active()->whereHas('customer', fn($c) => $c->whereNull('mac_reseller_id'))->sum('amount');
+        $cashThisMonth   = Payment::active()->thisMonth()->where('method', 'cash')->whereHas('customer', fn($c) => $c->whereNull('mac_reseller_id'))->sum('amount');
         $mobileThisMonth = Payment::active()->thisMonth()
-            ->whereIn('method', ['bkash', 'nagad', 'rocket'])->sum('amount');
+            ->whereIn('method', ['bkash', 'nagad', 'rocket'])
+            ->whereHas('customer', fn($c) => $c->whereNull('mac_reseller_id'))
+            ->sum('amount');
 
-        $employees = User::role('employee')->get();
+        $employees = Employee::get();
         $zones     = \App\Models\Zone::all();
 
         return view('payments.index', compact(
@@ -53,7 +59,7 @@ class PaymentController extends Controller
             'amount'                => 'required|numeric|min:1',
             'method'                => 'required|in:cash,bkash,nagad,rocket,card,bank,advance',
             'payment_date'          => 'required|date',
-            'received_by'           => 'nullable|exists:users,id',
+            'received_by'           => 'nullable|exists:employees,id',
             'transaction_id'        => 'nullable|string|max:100',
             'discount'              => 'nullable|numeric|min:0',
             'remarks'               => 'nullable|string|max:255',
@@ -83,7 +89,7 @@ class PaymentController extends Controller
             'amount'                => 'required|numeric|min:1',
             'method'                => 'required|in:cash,bkash,nagad,rocket,card,bank',
             'payment_date'          => 'required|date',
-            'received_by'           => 'nullable|exists:users,id',
+            'received_by'           => 'nullable|exists:employees,id',
             'transaction_id'        => 'nullable|string|max:100',
             'remarks'               => 'nullable|string|max:255',
             'send_sms'              => 'nullable|boolean',

@@ -57,3 +57,35 @@ Route::prefix('client')->name('client.')->group(function () {
         Route::get('invoices/{invoice}/pdf', [ClientPortalController::class, 'invoicePdf'])->name('invoice.pdf');
     });
 });
+// ─────────────────────────────────────────────
+Route::prefix('client/payment')->group(function () {
+
+    // SSLCommerz & AmarPay — POST success/fail/cancel
+    Route::post('{gateway}/success', [OnlinePaymentController::class, 'success'])->name('client.payment.success');
+    Route::post('{gateway}/fail',    [OnlinePaymentController::class, 'fail'])   ->name('client.payment.fail');
+    Route::post('{gateway}/cancel',  [OnlinePaymentController::class, 'cancel']) ->name('client.payment.cancel');
+
+    // Razorpay & Stripe cancel — GET
+    Route::get('{gateway}/cancel',   [OnlinePaymentController::class, 'cancel']);
+
+    // Stripe success — GET (has ?session_id=)
+    Route::get('{gateway}/success',  [OnlinePaymentController::class, 'success']);
+
+    // bKash & Nagad & Razorpay — GET/POST callback
+    Route::get ('{gateway}/callback', [OnlinePaymentController::class, 'callback'])->name('client.payment.callback');
+    Route::post('{gateway}/callback', [OnlinePaymentController::class, 'callback']);
+
+    // IPN — server-to-server (SSLCommerz, AmarPay)
+    Route::post('{gateway}/ipn', [OnlinePaymentController::class, 'ipn'])
+         ->name('client.payment.ipn')
+         ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+
+    // Stripe Webhook
+    Route::post('stripe/webhook', [OnlinePaymentController::class, 'stripeWebhook'])
+         ->name('client.payment.stripe-webhook')
+         ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+
+    // Payment success page — no auth needed (SSLCommerz redirects here after payment)
+    Route::get('success-page/{ref}', [OnlinePaymentController::class, 'successPage'])
+         ->name('client.payment.success-page');
+});

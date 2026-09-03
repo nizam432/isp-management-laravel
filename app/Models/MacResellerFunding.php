@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MacResellerFunding extends Model
 {
@@ -51,6 +52,17 @@ class MacResellerFunding extends Model
     public function receivedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'received_by');
+    }
+
+    /**
+     * Individual payment installments against this funding. received_date/
+     * received_by on THIS model are kept as a cached "last payment" snapshot
+     * (matching the existing blade view's "ReceivedDate(Last)"/"ReceivedBy(Last)"
+     * columns) — the full history lives here.
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(MacResellerFundPayment::class, 'funding_id');
     }
 
     public static function generateInvoiceNumber(): string

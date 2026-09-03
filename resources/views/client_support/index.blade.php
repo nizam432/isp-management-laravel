@@ -471,7 +471,7 @@
                     </select>
                 </div>
                 <div class="custom-control custom-checkbox">
-                    <input type="checkbox" class="custom-control-input" id="reassign_sms">
+                    <input type="checkbox" checked="checked" class="custom-control-input" id="reassign_sms">
                     <label class="custom-control-label" for="reassign_sms">SMS</label>
                 </div>
             </div>
@@ -540,6 +540,7 @@ $('#btnNewTicket').click(() => {
     $('#ticket_id').val('');
     $('#ticketModalTitle').text('New Support Ticket');
     clearTicketForm();
+      $('#ticket_send_sms').prop('checked', true);
     $('#ticketModal').modal('show');
 });
 
@@ -562,7 +563,7 @@ function clearTicketForm() {
     $('#ticket_priority').val('').removeClass('is-invalid');
     $('#ticket_complained_no').val('').removeClass('is-invalid');
     $('#ticket_remarks').val('').removeClass('is-invalid');
-    $('#ticket_send_sms').prop('checked', false);
+   $('#ticket_send_sms').prop('checked', false);
     $('#ticket_customer_id_err').text('');
     clearTicketMessage();
 }
@@ -840,7 +841,11 @@ $('#btnConfirmReassign').click(function () {
     const btn = $(this).prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i>');
     $.ajax({
         url: `/client-support/${id}/reassign`, method: 'POST',
-        data: { _token: CSRF, employee_ids: employees },
+        data: {
+            _token: CSRF,
+            employee_ids: employees,
+            sms: $('#reassign_sms').is(':checked') ? 1 : 0,
+        },
         success(res) {
             if (res.success) {
                 $(`#ticket-row-${id}`).find('.assign-cell').html(`<small>${res.names}</small>`);

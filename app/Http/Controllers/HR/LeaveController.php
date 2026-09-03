@@ -94,10 +94,12 @@ class LeaveController extends Controller
         return back()->with('success', 'Leave rejected.');
     }
 
-    // Leave Types CRUD
     public function types()
     {
-        $types = LeaveType::latest()->get();
+        $types = LeaveType::whereNull('mac_reseller_id')   // shudu isp-admin er leave types
+            ->latest()
+            ->get();
+
         return view('hr.leave.types', compact('types'));
     }
 

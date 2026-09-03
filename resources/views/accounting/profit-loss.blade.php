@@ -1,139 +1,259 @@
-{{-- resources/views/accounting/profit-loss.blade.php --}}
-@extends('layouts.app')
-@section('page_title', 'Profit & Loss Report')
-@section('page_actions')
-    <a href="{{ route('expenses.profit-loss.pdf', ['from_date' => $from, 'to_date' => $to]) }}"
-       class="btn btn-danger btn-sm">
+@extends('adminlte::page')
+@section('title', 'Profit & Loss Report')
+
+@section('content_header')
+<div class="d-flex justify-content-between align-items-center">
+    <div>
+        <h4 class="mb-0 font-weight-bold text-dark">
+            <i class="fas fa-chart-pie mr-2 text-primary"></i>Profit & Loss Report
+        </h4>
+        <small class="text-muted">Financial summary by period</small>
+    </div>
+    <a href="{{ route('expenses.profit-loss.pdf', request()->query()) }}" class="btn btn-danger btn-sm px-3">
         <i class="fas fa-file-pdf mr-1"></i> PDF Export
     </a>
+</div>
 @endsection
-@section('page_content')
 
-{{-- Month Range Filter --}}
-<div class="card mb-3">
-    <div class="card-body py-2">
-        <form method="GET" class="form-inline flex-wrap">
-            <label class="mr-2 font-weight-bold">From:</label>
-            <input type="date" name="from_date" class="form-control form-control-sm mr-3"
-                   value="{{ $from }}">
-            <label class="mr-2 font-weight-bold">To:</label>
-            <input type="date" name="to_date" class="form-control form-control-sm mr-3"
-                   value="{{ $to }}">
-            <button class="btn btn-sm btn-primary mr-2">
+@section('content')
+
+{{-- Filter --}}
+<div class="card mb-3 shadow-sm">
+    <div class="card-body py-3">
+        <form method="GET" class="form-inline">
+            <label class="mr-2 font-weight-bold small">From:</label>
+            <input type="date" name="from_date" class="form-control form-control-sm mr-3" value="{{ $from }}">
+            <label class="mr-2 font-weight-bold small">To:</label>
+            <input type="date" name="to_date" class="form-control form-control-sm mr-3" value="{{ $to }}">
+            <button type="submit" class="btn btn-primary btn-sm mr-2">
                 <i class="fas fa-search mr-1"></i> Filter
             </button>
-            <a href="{{ route('expenses.profit-loss') }}" class="btn btn-sm btn-secondary">
+            <a href="{{ route('expenses.profit-loss') }}" class="btn btn-secondary btn-sm mr-3">
                 <i class="fas fa-redo mr-1"></i> Reset
             </a>
-            <span class="ml-3 text-muted small">
-                {{ \Carbon\Carbon::parse($from)->format('d M Y') }}
-                — {{ \Carbon\Carbon::parse($to)->format('d M Y') }}
-                ({{ count($rows) }} month{{ count($rows) > 1 ? 's' : '' }})
+            <span class="text-muted small">
+                {{ \Carbon\Carbon::parse($from)->format('d M Y') }} —
+                {{ \Carbon\Carbon::parse($to)->format('d M Y') }}
             </span>
         </form>
     </div>
 </div>
 
-{{-- Grand Total Summary Cards --}}
+{{-- Summary Cards --}}
+<style>
+.pl-stat-card {
+    border-radius: 8px;
+    color: #fff;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    overflow: hidden;
+}
+.pl-stat-card .sc-left .sc-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: rgba(255,255,255,.85);
+    margin-bottom: 4px;
+}
+.pl-stat-card .sc-left .sc-value {
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+}
+.pl-stat-card .sc-icon {
+    font-size: 44px;
+    color: rgba(255,255,255,.18);
+}
+</style>
+
 <div class="row mb-3">
-    <div class="col-md-3">
-        <div class="info-box bg-success">
-            <span class="info-box-icon"><i class="fas fa-arrow-up"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">Total Income</span>
-                <span class="info-box-number">BDT {{ number_format($grandIncome) }}</span>
+    <div class="col-md-3 col-6">
+        <div class="pl-stat-card" style="background:linear-gradient(135deg,#1b5e20,#2e7d32);">
+            <div class="sc-left">
+                <div class="sc-label"><i class="fas fa-arrow-up mr-1"></i>Total Income</div>
+                <div class="sc-value">৳{{ number_format($grandIncome) }}</div>
+            </div>
+            <div class="sc-icon"><i class="fas fa-arrow-up"></i></div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="pl-stat-card" style="background:linear-gradient(135deg,#b71c1c,#c62828);">
+            <div class="sc-left">
+                <div class="sc-label"><i class="fas fa-arrow-down mr-1"></i>Total Expense</div>
+                <div class="sc-value">৳{{ number_format($grandExpense) }}</div>
+            </div>
+            <div class="sc-icon"><i class="fas fa-arrow-down"></i></div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="pl-stat-card" style="background:linear-gradient(135deg,#1a237e,#283593);">
+            <div class="sc-left">
+                <div class="sc-label"><i class="fas fa-chart-line mr-1"></i>Net Profit</div>
+                <div class="sc-value">৳{{ number_format($grandProfit) }}</div>
+            </div>
+            <div class="sc-icon"><i class="fas fa-chart-line"></i></div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="pl-stat-card" style="background:linear-gradient(135deg,#006064,#00838f);">
+            <div class="sc-left">
+                <div class="sc-label"><i class="fas fa-percent mr-1"></i>Profit Margin</div>
+                <div class="sc-value">{{ $grandMargin }}%</div>
+            </div>
+            <div class="sc-icon"><i class="fas fa-percent"></i></div>
+        </div>
+    </div>
+</div>
+{{-- Category Breakdown --}}
+<div class="row mt-3">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header py-2" style="background:linear-gradient(135deg,#1b5e20,#2e7d32);">
+                <h6 class="m-0 text-white font-weight-bold">
+                    <i class="fas fa-plus-circle mr-1"></i> Income Breakdown
+                </h6>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        @forelse($incomeByCategory as $cat)
+                        <tr>
+                            <td style="padding:8px 12px;">
+                                <i class="fas fa-circle text-success mr-1" style="font-size:8px;"></i>
+                                {{ $cat->category_name }}
+                            </td>
+                            <td class="text-right font-weight-bold text-success" style="padding:8px 12px;">
+                                ৳{{ number_format($cat->total, 2) }}
+                            </td>
+                        </tr>
+                        @empty
+                        <tr><td colspan="2" class="text-center py-3 text-muted">No income data.</td></tr>
+                        @endforelse
+                    </tbody>
+                    <tfoot style="background:#e8f5e9; border-top:2px solid #2e7d32;">
+                        <tr>
+                            <td class="font-weight-bold" style="padding:10px 12px;">TOTAL INCOME</td>
+                            <td class="text-right font-weight-bold text-success" style="padding:10px 12px; font-size:15px;">
+                                ৳{{ number_format($grandIncome, 2) }}
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="info-box bg-danger">
-            <span class="info-box-icon"><i class="fas fa-arrow-down"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">Total Expense</span>
-                <span class="info-box-number">BDT {{ number_format($grandExpense) }}</span>
+
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header py-2" style="background:linear-gradient(135deg,#b71c1c,#c62828);">
+                <h6 class="m-0 text-white font-weight-bold">
+                    <i class="fas fa-minus-circle mr-1"></i> Expense Breakdown
+                </h6>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        @forelse($expenseByCategory as $cat)
+                        <tr>
+                            <td style="padding:8px 12px;">
+                                <i class="fas fa-circle text-danger mr-1" style="font-size:8px;"></i>
+                                {{ $cat->category_name }}
+                            </td>
+                            <td class="text-right font-weight-bold text-danger" style="padding:8px 12px;">
+                                ৳{{ number_format($cat->total, 2) }}
+                            </td>
+                        </tr>
+                        @empty
+                        <tr><td colspan="2" class="text-center py-3 text-muted">No expense data.</td></tr>
+                        @endforelse
+                    </tbody>
+                    <tfoot style="background:#ffebee; border-top:2px solid #c62828;">
+                        <tr>
+                            <td class="font-weight-bold" style="padding:10px 12px;">TOTAL EXPENSE</td>
+                            <td class="text-right font-weight-bold text-danger" style="padding:10px 12px; font-size:15px;">
+                                ৳{{ number_format($grandExpense, 2) }}
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
             </div>
         </div>
-    </div>
-    <div class="col-md-3">
-        <div class="info-box {{ $grandProfit >= 0 ? 'bg-primary' : 'bg-warning' }}">
-            <span class="info-box-icon"><i class="fas fa-chart-line"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">Net Profit</span>
-                <span class="info-box-number">BDT {{ number_format($grandProfit) }}</span>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="info-box bg-info">
-            <span class="info-box-icon"><i class="fas fa-percent"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">Profit Margin</span>
-                <span class="info-box-number">{{ $grandMargin }}%</span>
+
+        {{-- Net Profit Box --}}
+        <div class="card shadow-sm mt-3" style="background:{{ $grandProfit >= 0 ? '#e8f5e9' : '#ffebee' }}; border:2px solid {{ $grandProfit >= 0 ? '#2e7d32' : '#c62828' }};">
+            <div class="card-body py-3 text-center">
+                <div class="small font-weight-bold text-muted mb-1">NET PROFIT</div>
+                <h3 class="mb-0 font-weight-bold {{ $grandProfit >= 0 ? 'text-success' : 'text-danger' }}">
+                    ৳{{ number_format($grandProfit, 2) }}
+                </h3>
+                <small class="{{ $grandMargin >= 0 ? 'text-success' : 'text-danger' }}">
+                    Margin: {{ $grandMargin }}%
+                </small>
             </div>
         </div>
     </div>
 </div>
 
 <div class="row">
-    {{-- P&L Table --}}
-    <div class="{{ count($rows) > 1 ? 'col-md-7' : 'col-md-6' }}">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">
+    {{-- Monthly Breakdown --}}
+    <div class="col-lg-12">
+        <div class="card shadow-sm">
+            <div class="card-header py-2" style="background:linear-gradient(135deg,#1a237e,#283593);">
+                <h6 class="m-0 text-white font-weight-bold">
                     <i class="fas fa-table mr-1"></i> Monthly Breakdown
-                </h3>
+                </h6>
             </div>
             <div class="card-body p-0">
                 <table class="table table-sm table-hover mb-0">
-                    <thead class="thead-light">
+                    <thead style="background:#f8f9fa; border-bottom:2px solid #dee2e6;">
                         <tr>
-                            <th>Month</th>
-                            <th class="text-right">Income</th>
-                            <th class="text-right">Expense</th>
-                            <th class="text-right">Net Profit</th>
-                            <th class="text-right">Margin</th>
+                            <th style="padding:10px 12px;">Month</th>
+                            <th class="text-right" style="padding:10px 12px;">Income</th>
+                            <th class="text-right" style="padding:10px 12px;">Expense</th>
+                            <th class="text-right" style="padding:10px 12px;">Net Profit</th>
+                            <th class="text-center" style="padding:10px 12px;">Margin</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($rows as $row)
+                        @forelse($rows as $row)
                         <tr>
-                            <td class="font-weight-bold">{{ $row['month_label'] }}</td>
-                            <td class="text-right text-success">
-                                BDT {{ number_format($row['total_income']) }}
-                                @if($row['monthly_bill'] > 0 && $row['manual_income'] > 0)
-                                    <br><small class="text-muted">
-                                        Bill: {{ number_format($row['monthly_bill']) }}
-                                        + Manual: {{ number_format($row['manual_income']) }}
-                                    </small>
-                                @endif
+                            <td style="padding:10px 12px;" class="font-weight-bold">{{ $row['month_label'] }}</td>
+                            <td class="text-right text-success font-weight-bold" style="padding:10px 12px;">
+                                ৳{{ number_format($row['total_income']) }}
                             </td>
-                            <td class="text-right text-danger">
-                                BDT {{ number_format($row['total_expense']) }}
+                            <td class="text-right text-danger" style="padding:10px 12px;">
+                                ৳{{ number_format($row['total_expense']) }}
                             </td>
-                            <td class="text-right font-weight-bold {{ $row['net_profit'] >= 0 ? 'text-primary' : 'text-warning' }}">
-                                BDT {{ number_format($row['net_profit']) }}
+                            <td class="text-right font-weight-bold {{ $row['net_profit'] >= 0 ? 'text-primary' : 'text-danger' }}" style="padding:10px 12px;">
+                                ৳{{ number_format($row['net_profit']) }}
                             </td>
-                            <td class="text-right">
-                                <span class="badge {{ $row['margin'] >= 50 ? 'badge-success' : ($row['margin'] >= 20 ? 'badge-warning' : 'badge-danger') }}">
+                            <td class="text-center" style="padding:10px 12px;">
+                                <span class="badge badge-{{ $row['margin'] >= 50 ? 'success' : ($row['margin'] >= 20 ? 'warning' : 'danger') }}">
                                     {{ $row['margin'] }}%
                                 </span>
                             </td>
                         </tr>
-                        @endforeach
+                        @empty
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-muted">No data found.</td>
+                        </tr>
+                        @endforelse
                     </tbody>
                     @if(count($rows) > 1)
-                    <tfoot>
-                        <tr class="font-weight-bold" style="border-top:2px solid #dee2e6; background:#f8f9fa;">
-                            <td>Grand Total</td>
-                            <td class="text-right text-success">BDT {{ number_format($grandIncome) }}</td>
-                            <td class="text-right text-danger">BDT {{ number_format($grandExpense) }}</td>
-                            <td class="text-right {{ $grandProfit >= 0 ? 'text-primary' : 'text-warning' }}">
-                                BDT {{ number_format($grandProfit) }}
-                            </td>
-                            <td class="text-right">
-                                <span class="badge {{ $grandMargin >= 50 ? 'badge-success' : ($grandMargin >= 20 ? 'badge-warning' : 'badge-danger') }}">
-                                    {{ $grandMargin }}%
-                                </span>
+                    <tfoot style="background:#f8f9fa; border-top:2px solid #dee2e6;">
+                        <tr>
+                            <td class="font-weight-bold" style="padding:10px 12px;">Total</td>
+                            <td class="text-right font-weight-bold text-success" style="padding:10px 12px;">৳{{ number_format($grandIncome) }}</td>
+                            <td class="text-right font-weight-bold text-danger" style="padding:10px 12px;">৳{{ number_format($grandExpense) }}</td>
+                            <td class="text-right font-weight-bold text-primary" style="padding:10px 12px;">৳{{ number_format($grandProfit) }}</td>
+                            <td class="text-center" style="padding:10px 12px;">
+                                <span class="badge badge-{{ $grandMargin >= 50 ? 'success' : ($grandMargin >= 20 ? 'warning' : 'danger') }}">{{ $grandMargin }}%</span>
                             </td>
                         </tr>
                     </tfoot>
@@ -144,148 +264,81 @@
     </div>
 
     {{-- Chart --}}
-    <div class="{{ count($rows) > 1 ? 'col-md-5' : 'col-md-6' }}">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">
+    <div class="col-lg-12">
+        <div class="card shadow-sm">
+            <div class="card-header py-2" style="background:linear-gradient(135deg,#1a237e,#283593);">
+                <h6 class="m-0 text-white font-weight-bold">
                     <i class="fas fa-chart-bar mr-1"></i> Income vs Expense
-                </h3>
+                </h6>
             </div>
             <div class="card-body">
-                <canvas id="plChart" height="{{ count($rows) > 3 ? '280' : '220' }}"></canvas>
+                <canvas id="plChart" height="200"></canvas>
             </div>
         </div>
-
-        {{-- Single month detail --}}
-        @if(count($rows) === 1)
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">
-                    <i class="fas fa-list mr-1"></i>
-                    {{ $rows[0]['month_label'] }} — P&L Statement
-                </h3>
-            </div>
-            <div class="card-body p-0">
-                <table class="table table-sm mb-0">
-                    <thead class="thead-light">
-                        <tr><th colspan="2" class="text-success"><i class="fas fa-plus-circle mr-1"></i> Income</th></tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td class="pl-4 text-muted">Monthly Bill (Payments)</td>
-                            <td class="text-right text-success">BDT {{ number_format($rows[0]['monthly_bill'], 2) }}</td>
-                        </tr>
-                        @if($rows[0]['manual_income'] > 0)
-                        <tr>
-                            <td class="pl-4 text-muted">Other Income (Manual)</td>
-                            <td class="text-right text-success">BDT {{ number_format($rows[0]['manual_income'], 2) }}</td>
-                        </tr>
-                        @endif
-                        <tr class="font-weight-bold bg-light">
-                            <td>Total Income</td>
-                            <td class="text-right text-success">BDT {{ number_format($rows[0]['total_income'], 2) }}</td>
-                        </tr>
-                    </tbody>
-                    <thead class="thead-light">
-                        <tr><th colspan="2" class="text-danger"><i class="fas fa-minus-circle mr-1"></i> Expense</th></tr>
-                    </thead>
-                    <tbody>
-                        @php
-                            [$y, $mo] = explode('-', $rows[0]['month']);
-                            $breakdown = \App\Models\Expense::breakdownForMonth($rows[0]['month']);
-                        @endphp
-                        @foreach($breakdown as $item)
-                        <tr>
-                            <td class="pl-4 text-muted">
-                                @if($item['category'])
-                                    <span class="badge" style="{{ $item['category']->badgeStyle }}">{{ $item['category']->name }}</span>
-                                @else Uncategorized @endif
-                            </td>
-                            <td class="text-right text-danger">BDT {{ number_format($item['total'], 2) }}</td>
-                        </tr>
-                        @endforeach
-                        <tr class="font-weight-bold bg-light">
-                            <td>Total Expense</td>
-                            <td class="text-right text-danger">BDT {{ number_format($rows[0]['total_expense'], 2) }}</td>
-                        </tr>
-                    </tbody>
-                    <tfoot>
-                        <tr style="border-top:2px solid #dee2e6;">
-                            <td class="font-weight-bold" style="font-size:15px">Net Profit</td>
-                            <td class="text-right font-weight-bold {{ $rows[0]['net_profit'] >= 0 ? 'text-primary' : 'text-warning' }}"
-                                style="font-size:17px">
-                                BDT {{ number_format($rows[0]['net_profit'], 2) }}
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="text-muted">Profit Margin</td>
-                            <td class="text-right text-muted">{{ $rows[0]['margin'] }}%</td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-        </div>
-        @endif
     </div>
 </div>
 
-@push('js')
+
+@endsection
+
+@section('js')
+@parent
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-const chartData = @json($chartData);
-
-new Chart(document.getElementById('plChart'), {
+var chartData = @json($chartData);
+var ctx = document.getElementById('plChart').getContext('2d');
+new Chart(ctx, {
     type: 'bar',
     data: {
-        labels: chartData.map(d => d.month),
+        labels: chartData.map(r => r.month),
         datasets: [
             {
                 label: 'Income',
-                data: chartData.map(d => d.income),
-                backgroundColor: 'rgba(40,167,69,0.75)',
-                borderRadius: 3,
+                data: chartData.map(r => r.income),
+                backgroundColor: 'rgba(46,125,50,0.7)',
+                borderColor: '#2e7d32',
+                borderWidth: 1,
             },
             {
                 label: 'Expense',
-                data: chartData.map(d => d.expense),
-                backgroundColor: 'rgba(220,53,69,0.75)',
-                borderRadius: 3,
+                data: chartData.map(r => r.expense),
+                backgroundColor: 'rgba(198,40,40,0.7)',
+                borderColor: '#c62828',
+                borderWidth: 1,
             },
             {
                 label: 'Net Profit',
-                data: chartData.map(d => d.profit),
+                data: chartData.map(r => r.profit),
                 type: 'line',
-                borderColor: '#007bff',
-                backgroundColor: 'rgba(0,123,255,0.1)',
-                borderWidth: 2,
-                pointRadius: 4,
                 fill: false,
+                borderColor: '#1a237e',
+                borderWidth: 2,
+                pointBackgroundColor: '#1a237e',
                 tension: 0.3,
             },
-        ]
+        ],
     },
     options: {
         responsive: true,
-        interaction: { mode: 'index' },
         plugins: {
             legend: { position: 'top' },
             tooltip: {
                 callbacks: {
-                    label: ctx => ctx.dataset.label + ': BDT ' + Number(ctx.raw).toLocaleString()
+                    label: function(c) {
+                        return c.dataset.label + ': ৳' + Number(c.parsed.y).toLocaleString();
+                    }
                 }
             }
         },
         scales: {
-            x: { grid: { display: false } },
             y: {
+                beginAtZero: true,
                 ticks: {
-                    callback: v => 'BDT ' + (v >= 1000 ? Math.round(v/1000) + 'k' : v)
+                    callback: function(v) { return '৳' + Number(v).toLocaleString(); }
                 }
             }
         }
     }
 });
 </script>
-@endpush
-
-@endsection
+@stop

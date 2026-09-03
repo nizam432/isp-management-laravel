@@ -36,6 +36,14 @@ class ClientTicketReply extends Model
         if ($this->sender_type === 'admin') {
             return $this->user->name ?? 'Admin';
         }
+
+        // Reseller portal replies — sent by the reseller (owner or staff), not an
+        // Admin User and not the Customer themself. There's no reseller_id column
+        // on this table, so fall back to the ticket's own customer -> reseller link.
+        if ($this->sender_type === 'reseller') {
+            return $this->ticket?->customer?->macReseller?->business_name ?? 'Reseller Support';
+        }
+
         return $this->customer->name ?? 'Customer';
     }
 }

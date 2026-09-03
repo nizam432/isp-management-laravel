@@ -230,8 +230,9 @@ class PurchaseReturnController extends Controller
     // =========================================================================
     // SHOW
     // =========================================================================
-    public function show(PurchaseReturn $purchaseReturn)
+    public function show(PurchaseReturn $purchaseReturn) 
     {
+
         $purchaseReturn->load('purchase', 'vendor', 'location', 'items.product', 'createdBy', 'approvedBy');
         return view('inventory.purchase-returns.show', ['return' => $purchaseReturn]);
     }

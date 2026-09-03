@@ -1,5 +1,5 @@
 {{-- resources/views/super-admin/dashboard.blade.php --}}
-@extends('layouts.app')
+@extends('layouts.super-admin')
 
 @section('page_title', 'Super Admin Dashboard')
 

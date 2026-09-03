@@ -27,11 +27,11 @@ return new class extends Migration
         // so nothing breaks on first deploy — admin can rename titles afterward.
         $now = now();
         DB::table('sms_template_mappings')->insert([
-            ['type' => 'bill_due',        'title' => 'Bill Due Reminder',    'label' => 'Bill Due Reminder',    'created_at' => $now, 'updated_at' => $now],
-            ['type' => 'payment_confirm', 'title' => 'Payment Confirmation', 'label' => 'Payment Confirmation', 'created_at' => $now, 'updated_at' => $now],
-            ['type' => 'suspend',         'title' => 'Suspension Notice',    'label' => 'Suspension Notice',    'created_at' => $now, 'updated_at' => $now],
-            ['type' => 'restore',         'title' => 'Restore Notice',       'label' => 'Restore Notice',       'created_at' => $now, 'updated_at' => $now],
-            ['type' => 'welcome',         'title' => 'Welcome Message',      'label' => 'Welcome Message',      'created_at' => $now, 'updated_at' => $now],
+            ['type' => 'bill_due',           'title' => 'Bill Due Reminder',    'label' => 'Bill Due Reminder',    'created_at' => $now, 'updated_at' => $now],
+            ['type' => 'payment_confirm',    'title' => 'Payment Confirmation', 'label' => 'Payment Confirmation', 'created_at' => $now, 'updated_at' => $now],
+            ['type' => 'suspend',            'title' => 'Suspension Notice',    'label' => 'Suspension Notice',    'created_at' => $now, 'updated_at' => $now],
+            ['type' => 'restore',            'title' => 'Restore Notice',       'label' => 'Restore Notice',       'created_at' => $now, 'updated_at' => $now],
+            ['type' => 'welcome',            'title' => 'Welcome Message',      'label' => 'Welcome Message',      'created_at' => $now, 'updated_at' => $now],
         ]);
     }
 

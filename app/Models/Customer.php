@@ -15,6 +15,8 @@ class Customer extends Authenticatable
         'occupation', 'gender', 'zone_id', 'sub_zone_id',
         'connection_type_id', 'client_type_id', 'protocol_type_id', 'router_id',
         'mac_reseller_id',
+        'mac_reseller_zone_id', 'mac_reseller_sub_zone_id', // ── reseller-scoped zone/sub-zone (used only when mac_reseller_id is set) ──
+        'mac_reseller_tariff_package_id', // ── reseller-scoped package line (Server/Protocol/Profile), used instead of package_id when mac_reseller_id is set ──
         'billing_status', 'monthly_bill_amount',
         'customer_code', 'name', 'phone', 'email', 'nid_number',
         'nid_photo', 'photo', 'address', 'latitude', 'longitude', 'package_id',
@@ -44,6 +46,12 @@ class Customer extends Authenticatable
     public function package()
     {
         return $this->belongsTo(Package::class);
+    }
+
+    // ── Reseller-scoped package line (Server/Protocol/Profile/Rate) — used when mac_reseller_id is set ──
+    public function resellerTariffPackage()
+    {
+        return $this->belongsTo(\App\Models\MacResellerTariffPackage::class, 'mac_reseller_tariff_package_id');
     }
 
     public function agent()
@@ -81,6 +89,7 @@ class Customer extends Authenticatable
         return $this->hasMany(SmsLog::class);
     }
 
+    // ── Global Zone/SubZone — used for customers created directly by ISP Admin ──
     public function zone()
     {
         return $this->belongsTo(\App\Models\Zone::class);
@@ -89,6 +98,17 @@ class Customer extends Authenticatable
     public function subZone()
     {
         return $this->belongsTo(\App\Models\SubZone::class);
+    }
+
+    // ── Reseller-scoped Zone/SubZone — used for customers created by a MAC Reseller ──
+    public function resellerZone()
+    {
+        return $this->belongsTo(\App\Models\MacResellerZone::class, 'mac_reseller_zone_id');
+    }
+
+    public function resellerSubZone()
+    {
+        return $this->belongsTo(\App\Models\MacResellerSubZone::class, 'mac_reseller_sub_zone_id');
     }
 
     public function connectionType()

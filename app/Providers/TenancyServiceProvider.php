@@ -23,31 +23,23 @@ class TenancyServiceProvider extends ServiceProvider
         return [
             // Tenant events
             Events\CreatingTenant::class => [],
-            Events\TenantCreated::class => [
-                JobPipeline::make([
-                    Jobs\CreateDatabase::class,
-                    Jobs\MigrateDatabase::class,
-                    // Jobs\SeedDatabase::class,
-
-                    // Your own jobs to prepare the tenant.
-                    // Provision API keys, create S3 buckets, anything you want!
-
-                ])->send(function (Events\TenantCreated $event) {
-                    return $event->tenant;
-                })->shouldBeQueued(false), // `false` by default, but you probably want to make this `true` for production.
-            ],
+            // Previously ran CreateDatabase + MigrateDatabase automatically here.
+            // Removed — this hosting environment's MySQL user has no CREATE
+            // DATABASE privilege (confirmed via hosting support), so automatic
+            // database creation always failed. Database assignment (from a
+            // pre-created, pre-migrated pool — see database_pool table) is now
+            // handled manually in SuperAdmin\TenantController::store().
+            Events\TenantCreated::class => [],
             Events\SavingTenant::class => [],
             Events\TenantSaved::class => [],
             Events\UpdatingTenant::class => [],
             Events\TenantUpdated::class => [],
             Events\DeletingTenant::class => [],
-            Events\TenantDeleted::class => [
-                JobPipeline::make([
-                    Jobs\DeleteDatabase::class,
-                ])->send(function (Events\TenantDeleted $event) {
-                    return $event->tenant;
-                })->shouldBeQueued(false), // `false` by default, but you probably want to make this `true` for production.
-            ],
+            // Previously ran DeleteDatabase (DROP DATABASE) here — same
+            // permission problem as CREATE DATABASE. Pool release (marking
+            // the database as free again) is handled manually where tenants
+            // are deleted, if/when that's implemented.
+            Events\TenantDeleted::class => [],
 
             // Domain events
             Events\CreatingDomain::class => [],

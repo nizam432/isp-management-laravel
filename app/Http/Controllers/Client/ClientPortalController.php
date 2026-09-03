@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 namespace App\Http\Controllers\Client;
 
@@ -152,8 +152,8 @@ class ClientPortalController extends Controller
     {
         $customer = Auth::guard('customer')->user();
 
-        if ($invoice->customer_id !== $customer->id) {
-            abort(403, 'You are not authorized to view this invoice.');
+        if ((int) $invoice->customer_id !== (int) $customer->id) {
+            abort(403, 'Unauthorized.');
         }
 
         $invoice->load(['package', 'payments']);
@@ -240,9 +240,9 @@ class ClientPortalController extends Controller
     {
         $customer = Auth::guard('customer')->user();
 
-        if ($ticket->customer_id !== $customer->id) {
-            abort(403);
-        }
+             if ($ticket->customer_id != $customer->id) {
+                abort(403, 'Unauthorized.');
+            }
 
         $ticket->load(['category', 'replies.customer', 'replies.user', 'assignees']);
 
@@ -256,8 +256,9 @@ class ClientPortalController extends Controller
     {
         $customer = Auth::guard('customer')->user();
 
-        if ($ticket->customer_id !== $customer->id) {
-            abort(403);
+  
+        if ((int) $ticket->customer_id !== (int) $customer->id) {
+            abort(403, 'Unauthorized.');
         }
 
         $request->validate([
@@ -392,7 +393,7 @@ class ClientPortalController extends Controller
     {
         $customer = Auth::guard('customer')->user();
 
-        if ($invoice->customer_id !== $customer->id) {
+        if ((int) $invoice->customer_id !== (int) $customer->id) {
             abort(403, 'Unauthorized.');
         }
 

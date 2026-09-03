@@ -6,39 +6,35 @@ use App\Models\SmsGateway;
 use App\Models\SmsTemplate;
 use App\Models\SmsTemplateMapping;
 use App\Models\TenantSmsSetting;
+use App\Models\ResellerSmsSetting;
+use App\Models\ResellerSmsTemplate;
+use App\Models\ResellerSmsTemplateMapping;
 use App\Models\SmsLog;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * SmsService — Tenant Aware
+ * SmsService — Tenant Aware (and now Reseller Aware)
  * ─────────────────────────────────────────────
- * Takes the gateway from the ISP company's own SMS settings.
- * The ISP can only see gateways that the Super Admin has enabled.
+ * Takes the gateway from the ISP company's own SMS settings, OR — when a
+ * $macResellerId is passed in — from that MAC Reseller's own SMS settings
+ * instead (each reseller can configure their own gateway credentials,
+ * separate from the tenant-wide ones). The ISP/reseller can only see
+ * gateways that the Super Admin has enabled.
  */
 class SmsService
 {
     private ?string $tenantId;
+    private ?int $macResellerId;
 
-    public function __construct(?string $tenantId = null)
+    public function __construct(?string $tenantId = null, ?int $macResellerId = null)
     {
-        // Previously, every `new SmsService()` call across the app (BillingService,
-        // InvoiceController, all commands) passed NO tenant ID, so $this->tenantId
-        // was ALWAYS null. That meant getActiveSetting() NEVER read from
-        // tenant_sms_settings — it always fell back to the global sms_gateways.config
-        // column, even though the correct customer_id/api_key were saved in
-        // tenant_sms_settings all along. This is why "Customer id Missing" kept
-        // happening despite the tenant's settings page showing correct values.
-        //
-        // Fix: auto-detect the current tenant via stancl/tenancy's tenant() helper
-        // when no explicit tenant ID is given, so existing `new SmsService()` calls
-        // everywhere automatically start using the correct tenant-scoped config
-        // without needing to touch every call site.
         if ($tenantId === null && function_exists('tenant') && tenant()) {
             $tenantId = tenant()->getTenantKey();
         }
 
-        $this->tenantId = $tenantId;
+        $this->tenantId      = $tenantId;
+        $this->macResellerId = $macResellerId;
     }
 
     /**
@@ -46,7 +42,7 @@ class SmsService
      */
     public function send(string $mobile, string $message, string $type = 'general'): bool
     {
-        // Find the tenant's active gateway
+        // Find the active gateway (reseller's own, if set — else tenant's)
         $setting = $this->getActiveSetting();
 
         if (!$setting) {
@@ -56,11 +52,6 @@ class SmsService
 
         $gateway = SmsGateway::where('slug', $setting->gateway_slug)->first();
         if (!$gateway) {
-            // Previously this returned false with ZERO logging — no SmsLog entry,
-            // no Log::error, nothing. If you ever see empty sms_logs AND no errors
-            // in laravel.log, THIS is almost certainly why: the tenant's configured
-            // gateway_slug doesn't match any row in sms_gateways (deleted gateway,
-            // typo, data mismatch, etc).
             Log::error("SMS: gateway slug '{$setting->gateway_slug}' not found in sms_gateways table.");
             return false;
         }
@@ -78,14 +69,15 @@ class SmsService
             };
 
             SmsLog::create([
-                'gateway'   => $gateway->slug,
-                'mobile'    => $mobile,
-                'phone'     => $mobile, // sms_logs.phone has no default and is NOT NULL — mirror mobile to avoid insert failure
-                'message'   => $message,
-                'type'      => $type,
-                'status'    => 'sent', // sms_logs.status is enum('sent','failed','pending') — 'success' is NOT a valid value
-                'response'  => $response,
-                'count_sms' => $this->countSms($message),
+                'gateway'         => $gateway->slug,
+                'mobile'          => $mobile,
+                'phone'           => $mobile,
+                'message'         => $message,
+                'type'            => $type,
+                'status'          => 'sent',
+                'response'        => $response,
+                'count_sms'       => $this->countSms($message),
+                'mac_reseller_id' => $this->macResellerId,
             ]);
 
             return true;
@@ -94,14 +86,15 @@ class SmsService
             Log::error("SMS failed [{$gateway->slug}]: " . $e->getMessage());
 
             SmsLog::create([
-                'gateway'   => $gateway->slug,
-                'mobile'    => $mobile,
-                'phone'     => $mobile,
-                'message'   => $message,
-                'type'      => $type,
-                'status'    => 'failed',
-                'response'  => $e->getMessage(),
-                'count_sms' => $this->countSms($message),
+                'gateway'         => $gateway->slug,
+                'mobile'          => $mobile,
+                'phone'           => $mobile,
+                'message'         => $message,
+                'type'            => $type,
+                'status'          => 'failed',
+                'response'        => $e->getMessage(),
+                'count_sms'       => $this->countSms($message),
+                'mac_reseller_id' => $this->macResellerId,
             ]);
 
             return false;
@@ -119,16 +112,6 @@ class SmsService
 
     /**
      * Dynamic SMS — sends a different message to multiple numbers in a single call.
-     * (Useful for bill-due reminders, personalized batch SMS, etc.)
-     *
-     * $recipients format: [ ['mobile' => '018xxxxxxxx', 'message' => '...'], ... ]
-     *
-     * Only the 24bulksmsbd gateway supports dynamic batch sending in a single API call.
-     * If another gateway is active (SSL Wireless, Muthofun, AlphaNet, Twilio) — those
-     * don't have a dynamic batch endpoint, so as a backward-compatible fallback, each
-     * recipient is sent individually via send() (no changes made to those gateways).
-     *
-     * Returns: ['sent' => int, 'failed' => int]
      */
     public function sendDynamic(array $recipients, string $type = 'general'): array
     {
@@ -148,7 +131,6 @@ class SmsService
             return ['sent' => 0, 'failed' => count($recipients)];
         }
 
-        // Normalize mobiles up front
         $recipients = array_map(function ($r) {
             return [
                 'mobile'  => $this->formatMobile($r['mobile']),
@@ -157,7 +139,6 @@ class SmsService
         }, $recipients);
 
         if ($gateway->slug !== '24bulksmsbd') {
-            // Fallback: this gateway doesn't support dynamic batch, so loop with individual send() calls.
             $sent = 0;
             foreach ($recipients as $r) {
                 if ($this->send($r['mobile'], $r['message'], $type)) $sent++;
@@ -168,18 +149,17 @@ class SmsService
         try {
             $response = $this->send24BulkSMSDynamic($setting->config, $recipients);
 
-            // A separate log entry is kept for each recipient, so the existing SmsLog
-            // reporting/history (SmsReportController, etc.) remains unaffected.
             foreach ($recipients as $r) {
                 SmsLog::create([
-                    'gateway'   => $gateway->slug,
-                    'mobile'    => $r['mobile'],
-                    'phone'     => $r['mobile'],
-                    'message'   => $r['message'],
-                    'type'      => $type,
-                    'status'    => 'sent',
-                    'response'  => $response,
-                    'count_sms' => $this->countSms($r['message']),
+                    'gateway'         => $gateway->slug,
+                    'mobile'          => $r['mobile'],
+                    'phone'           => $r['mobile'],
+                    'message'         => $r['message'],
+                    'type'            => $type,
+                    'status'          => 'sent',
+                    'response'        => $response,
+                    'count_sms'       => $this->countSms($r['message']),
+                    'mac_reseller_id' => $this->macResellerId,
                 ]);
             }
 
@@ -190,14 +170,15 @@ class SmsService
 
             foreach ($recipients as $r) {
                 SmsLog::create([
-                    'gateway'   => $gateway->slug,
-                    'mobile'    => $r['mobile'],
-                    'phone'     => $r['mobile'],
-                    'message'   => $r['message'],
-                    'type'      => $type,
-                    'status'    => 'failed',
-                    'response'  => $e->getMessage(),
-                    'count_sms' => $this->countSms($r['message']),
+                    'gateway'         => $gateway->slug,
+                    'mobile'          => $r['mobile'],
+                    'phone'           => $r['mobile'],
+                    'message'         => $r['message'],
+                    'type'            => $type,
+                    'status'          => 'failed',
+                    'response'        => $e->getMessage(),
+                    'count_sms'       => $this->countSms($r['message']),
+                    'mac_reseller_id' => $this->macResellerId,
                 ]);
             }
 
@@ -207,16 +188,21 @@ class SmsService
 
     // ── SMS Templates ──────────────────────────────
 
-    /**
-     * Renders a message using the DB mapping (sms_template_mappings) to find which
-     * SmsTemplate title applies to $type, then fetches that active template and
-     * renders it with $data. Falls back to $fallback (hardcoded default) if:
-     *  - no mapping row exists for this $type, OR
-     *  - the mapped title has no matching active SmsTemplate.
-     * This keeps SMS sending working even if the mapping/template isn't configured yet.
-     */
     private function renderTemplate(string $type, array $data, string $fallback): string
     {
+        // Reseller-triggered sends check THEIR OWN mapping/template first.
+        if ($this->macResellerId) {
+            $mapping = ResellerSmsTemplateMapping::where('mac_reseller_id', $this->macResellerId)
+                ->where('type', $type)->first();
+            if ($mapping) {
+                $template = ResellerSmsTemplate::where('mac_reseller_id', $this->macResellerId)
+                    ->active()->where('title', $mapping->title)->first();
+                if ($template) {
+                    return $template->render($data);
+                }
+            }
+        }
+
         $mapping = SmsTemplateMapping::where('type', $type)->first();
         if ($mapping) {
             $template = SmsTemplate::active()->where('title', $mapping->title)->first();
@@ -227,18 +213,6 @@ class SmsService
         return $fallback;
     }
 
-    /**
-     * Formats a 'Y-m' month string (e.g. "2026-06", as stored in Invoice::month)
-     * into a human-readable form (e.g. "June 2026") for use in SMS templates.
-     * Falls back to the original string unchanged if it isn't in 'Y-m' format,
-     * so this never breaks message sending even with unexpected input.
-     */
-    /**
-     * PHP port of the count_sms() function used on the frontend — calculates how
-     * many SMS segments a message will consume, following standard concatenated-SMS
-     * rules (70/66 chars for Unicode/Bengali, 160/153 chars for plain GSM-7 text).
-     * Stored per SmsLog entry in the `count_sms` column.
-     */
     private function countSms(string $message): int
     {
         $message = trim($message);
@@ -248,7 +222,6 @@ class SmsService
         $encoding       = mb_detect_encoding($message);
 
         if ($encoding === 'UTF-8' && mb_strlen($message, 'UTF-8') !== strlen($message)) {
-            // Contains actual multi-byte (Bengali/Unicode) characters
             $totalChar = mb_strlen($message, 'UTF-8') + $totalLineBreak;
 
             if ($totalChar <= 70) return 1;
@@ -264,7 +237,6 @@ class SmsService
             return (int) floor($remaining / 66) + 8 + 1;
         }
 
-        // Plain GSM-7 (English/numbers)
         $totalChar = strlen($message);
 
         if ($totalChar <= 160) return 1;
@@ -289,12 +261,6 @@ class SmsService
         }
     }
 
-    /**
-     * Builds the bill-due reminder message from the DB template (or fallback),
-     * without sending it. Used by both sendBillDue() (single) and callers that
-     * batch multiple personalized messages via sendDynamic() (e.g. bulk reminders),
-     * so both paths stay consistent with whatever template is configured in DB.
-     */
     public function buildBillDueMessage(string $name, float $amount, string $month): string
     {
         return $this->renderTemplate('bill_due', [
@@ -350,44 +316,70 @@ class SmsService
         return $this->send($mobile, $message, 'welcome');
     }
 
-    /**
-     * Builds the invoice-generated message from the DB template (or fallback),
-     * without sending it. Used by both sendInvoiceGenerated() (single) and callers
-     * that batch multiple personalized messages via sendDynamic() (e.g. the
-     * date-to-date invoice generation command, so 500 customers = 1 API call
-     * instead of 500).
-     */
-    public function buildInvoiceGeneratedMessage(string $name, float $amount, string $month): string
+    public function buildInvoiceGeneratedMessage(string $name, float $totalDue, string $month): string
     {
         return $this->renderTemplate('invoice_generated', [
-            'name'   => $name,
-            'amount' => $amount,
-            'month'  => $this->formatMonth($month),
-        ], "প্রিয় {$name}, আপনার {$this->formatMonth($month)} মাসের ইনভয়েস তৈরি হয়েছে। বিল পরিমাণ {$amount} টাকা। দ্রুত পরিশোধ করুন।");
+            'name'     => $name,
+            'bill_due' => $totalDue,
+            'month'    => $this->formatMonth($month),
+        ], "প্রিয় {$name}, আপনার {$this->formatMonth($month)} মাসের ইনভয়েস তৈরি হয়েছে। আপনার মোট বিল: {$totalDue} টাকা। দ্রুত পরিশোধ করুন।");
     }
 
-    /**
-     * Sent when a new invoice/bill is auto-generated (date_to_date or monthly).
-     * Uses the same DB template pattern as other notifications — looks up the
-     * 'invoice_generated' mapping in sms_template_mappings, falls back to the
-     * hardcoded default if not configured yet.
-     */
-    public function sendInvoiceGenerated(string $mobile, string $name, float $amount, string $month): bool
+    public function sendInvoiceGenerated(string $mobile, string $name, float $totalDue, string $month): bool
     {
-        $message = $this->buildInvoiceGeneratedMessage($name, $amount, $month);
+        $message = $this->buildInvoiceGeneratedMessage($name, $totalDue, $month);
         return $this->send($mobile, $message, 'invoice_generated');
+    }
+
+    // ── Support Ticket Notifications ──────────────
+
+    public function buildTicketCreatedMessage(string $name, string $ticketNo, string $category, string $complainedNo): string
+    {
+        return $this->renderTemplate('support_ticket_created', [
+            'name'          => $name,
+            'ticket_no'     => $ticketNo,
+            'category'      => $category,
+            'complained_no' => $complainedNo,
+        ], "প্রিয় {$name}, আপনার সাপোর্ট টিকিট #{$ticketNo} সফলভাবে গ্রহণ করা হয়েছে। বিষয়: {$category}। আমাদের টিম শীঘ্রই যোগাযোগ করবে।");
+    }
+
+    public function sendTicketCreated(string $mobile, string $name, string $ticketNo, string $category, string $complainedNo): bool
+    {
+        $message = $this->buildTicketCreatedMessage($name, $ticketNo, $category, $complainedNo);
+        return $this->send($mobile, $message, 'support_ticket_created');
+    }
+
+    public function buildTicketSolvedMessage(string $name, string $ticketNo): string
+    {
+        return $this->renderTemplate('support_ticket_solved', [
+            'name'      => $name,
+            'ticket_no' => $ticketNo,
+        ], "প্রিয় {$name}, আপনার সাপোর্ট টিকিট #{$ticketNo} সমাধান করা হয়েছে। ধন্যবাদ।");
+    }
+
+    public function sendTicketSolved(string $mobile, string $name, string $ticketNo): bool
+    {
+        $message = $this->buildTicketSolvedMessage($name, $ticketNo);
+        return $this->send($mobile, $message, 'support_ticket_solved');
+    }
+
+    public function buildTicketAssignedMessage(string $employeeName, string $ticketNo, string $complainedNo): string
+    {
+        return $this->renderTemplate('support_ticket_assigned', [
+            'name'          => $employeeName,
+            'ticket_no'     => $ticketNo,
+            'complained_no' => $complainedNo,
+        ], "আপনাকে সাপোর্ট টিকিট #{$ticketNo} ({$complainedNo}) এসাইন করা হয়েছে। দ্রুত সমাধান করুন।");
+    }
+
+    public function sendTicketAssigned(string $mobile, string $employeeName, string $ticketNo, string $complainedNo): bool
+    {
+        $message = $this->buildTicketAssignedMessage($employeeName, $ticketNo, $complainedNo);
+        return $this->send($mobile, $message, 'support_ticket_assigned');
     }
 
     // ── Private Helpers ────────────────────────────
 
-    /**
-     * Fetches the current SMS balance from the active gateway, if that gateway
-     * supports a balance-check API. Currently only 24bulksmsbd is supported —
-     * other gateways return null (dashboard shows "N/A" in that case).
-     *
-     * Cached for 5 minutes so the SMS dashboard doesn't hit the gateway's balance
-     * API on every single page load.
-     */
     public function getBalance(): ?string
     {
         $setting = $this->getActiveSetting();
@@ -397,11 +389,12 @@ class SmsService
         if (!$gateway) return null;
 
         if ($gateway->slug !== '24bulksmsbd') {
-            // Balance API not implemented for other gateways yet.
             return null;
         }
 
-        return Cache::remember('sms_balance_' . $gateway->slug, 300, function () use ($setting) {
+        $cacheKey = 'sms_balance_' . $gateway->slug . ($this->macResellerId ? '_reseller_' . $this->macResellerId : '');
+
+        return Cache::remember($cacheKey, 300, function () use ($setting) {
             try {
                 return $this->send24BulkSMSBalance($setting->config);
             } catch (\Exception $e) {
@@ -435,10 +428,6 @@ class SmsService
 
         $decoded = json_decode($response, true);
 
-        // 24bulksmsbd's balance response format isn't confirmed from docs here —
-        // trying common key names. Adjust the key below if the actual response
-        // uses a different field (check by visiting the API directly once, or
-        // logging $response the first time this runs).
         if (is_array($decoded)) {
             return $decoded['balance'] ?? $decoded['sms_balance'] ?? $decoded['credit'] ?? null;
         }
@@ -446,12 +435,45 @@ class SmsService
         return null;
     }
 
-    private function getActiveSetting(): ?TenantSmsSetting
+    /**
+     * Resolves the active gateway setting to use, in priority order:
+     *   1. THIS reseller's own ResellerSmsSetting (if a mac_reseller_id was passed in)
+     *   2. The tenant-wide TenantSmsSetting (existing Admin behavior)
+     *   3. Global fallback gateway config (existing backward-compatible behavior)
+     *
+     * Both ResellerSmsSetting and TenantSmsSetting expose the same
+     * `gateway_slug` / `config` attributes, so callers can use either
+     * interchangeably without caring which one was actually resolved.
+     *
+     * Was: ->whereHas('gateway', fn($q) => $q->where('is_enabled', true))
+     * That built a SINGLE SQL query joining tenant_sms_settings (tenant DB)
+     * with sms_gateways (central DB — SmsGateway's connection is hardcoded
+     * to central). Eloquent can't do a cross-database JOIN, so this always
+     * threw "table sms_gateways doesn't exist" (it was looking for that
+     * table inside the tenant's own database). Split into two separate
+     * queries instead: first get enabled gateway slugs from central, then
+     * filter tenant_sms_settings by that list.
+     */
+    private function getActiveSetting(): TenantSmsSetting|ResellerSmsSetting|null
     {
+        $enabledGatewaySlugs = SmsGateway::where('is_enabled', true)->pluck('slug');
+
+        if ($this->macResellerId) {
+            $setting = ResellerSmsSetting::where('mac_reseller_id', $this->macResellerId)
+                ->where('is_active', true)
+                ->whereIn('gateway_slug', $enabledGatewaySlugs)
+                ->first();
+
+            if ($setting) return $setting;
+
+            // this reseller has no active gateway of their own — fall through
+            // to the tenant/global gateway below (same as Admin would use)
+        }
+
         if ($this->tenantId) {
             $setting = TenantSmsSetting::where('tenant_id', $this->tenantId)
                 ->where('is_active', true)
-                ->whereHas('gateway', fn($q) => $q->where('is_enabled', true))
+                ->whereIn('gateway_slug', $enabledGatewaySlugs)
                 ->first();
 
             if ($setting) return $setting;
@@ -459,10 +481,7 @@ class SmsService
             // No tenant-specific setting matched — fall through to global.
         }
 
-        // Fallback: global gateway config (backward compatible). This is the
-        // primary path in practice — tenant() detection isn't reliably available
-        // in this app's request lifecycle, same as how the payment gateway
-        // integration also uses a single global config rather than per-tenant.
+        // Fallback: global gateway config (backward compatible).
         $gateway = SmsGateway::where('is_active', true)->first();
         if (!$gateway) return null;
 
@@ -497,10 +516,6 @@ class SmsService
         throw new \Exception($decoded['message'] ?? $response);
     }
 
-    /**
-     * 24bulksmsbd — DynamicSMSApi: multiple numbers in one call, each with its own message.
-     * $recipients format: [ ['mobile' => '018xxxxxxxx', 'message' => '...'], ... ]
-     */
     private function send24BulkSMSDynamic(array $config, array $recipients): string
     {
         $messages = array_map(fn($r) => [

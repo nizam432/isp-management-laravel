@@ -21,7 +21,7 @@ class AccountingService
     public function createSaleIncome(SalePayment $payment): ?Income
     {
         $sale     = $payment->sale;
-        $category = IncomeCategory::where('slug', 'product_sale')
+        $category = IncomeCategory::where('slug', 'product-sale')
             ->orWhere('slug', 'product-sale')
             ->first();
         if (! $category) return null;
@@ -37,7 +37,7 @@ class AccountingService
             'reference_no'      => $sale->invoice_no,
             'description'       => "Product Sale: {$sale->sale_no}"
                                    . " [Payment: ৳" . number_format($payment->amount, 2) . "]",
-            'source_type'       => 'product_sale',
+            'source_type'       => 'product-sale',
             'source_id'         => $payment->id,
             'source_invoice_id' => $sale->id,
             'status'            => 'active',
@@ -47,7 +47,7 @@ class AccountingService
 
     public function voidSaleIncome(SalePayment $payment): void
     {
-        Income::where('source_type', 'product_sale')
+        Income::where('source_type', 'product-sale')
               ->where('source_id', $payment->id)
               ->where('status', 'active')
               ->update([
@@ -65,7 +65,7 @@ class AccountingService
     public function createPurchaseExpense(PurchasePayment $payment): ?Expense
     {
         $purchase = $payment->purchase;
-        $category = ExpenseCategory::where('slug', 'stock_purchase')->first();
+        $category = ExpenseCategory::where('slug', 'stock-purchase')->first();
         if (! $category) return null;
 
         return Expense::create([
@@ -78,7 +78,7 @@ class AccountingService
             'reference_no'      => $purchase->purchase_no,
             'description'       => "Stock Purchase: {$purchase->purchase_no}"
                                    . " [Payment: ৳" . number_format($payment->amount, 2) . "]",
-            'source_type'       => 'inventory_purchase',
+            'source_type'       => 'stock-purchase',
             'source_id'         => $payment->id,
             'source_invoice_id' => $purchase->id,
             'status'            => 'approved',
@@ -90,7 +90,7 @@ class AccountingService
 
     public function voidPurchaseExpense(PurchasePayment $payment): void
     {
-        Expense::where('source_type', 'inventory_purchase')
+        Expense::where('source_type', 'stock-purchase')
                ->where('source_id', $payment->id)
                ->where('status', 'approved')
                ->update([
@@ -107,7 +107,7 @@ class AccountingService
 
     public function createConsumptionExpense(InternalConsumption $consumption): ?Expense
     {
-        $category = ExpenseCategory::where('slug', 'consumption_expense')->first();
+        $category = ExpenseCategory::where('slug', 'consumption-expense')->first();
         if (! $category) return null;
 
         $description = 'Internal Consumption — ' . $consumption->purpose;
@@ -124,7 +124,7 @@ class AccountingService
             'payee'             => 'Internal Use',
             'reference_no'      => $consumption->consumption_no,
             'description'       => $description,
-            'source_type'       => 'inventory_consumption',
+            'source_type'       => 'consumption-expense',
             'source_id'         => $consumption->id,
             'source_invoice_id' => $consumption->id,
             'status'            => 'approved',
@@ -136,7 +136,7 @@ class AccountingService
 
     public function voidConsumptionExpense(InternalConsumption $consumption): void
     {
-        Expense::where('source_type', 'inventory_consumption')
+        Expense::where('source_type', 'consumption-expense')
                ->where('source_id', $consumption->id)
                ->where('status', 'approved')
                ->update([
@@ -153,34 +153,35 @@ class AccountingService
 
     public function createSaleReturnIncome(SaleReturn $return): ?Income
     {
-        $category = IncomeCategory::where('slug', 'product-return')
-            ->orWhere('slug', 'product_return')
+        $category = IncomeCategory::where('slug', 'sale-return')
+            ->orWhere('slug', 'sale-return')
             ->first();
         if (! $category) return null;
 
         $sale = $return->sale;
 
-        // ── Income এ শুধু ততটুকুই বিয়োগ হবে যতটুকু আসলে Received হয়েছিল ──
-        // ইতিমধ্যে কত টাকা Income এ negative entry হয়ে গেছে (আগের return গুলো থেকে)
-        $alreadyDeducted = Income::where('source_type', 'product_return')
+        // Deduct only the amount that was actually recorded as income.
+        // Calculate the total amount already deducted from income through previous return transactions.
+
+        $alreadyDeducted = Income::where('source_type', 'sale-return')
             ->where('source_invoice_id', $sale->id)
             ->where('status', 'active')
             ->sum('amount'); // negative sum
 
         $alreadyDeducted = abs($alreadyDeducted);
-        $totalPaid       = (float) $sale->paid_amount; // sale already reduced বা আগের state — call site এ আগে capture করা ভালো
+        $totalPaid       = (float) $sale->paid_amount; // Capture the original sale amount before applying any changes.
 
         $availableToDeduct = max(0, $totalPaid - $alreadyDeducted);
         $incomeImpact       = min($return->total_amount, $availableToDeduct);
 
         if ($incomeImpact <= 0) {
-            return null; // কোনো টাকা Income এ আসেইনি — কিছু বিয়োগ করার নেই
+            return null; //No income has been recorded. There is nothing to deduct.
         }
 
         return Income::create([
             'income_no'         => Income::generateNumber(),
             'category_id'       => $category->id,
-            'amount'            => -abs($incomeImpact), // শুধু received অংশ negative
+            'amount'            => -abs($incomeImpact), // Record only the received amount as a negative entry.
             'income_date'       => $return->return_date,
             'payment_method'    => 'cash',
             'customer_id'       => $return->client_id ?? null,
@@ -189,7 +190,7 @@ class AccountingService
             'description'       => "Sale Return — {$sale->sale_no}"
                                    . " [Return Item Value: ৳" . number_format($return->total_amount, 2)
                                    . " | Income Adjusted: ৳" . number_format($incomeImpact, 2) . "]",
-            'source_type'       => 'product_return',
+            'source_type'       => 'sale-return',
             'source_id'         => $return->id,
             'source_invoice_id' => $sale->id,
             'status'            => 'active',
@@ -203,25 +204,44 @@ class AccountingService
 
     public function createPurchaseReturnExpense(PurchaseReturn $return): ?Expense
     {
-        $category = ExpenseCategory::where('slug', 'purchase_return')
+        $category = ExpenseCategory::where('slug', 'purchase-return')
             ->orWhere('slug', 'purchase-return')
             ->first();
         if (! $category) return null;
 
+        $purchase = $return->purchase;
+
+        // Deduct only the amount that was actually paid as an expense.
+        $alreadyDeducted = Expense::where('source_type', 'purchase-return')
+            ->where('source_invoice_id', $purchase->id)
+            ->where('status', '!=', 'void')
+            ->sum('amount'); // negative sum
+
+        $alreadyDeducted = abs($alreadyDeducted);
+        $totalPaid       = (float) $purchase->paid_amount;
+
+        $availableToDeduct = max(0, $totalPaid - $alreadyDeducted);
+        $expenseImpact      = min($return->total_amount, $availableToDeduct);
+
+        if ($expenseImpact <= 0) {
+            return null;// No expense has been recorded. Nothing to deduct.
+        }
+
         return Expense::create([
             'expense_no'        => Expense::generateNumber(),
             'category_id'       => $category->id,
-            'amount'            => -abs($return->total_amount), // negative entry
+            'amount'            => -abs($expenseImpact), // Record only the paid amount as a negative entry.
             'expense_date'      => $return->return_date,
             'payment_method'    => 'cash',
-            'payee'             => $return->vendor->name,
+            'payee'             => $return->vendor->name ?? '—',
             'reference_no'      => $return->return_no,
-            'description'       => "Purchase Return — {$return->purchase->purchase_no}"
-                                   . " [Return: ৳" . number_format($return->total_amount, 2) . "]",
-            'source_type'       => 'purchase_return',
+            'description'       => "Purchase Return — {$purchase->purchase_no}"
+                                   . " [Return Item Value: ৳" . number_format($return->total_amount, 2)
+                                   . " | Expense Adjusted: ৳" . number_format($expenseImpact, 2) . "]",
+            'source_type'       => 'purchase-return',
             'source_id'         => $return->id,
-            'source_invoice_id' => $return->purchase_id,
-            'status'            => 'approved', // negative entry but active — not void
+            'source_invoice_id' => $purchase->id,
+            'status'            => 'approved',
             'created_by'        => auth()->id(),
             'approved_by'       => auth()->id(),
             'approved_at'       => now(),

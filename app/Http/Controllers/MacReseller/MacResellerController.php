@@ -221,4 +221,39 @@ class MacResellerController extends Controller
         $macReseller->update(['is_locked' => !$macReseller->is_locked]);
         return response()->json(['success' => true]);
     }
+    public function changePassword(Request $request, MacReseller $macReseller)
+    {
+        $data = $request->validate([
+            'password' => 'required|string|min:6|confirmed',
+        ]);
+
+        $macReseller->update([
+            'password' => Hash::make($data['password']),
+        ]);
+
+        return response()->json(['success' => true, 'message' => 'Password updated successfully.']);
+    }
+
+    /**
+     * Impersonate this reseller — logs the ISP Admin's own user id into the
+     * session first (so the reseller portal can offer a "Back to Admin"
+     * button), then logs into the reseller portal's own guard/dashboard.
+     *
+     * Was redirecting to route('mac-reseller.dashboard'), which doesn't
+     * exist — the reseller portal's actual dashboard route is
+     * 'reseller.dashboard' (guard: mac_reseller).
+     */
+    public function loginAs(MacReseller $macReseller)
+    {
+        // Save admin's id + guard so "Back to Admin" can restore the exact session later
+        session([
+            'impersonator_admin_id'    => auth()->id(),
+            'impersonator_admin_guard' => auth()->getDefaultDriver(),
+        ]);
+
+        auth('mac_reseller')->login($macReseller);
+
+        return redirect()->route('reseller.dashboard')
+            ->with('success', "Logged in as {$macReseller->business_name}");
+    }
 }

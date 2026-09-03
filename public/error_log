@@ -1,0 +1,18 @@
+[08-Jul-2026 11:11:27 UTC] PHP Warning:  require(/home/amarsmsb/isp.innovativeitbd.com/public/vendor/autoload.php): Failed to open stream: No such file or directory in /home/amarsmsb/isp.innovativeitbd.com/public/index.php on line 14
+[08-Jul-2026 11:11:27 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/amarsmsb/isp.innovativeitbd.com/public/vendor/autoload.php' (include_path='.:/opt/alt/php82/usr/share/pear:/opt/alt/php82/usr/share/php:/usr/share/pear:/usr/share/php') in /home/amarsmsb/isp.innovativeitbd.com/public/index.php:14
+Stack trace:
+#0 {main}
+  thrown in /home/amarsmsb/isp.innovativeitbd.com/public/index.php on line 14
+[08-Jul-2026 11:11:29 UTC] PHP Warning:  require(/home/amarsmsb/isp.innovativeitbd.com/public/vendor/autoload.php): Failed to open stream: No such file or directory in /home/amarsmsb/isp.innovativeitbd.com/public/index.php on line 14
+[08-Jul-2026 11:11:29 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/amarsmsb/isp.innovativeitbd.com/public/vendor/autoload.php' (include_path='.:/opt/alt/php82/usr/share/pear:/opt/alt/php82/usr/share/php:/usr/share/pear:/usr/share/php') in /home/amarsmsb/isp.innovativeitbd.com/public/index.php:14
+Stack trace:
+#0 {main}
+  thrown in /home/amarsmsb/isp.innovativeitbd.com/public/index.php on line 14
+[08-Jul-2026 11:12:29 UTC] PHP Warning:  require(/home/amarsmsb/isp.innovativeitbd.com/public/vendor/autoload.php): Failed to open stream: No such file or directory in /home/amarsmsb/isp.innovativeitbd.com/public/index.php on line 14
+[08-Jul-2026 11:12:29 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/amarsmsb/isp.innovativeitbd.com/public/vendor/autoload.php' (include_path='.:/opt/alt/php82/usr/share/pear:/opt/alt/php82/usr/share/php:/usr/share/pear:/usr/share/php') in /home/amarsmsb/isp.innovativeitbd.com/public/index.php:14
+Stack trace:
+#0 {main}
+  thrown in /home/amarsmsb/isp.innovativeitbd.com/public/index.php on line 14
+[14-Jul-2026 17:16:27 Asia/Dhaka] PHP Fatal error:  Allowed memory size of 2147483648 bytes exhausted (tried to allocate 1071648768 bytes) in /home/amarsmsb/isp.innovativeitbd.com/app/Http/Controllers/Client/OnlinePaymentController.php on line 59
+[14-Jul-2026 17:16:57 Asia/Dhaka] PHP Fatal error:  Allowed memory size of 2147483648 bytes exhausted (tried to allocate 1608519680 bytes) in /home/amarsmsb/isp.innovativeitbd.com/app/Http/Controllers/Client/OnlinePaymentController.php on line 59
+[18-Jul-2026 14:16:32 Asia/Dhaka] PHP Fatal error:  Cannot redeclare App\Http\Controllers\ClientSupportController::mikrotikStatus() in /home/amarsmsb/isp.innovativeitbd.com/app/Http/Controllers/ClientSupportController.php on line 202

@@ -1,36 +1,94 @@
 <?php
 
-// Add to $commands array in app/Console/Kernel.php:
+namespace App\Console;
 
-protected $commands = [
-    \App\Console\Commands\GenerateDateToDateInvoices::class,
-    \App\Console\Commands\GenerateMonthlyInvoices::class,
-    \App\Console\Commands\MarkOverdueInvoices::class,
-    \App\Console\Commands\SendBillDueReminders::class,
-    \App\Console\Commands\SendExpiryReminders::class,
-    \App\Console\Commands\SyncOltCommand::class,  // NEW
-];
+use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
-// Add to schedule() method in app/Console/Kernel.php:
-
-protected function schedule(Schedule $schedule): void
+class Kernel extends ConsoleKernel
 {
-    // Generate Date to Date invoices — every day at midnight
-    $schedule->command('billing:generate-date-to-date')->daily();
+    /**
+     * Explicitly registered Artisan commands. Laravel auto-discovers
+     * everything under app/Console/Commands anyway (see commands() below),
+     * so this array is only needed if a command lives outside that folder.
+     */
+    protected $commands = [
+        //
+    ];
 
-    // Mark overdue invoices — every day at 1 AM
-    $schedule->command('billing:mark-overdue')->dailyAt('01:00');
+    /**
+     * Define the application's command schedule.
+     *
+     * IMPORTANT — multi-tenant (Stancl Tenancy v3):
+     * Every billing/reminder/OLT command below only makes sense run INSIDE
+     * a tenant's own database connection (each ISP's own customers/invoices).
+     * Calling $schedule->command('billing:generate-date-to-date') directly
+     * runs it against the CENTRAL connection only — no tenant ever gets its
+     * invoices generated. Wrapping with `tenants:run "..."` (Stancl's own
+     * command) makes the scheduler iterate every tenant and run the inner
+     * command inside each one, exactly like running it manually per tenant.
+     */
+    protected function schedule(Schedule $schedule): void
+    {
+        // ── Admin's own customers ──
+        $schedule->command('tenants:run billing:generate-date-to-date')
+               //  ->daily()
+               ->everyMinute()
+                 ->withoutOverlapping()
+                 ->appendOutputTo(storage_path('logs/billing-date-to-date.log'));
 
-    // Send bill due reminders — every day at 9 AM
-    $schedule->command('billing:send-due-reminders')->dailyAt('09:00');
+        $schedule->command('tenants:run "invoices:generate-monthly"')
+                 //->dailyAt('00:05')
+                 ->everyMinute()
+                 ->withoutOverlapping()
+                 ->appendOutputTo(storage_path('logs/invoices-monthly.log'));
 
-    // Send expiry reminders — every day at 9 AM
-    $schedule->command('billing:send-expiry-reminders')->dailyAt('09:00');
+        $schedule->command('tenants:run billing:send-due-reminders')
+                 ->dailyAt('09:00')
+                 ->withoutOverlapping()
+                 ->appendOutputTo(storage_path('logs/billing-due-reminder.log'));
 
-    // OLT Auto Sync — every 5 minutes (NEW)
-    $schedule->command('olt:sync')
-             ->everyFiveMinutes()
-             ->withoutOverlapping()
-             ->runInBackground()
-             ->appendOutputTo(storage_path('logs/olt-sync.log'));
+        // ── Reseller customers (each reseller's own billing_type/settings/gateway) ──
+        $schedule->command('tenants:run reseller-billing:generate-date-to-date')
+                 ->daily()
+                 ->withoutOverlapping()
+                 ->appendOutputTo(storage_path('logs/reseller-billing-date-to-date.log'));
+
+        $schedule->command('tenants:run "reseller-billing:generate-monthly"')
+                 ->dailyAt('00:10')
+                 ->withoutOverlapping()
+                 ->appendOutputTo(storage_path('logs/reseller-invoices-monthly.log'));
+
+        $schedule->command('tenants:run reseller-billing:send-due-reminders')
+                 ->dailyAt('09:05')
+                 ->withoutOverlapping()
+                 ->appendOutputTo(storage_path('logs/reseller-billing-due-reminder.log'));
+
+        // ── Everything else — unchanged ──
+        $schedule->command('tenants:run billing:mark-overdue')
+                 ->dailyAt('01:00')
+                 ->withoutOverlapping()
+                 ->appendOutputTo(storage_path('logs/billing-mark-overdue.log'));
+
+        $schedule->command('tenants:run billing:send-expiry-reminders')
+                 ->dailyAt('09:00')
+                 ->withoutOverlapping()
+                 ->appendOutputTo(storage_path('logs/billing-expiry-reminder.log'));
+
+        $schedule->command('tenants:run olt:sync')
+                 ->everyFiveMinutes()
+                 ->withoutOverlapping()
+                 ->runInBackground()
+                 ->appendOutputTo(storage_path('logs/olt-sync.log'));
+    }
+
+    /**
+     * Register the commands for the application.
+     */
+    protected function commands(): void
+    {
+        $this->load(__DIR__ . '/Commands');
+
+        require base_path('routes/console.php');
+    }
 }

@@ -15,6 +15,7 @@ class SmsLog extends Model
         // of this. Adding them here makes those fields actually save.
         'gateway', 'mobile', 'phone', 'customer_id', 'message', 'type',
         'status', 'response', 'gateway_response', 'sent_at', 'count_sms',
+        'mac_reseller_id', // ── which reseller sent this (null = sent by ISP Admin) ──
     ];
 
     // SMS types
@@ -26,6 +27,9 @@ class SmsLog extends Model
         'restore'           => 'Restore Notice',
         'welcome'           => 'Welcome',
         'invoice_generated' => 'Invoice Generated',
+        'support_ticket_solved' => 'Support Ticket Solved',
+        'support_ticket_created' => 'Support Ticket Created',
+        'support_ticket_assigned' => 'Support Ticket Assigned',
     ];
 
     public function scopeSuccess($query)
@@ -44,5 +48,10 @@ class SmsLog extends Model
     public function scopeToday($query)
     {
         return $query->whereDate('created_at', today());
+    }
+
+    public function scopeForReseller($query, $macResellerId)
+    {
+        return $query->where('mac_reseller_id', $macResellerId);
     }
 }
